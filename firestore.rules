@@ -1,0 +1,286 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // =========================================================================
+    // REUSABLE HELPER FUNCTIONS
+    // =========================================================================
+
+    function isAuthenticated() {
+      return request.auth != null && request.auth.uid != null;
+    }
+
+    function isOwner(uid) {
+      return isAuthenticated() && request.auth.uid == uid;
+    }
+
+    function hasCustomClaim(claim) {
+      return isAuthenticated() && request.auth.token.get(claim, false) == true;
+    }
+
+    function isVerifier() {
+      return hasCustomClaim('isVerifier') || hasCustomClaim('isSuperAdmin');
+    }
+
+    function isSupportAdmin() {
+      return hasCustomClaim('isSupportAdmin') || hasCustomClaim('isSuperAdmin');
+    }
+
+    function isSuperAdmin() {
+      return hasCustomClaim('isSuperAdmin');
+    }
+
+    function isOrgMember(orgId) {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid));
+    }
+
+    function isOrgAdmin(orgId) {
+      return isAuthenticated() &&
+        get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.role in ['owner', 'admin'];
+    }
+
+    // Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // =========================================================================
+    // USERS & SESSIONS
+    // =========================================================================
+    match /users/{uid} {
+      allow read: if isOwner(uid) || isSupportAdmin() || isSuperAdmin();
+      allow create, update: if isOwner(uid) && request.resource.data.uid == uid;
+      allow delete: if isSuperAdmin();
+    }
+
+    match /deviceTokens/{tokenId} {
+      allow read, write: if isAuthenticated() && (resource == null || resource.data.uid == request.auth.uid) && request.resource.data.uid == request.auth.uid;
+    }
+
+    // =========================================================================
+    // DOCTORS & PROFILES
+    // =========================================================================
+    match /doctors/{doctorId} {
+      // Authenticated users can view doctor profile summary; doctor can update non-privileged fields
+      allow read: if isAuthenticated();
+      allow create: if isOwner(doctorId) && request.resource.data.userId == request.auth.uid && request.resource.data.isVerified == false;
+      allow update: if isOwner(doctorId) && 
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.isVerified == resource.data.isVerified; // Prevent self-verification
+      allow delete: if isSuperAdmin();
+
+      match /qualifications/{qualId} {
+        allow read: if isAuthenticated();
+        allow write: if isOwner(doctorId);
+      }
+
+      match /specialties/{specId} {
+        allow read: if isAuthenticated();
+        allow write: if isOwner(doctorId);
+      }
+    }
+
+    match /doctorSchedules/{scheduleId} {
+      allow read: if isAuthenticated() && (resource.data.doctorId == request.auth.uid || isSupportAdmin());
+      allow write: if false; // Mutated strictly via Cloud Functions transactions
+    }
+
+    // =========================================================================
+    // ORGANIZATIONS & FACILITIES
+    // =========================================================================
+    match /organizations/{orgId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isOrgAdmin(orgId) && request.resource.data.verificationState == resource.data.verificationState;
+      allow delete: if isSuperAdmin();
+
+      match /members/{memberUid} {
+        allow read: if isOrgMember(orgId) || isSupportAdmin();
+        allow write: if isOrgAdmin(orgId) || isSuperAdmin();
+      }
+
+      match /facilities/{facilityId} {
+        allow read: if isAuthenticated();
+        allow write: if isOrgAdmin(orgId);
+      }
+    }
+
+    // =========================================================================
+    // DUTIES & APPLICATIONS
+    // =========================================================================
+    match /duties/{dutyId} {
+      // Doctors can read published/filled duties; Org members can read their own
+      allow read: if (isAuthenticated() && (resource.data.status in ['published', 'filled', 'in_progress', 'completed'])) ||
+                     (resource != null && isOrgMember(resource.data.organizationId)) ||
+                     isSupportAdmin();
+      allow create, update, delete: if false; // Mutated strictly via Cloud Functions
+
+      match /applications/{doctorId} {
+        allow read: if isOwner(doctorId) || isOrgMember(get(/databases/$(database)/documents/duties/$(dutyId)).data.organizationId) || isSupportAdmin();
+        allow write: if false; // Mutated strictly via Cloud Functions
+      }
+    }
+
+    match /applicationSnapshots/{snapshotId} {
+      allow read: if isAuthenticated() && (
+        resource.data.doctorId == request.auth.uid ||
+        isOrgMember(get(/databases/$(database)/documents/duties/$(resource.data.dutyId)).data.organizationId) ||
+        isSupportAdmin()
+      );
+      allow write: if false; // Server created only
+    }
+
+    // =========================================================================
+    // ASSIGNMENTS, EVENTS & CONTACTS
+    // =========================================================================
+    match /assignments/{assignmentId} {
+      allow read: if isAuthenticated() && (
+        resource.data.doctorId == request.auth.uid ||
+        isOrgMember(resource.data.organizationId) ||
+        isSupportAdmin()
+      );
+      allow write: if false; // Mutated strictly via Cloud Functions
+    }
+
+    match /assignmentEvents/{eventId} {
+      allow read: if isAuthenticated() && (
+        resource.data.doctorId == request.auth.uid ||
+        isOrgMember(resource.data.organizationId) ||
+        isSupportAdmin()
+      );
+      allow write: if false; // Server created only
+    }
+
+    match /contactGrants/{grantId} {
+      allow read: if isAuthenticated() && (
+        resource.data.doctorId == request.auth.uid ||
+        isOrgMember(resource.data.organizationId) ||
+        isSupportAdmin()
+      );
+      allow write: if false; // Server created only
+    }
+
+    match /completionRecords/{recordId} {
+      allow read: if isAuthenticated() && (
+        resource.data.doctorId == request.auth.uid ||
+        isOrgMember(resource.data.organizationId) ||
+        isSupportAdmin()
+      );
+      allow write: if false; // Server created only
+    }
+
+    match /paymentAcknowledgements/{ackId} {
+      allow read: if isAuthenticated() && (
+        resource.data.doctorId == request.auth.uid ||
+        isOrgMember(resource.data.organizationId) ||
+        isSupportAdmin()
+      );
+      allow write: if false; // Server created only
+    }
+
+    match /feedback/{feedbackId} {
+      allow read: if isAuthenticated() && (
+        resource.data.authorId == request.auth.uid ||
+        resource.data.targetId == request.auth.uid ||
+        isSupportAdmin()
+      );
+      allow write: if false; // Server created only
+    }
+
+    // =========================================================================
+    // VERIFICATION CASES & CHECKS
+    // =========================================================================
+    match /verificationCases/{caseId} {
+      allow read: if isAuthenticated() && (
+        (resource.data.subjectType == 'doctor' && resource.data.subjectId == request.auth.uid) ||
+        (resource.data.subjectType == 'organization' && isOrgMember(resource.data.subjectId)) ||
+        isVerifier() || isSupportAdmin()
+      );
+      allow write: if false; // Mutated strictly via Cloud Functions
+    }
+
+    match /verificationChecks/{checkId} {
+      allow read: if isVerifier() || isSuperAdmin();
+      allow write: if false; // Server created only
+    }
+
+    match /verificationDocuments/{docId} {
+      allow read: if isAuthenticated() && (
+        resource.data.uploadedBy == request.auth.uid ||
+        isVerifier() || isSuperAdmin()
+      );
+      allow write: if false; // Server created only
+    }
+
+    // =========================================================================
+    // OPERATIONS, AUDIT & NOTIFICATIONS
+    // =========================================================================
+    match /notificationOutbox/{eventId} {
+      allow read, write: if false; // Server-only background trigger & worker
+    }
+
+    match /inboxNotifications/{notifId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead', 'readAt']);
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if false;
+    }
+
+    match /moderationReports/{reportId} {
+      allow read: if isAuthenticated() && (resource.data.reporterId == request.auth.uid || isSupportAdmin());
+      allow create: if isAuthenticated() && request.resource.data.reporterId == request.auth.uid;
+      allow update, delete: if isSupportAdmin() || isSuperAdmin();
+    }
+
+    match /auditLogs/{auditId} {
+      allow read: if isSupportAdmin() || isSuperAdmin();
+      allow write: if false; // Append-only by Cloud Functions
+    }
+
+    match /configuration/{configKey} {
+      allow read: if isAuthenticated();
+      allow write: if isSuperAdmin();
+    }
+
+    match /featureFlags/{flag} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
+    match /appVersions/{version} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
+    // =========================================================================
+    // PHASE 2 (Behind Feature Flags)
+    // =========================================================================
+    match /availabilityRules/{ruleId} {
+      allow read, write: if isAuthenticated() && (resource == null || resource.data.doctorId == request.auth.uid) && request.resource.data.doctorId == request.auth.uid;
+    }
+
+    match /availabilityExceptions/{exceptionId} {
+      allow read, write: if isAuthenticated() && (resource == null || resource.data.doctorId == request.auth.uid) && request.resource.data.doctorId == request.auth.uid;
+    }
+
+    match /reliabilitySnapshots/{snapshotId} {
+      allow read: if isAuthenticated();
+      allow write: if false;
+    }
+
+    match /replacementRequests/{requestId} {
+      allow read: if isAuthenticated();
+      allow write: if false;
+    }
+
+    match /disputes/{disputeId} {
+      allow read: if isAuthenticated() && (
+        resource.data.openedBy == request.auth.uid ||
+        isSupportAdmin() || isSuperAdmin()
+      );
+      allow write: if false;
+    }
+  }
+}

@@ -1,0 +1,45 @@
+/**
+ * Cloud Functions Entry Point
+ * Healthcare Workforce Platform
+ */
+
+import { initializeApp } from 'firebase-admin/app';
+
+// Initialize Firebase Admin SDK
+initializeApp();
+
+// Auth & Identity
+export { recordConsent, setCustomClaims } from './auth/authFunctions';
+
+// Doctors
+export { submitDoctorProfile } from './doctors/doctorFunctions';
+
+// Hospitals & Facilities
+export { createOrganizationDraft, addFacility } from './hospitals/hospitalFunctions';
+
+// Duties
+export { createDuty, publishDuty } from './duties/dutyFunctions';
+
+// Applications
+export { applyToDuty, shortlistApplication } from './applications/applicationFunctions';
+
+// Assignments, Selection & Contact Privacy
+export { atomicSelectDoctor, confirmAssignment, getAssignmentContact, completeAssignment, cancelAssignment } from './assignments/assignmentFunctions';
+
+// Verification Engine
+export {
+  createVerificationCase,
+  submitVerificationCase,
+  getEvidenceReadUrl,
+  recordVerificationDecision,
+  verifyDoctorRegistration,
+} from './verification/verificationFunctions';
+
+// Outbox Worker
+export { processNotificationOutbox } from './notifications/outboxWorker';
+
+// Admin & Moderation
+export { getAdminQueues, submitModerationAction, updatePlatformConfig } from './admin/adminFunctions';
+
+// Phase 2 Modules (Gated behind feature flags)
+export { createAvailabilityRule, requestDutyReplacement, openDispute } from './phase2/phase2Functions';

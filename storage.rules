@@ -1,0 +1,56 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isAuthenticated() {
+      return request.auth != null && request.auth.uid != null;
+    }
+
+    function isOwner(uid) {
+      return isAuthenticated() && request.auth.uid == uid;
+    }
+
+    function hasCustomClaim(claim) {
+      return isAuthenticated() && request.auth.token[claim] == true;
+    }
+
+    function isVerifier() {
+      return hasCustomClaim('isVerifier') || hasCustomClaim('isSuperAdmin');
+    }
+
+    function isValidEvidenceFile() {
+      return request.resource.size < 10 * 1024 * 1024 // 10MB
+        && request.resource.contentType.matches('image/(jpeg|png)|application/pdf');
+    }
+
+    // Default Deny
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+
+    // Doctor Verification Evidence
+    match /verification/doctor/{doctorUid}/{caseId}/{fileName} {
+      allow write: if isOwner(doctorUid) && isValidEvidenceFile();
+      // Direct reads blocked: authorized verifiers read through Cloud Function short-lived signed URLs
+      allow read: if isOwner(doctorUid) || isVerifier();
+    }
+
+    // Hospital / Organization Verification Evidence
+    match /verification/organization/{orgId}/{caseId}/{fileName} {
+      allow write: if isAuthenticated() && isValidEvidenceFile();
+      allow read: if isAuthenticated() || isVerifier();
+    }
+
+    // Dispute Evidence (Phase 2)
+    match /disputes/{disputeId}/{fileName} {
+      allow write: if isAuthenticated() && isValidEvidenceFile();
+      allow read: if isAuthenticated();
+    }
+
+    // Public Organization Assets (Logos)
+    match /public/branding/{orgId}/{fileName} {
+      allow read: if true;
+      allow write: if isAuthenticated() && request.resource.size < 2 * 1024 * 1024 && request.resource.contentType.matches('image/(jpeg|png|webp)');
+    }
+  }
+}
