@@ -9,6 +9,7 @@ import '../../../core/design_system/app_colors.dart';
 import '../../../core/design_system/app_typography.dart';
 import '../../../core/design_system/app_spacing.dart';
 import '../../../core/design_system/app_cards.dart';
+import '../../auth/data/auth_repository.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -25,7 +26,7 @@ class SettingsScreen extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Security & Preferences', style: AppTypography.headingSmall(AppColors.textDarkPrimary)),
+              Text('Security & Preferences', style: AppTypography.headingSmall(AppColors.textLightPrimary)),
               const SizedBox(height: AppSpacing.sm),
               AppCard(
                 child: Column(
@@ -48,7 +49,7 @@ class SettingsScreen extends ConsumerWidget {
                       icon: Icons.description_outlined,
                       title: 'Terms of Use & Integrity Charter',
                       subtitle: 'Version v1.0_2026',
-                      trailing: const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.textDarkMuted, size: 16),
+                      trailing: const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.textLightMuted, size: 16),
                     ),
                   ],
                 ),
@@ -62,7 +63,10 @@ class SettingsScreen extends ConsumerWidget {
                     side: const BorderSide(color: AppColors.rose),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
-                  onPressed: () => context.go('/login'),
+                  onPressed: () async {
+                    await AuthRepository().signOut();
+                    if (context.mounted) context.go('/login');
+                  },
                   child: const Text('Sign Out of Account', style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
               ),
@@ -90,8 +94,8 @@ class SettingsScreen extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: AppTypography.labelBold(AppColors.textDarkPrimary)),
-                Text(subtitle, style: AppTypography.bodySmall(AppColors.textDarkMuted)),
+                Text(title, style: AppTypography.labelBold(AppColors.textLightPrimary)),
+                Text(subtitle, style: AppTypography.bodySmall(AppColors.textLightMuted)),
               ],
             ),
           ),

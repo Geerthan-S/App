@@ -86,6 +86,10 @@ class AppTheme {
         type: BottomNavigationBarType.fixed,
         elevation: 8,
       ),
+      dividerTheme: const DividerThemeData(
+        color: AppColors.borderLight,
+        thickness: 1,
+      ),
     );
   }
 }

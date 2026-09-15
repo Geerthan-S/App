@@ -2,6 +2,9 @@
  * Application GoRouter Configuration with Auth & Role Routing
  */
 
+import 'dart:async';
+
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'main_scaffold.dart';
@@ -11,9 +14,12 @@ import '../../features/auth/presentation/consent_screen.dart';
 import '../../features/onboarding/presentation/role_selection_screen.dart';
 import '../../features/doctor_profile/presentation/doctor_onboarding_screen.dart';
 import '../../features/doctor_profile/presentation/doctor_profile_screen.dart';
+import '../../features/doctor_profile/presentation/hospital_info_screen.dart';
+import '../../features/doctor_profile/presentation/reviews_screen.dart';
 import '../../features/verification/presentation/verification_center_screen.dart';
 import '../../features/duty_marketplace/presentation/duty_marketplace_screen.dart';
 import '../../features/duty_details/presentation/duty_details_screen.dart';
+import '../../features/duty_post_details/presentation/duty_post_details_screen.dart';
 import '../../features/applications/presentation/applications_screen.dart';
 import '../../features/assignments/presentation/assignments_screen.dart';
 import '../../features/hospital/presentation/hospital_dashboard_screen.dart';
@@ -21,12 +27,50 @@ import '../../features/hospital/presentation/hospital_profile_screen.dart';
 import '../../features/hospital/presentation/create_duty_screen.dart';
 import '../../features/notifications/presentation/notifications_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
+import '../../features/home/presentation/home_screen.dart';
+import '../../features/search/presentation/search_screen.dart';
+import '../../features/add_post/presentation/add_post_screen.dart';
+import '../../features/messages/presentation/messages_screen.dart';
+import '../../features/messages/presentation/chat_screen.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
+
+/// Bridges a [Stream] into a [Listenable] so GoRouter re-evaluates its
+/// `redirect` callback whenever Firebase's auth state changes.
+class GoRouterRefreshStream extends ChangeNotifier {
+  GoRouterRefreshStream(Stream<dynamic> stream) {
+    notifyListeners();
+    _subscription = stream.listen((_) => notifyListeners());
+  }
+
+  late final StreamSubscription<dynamic> _subscription;
+
+  @override
+  void dispose() {
+    _subscription.cancel();
+    super.dispose();
+  }
+}
 
 final appRouter = GoRouter(
   navigatorKey: _rootNavigatorKey,
   initialLocation: '/login',
+  refreshListenable: GoRouterRefreshStream(FirebaseAuth.instance.authStateChanges()),
+  redirect: (context, state) {
+    final isLoggedIn = FirebaseAuth.instance.currentUser != null;
+    final isLoggingIn = state.matchedLocation == '/login';
+    // '/otp' is reached mid phone-verification, before Firebase has signed
+    // the user in, so it must stay reachable without an active session.
+    final isPublicRoute = isLoggingIn || state.matchedLocation == '/otp';
+
+    if (!isLoggedIn) {
+      return isPublicRoute ? null : '/login';
+    }
+    if (isLoggingIn) {
+      return '/home';
+    }
+    return null;
+  },
   routes: [
     GoRoute(
       path: '/login',
@@ -34,7 +78,13 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/otp',
-      builder: (context, state) => OtpScreen(phoneNumber: state.extra as String? ?? '+91 9876543210'),
+      builder: (context, state) {
+        final extra = state.extra as Map<String, String>;
+        return OtpScreen(
+          phoneNumber: extra['phoneNumber']!,
+          verificationId: extra['verificationId']!,
+        );
+      },
     ),
     GoRoute(
       path: '/consent',
@@ -65,6 +115,14 @@ final appRouter = GoRouter(
       builder: (context, state) => DutyDetailsScreen(duty: state.extra as Map<String, dynamic>),
     ),
     GoRoute(
+      path: '/post-details',
+      builder: (context, state) => DutyPostDetailsScreen(duty: state.extra as Map<String, dynamic>),
+    ),
+    GoRoute(
+      path: '/chat',
+      builder: (context, state) => ChatScreen(conversation: state.extra as Map<String, dynamic>),
+    ),
+    GoRoute(
       path: '/verification',
       builder: (context, state) => const VerificationCenterScreen(),
     ),
@@ -76,32 +134,70 @@ final appRouter = GoRouter(
       path: '/settings',
       builder: (context, state) => const SettingsScreen(),
     ),
+    GoRoute(
+      path: '/hospital-info',
+      builder: (context, state) => const HospitalInfoScreen(),
+    ),
+    GoRoute(
+      path: '/reviews',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>;
+        return ReviewsScreen(
+          title: extra['title'] as String,
+          reviews: extra['reviews'] as List<Map<String, dynamic>>,
+        );
+      },
+    ),
 
-    // Stateful Nested Shell for Doctor Bottom Navigation
+    // Duty marketplace screens remain fully intact and reachable by direct
+    // path; they are no longer part of the bottom navigation shell below.
+    GoRoute(
+      path: '/marketplace',
+      builder: (context, state) => const DutyMarketplaceScreen(),
+    ),
+    GoRoute(
+      path: '/applications',
+      builder: (context, state) => const ApplicationsScreen(),
+    ),
+    GoRoute(
+      path: '/assignments',
+      builder: (context, state) => const AssignmentsScreen(),
+    ),
+
+    // Stateful Nested Shell for Main Bottom Navigation
+    // Home / Search / Add Post / Messages / Profile
     StatefulShellRoute.indexedStack(
       builder: (context, state, navigationShell) => MainScaffold(navigationShell: navigationShell),
       branches: [
         StatefulShellBranch(
           routes: [
             GoRoute(
-              path: '/marketplace',
-              builder: (context, state) => const DutyMarketplaceScreen(),
+              path: '/home',
+              builder: (context, state) => const HomeScreen(),
             ),
           ],
         ),
         StatefulShellBranch(
           routes: [
             GoRoute(
-              path: '/applications',
-              builder: (context, state) => const ApplicationsScreen(),
+              path: '/search',
+              builder: (context, state) => const SearchScreen(),
             ),
           ],
         ),
         StatefulShellBranch(
           routes: [
             GoRoute(
-              path: '/assignments',
-              builder: (context, state) => const AssignmentsScreen(),
+              path: '/add-post',
+              builder: (context, state) => const AddPostScreen(),
+            ),
+          ],
+        ),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/messages',
+              builder: (context, state) => const MessagesScreen(),
             ),
           ],
         ),

@@ -26,7 +26,7 @@ class LoadingView extends StatelessWidget {
             const SizedBox(height: AppSpacing.md),
             Text(
               message!,
-              style: AppTypography.bodyMedium(AppColors.textDarkSecondary),
+              style: AppTypography.bodyMedium(AppColors.textLightSecondary),
             ),
           ],
         ],
@@ -57,13 +57,13 @@ class ErrorView extends StatelessWidget {
             const SizedBox(height: AppSpacing.md),
             Text(
               'Something Went Wrong',
-              style: AppTypography.headingSmall(AppColors.textDarkPrimary),
+              style: AppTypography.headingSmall(AppColors.textLightPrimary),
             ),
             const SizedBox(height: AppSpacing.xs),
             Text(
               message,
               textAlign: TextAlign.center,
-              style: AppTypography.bodyMedium(AppColors.textDarkSecondary),
+              style: AppTypography.bodyMedium(AppColors.textLightSecondary),
             ),
             if (onRetry != null) ...[
               const SizedBox(height: AppSpacing.lg),
@@ -104,17 +104,17 @@ class EmptyStateView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: AppColors.textDarkMuted, size: 56),
+            Icon(icon, color: AppColors.textLightMuted, size: 56),
             const SizedBox(height: AppSpacing.md),
             Text(
               title,
-              style: AppTypography.headingSmall(AppColors.textDarkPrimary),
+              style: AppTypography.headingSmall(AppColors.textLightPrimary),
             ),
             const SizedBox(height: AppSpacing.xs),
             Text(
               description,
               textAlign: TextAlign.center,
-              style: AppTypography.bodyMedium(AppColors.textDarkSecondary),
+              style: AppTypography.bodyMedium(AppColors.textLightSecondary),
             ),
             if (actionLabel != null && onAction != null) ...[
               const SizedBox(height: AppSpacing.lg),

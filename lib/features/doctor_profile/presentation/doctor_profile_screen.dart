@@ -7,12 +7,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/constants/mock_data.dart';
 import '../../../core/design_system/app_colors.dart';
 import '../../../core/design_system/app_typography.dart';
 import '../../../core/design_system/app_spacing.dart';
 import '../../../core/design_system/app_cards.dart';
 import '../../../core/design_system/app_buttons.dart';
 import '../../../core/design_system/app_inputs.dart';
+import '../../../core/widgets/status_badge.dart';
 import '../../../core/widgets/language_selector_dialog.dart';
 import '../../../core/localization/language_provider.dart';
 
@@ -24,13 +26,150 @@ class DoctorProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
-  String _fullName = 'Dr. Aravind Swaminathan';
+  String _fullName = MockData.currentDoctorName;
   String _qualifications = 'MBBS, MD (General Medicine)';
   String _primarySpecialty = 'General Medicine';
   int _experienceYears = 5;
   String _preferredHubs = 'Chennai, Coimbatore';
   String _bio = 'Consultant Physician with 5+ years experience in ICU management, inpatient care, and acute medical emergencies.';
   bool _isVerified = true;
+
+  static const List<String> _specialtyChips = ['Emergency Triage', 'Critical Care Coverage'];
+
+  double get _doctorRating {
+    const reviews = MockData.doctorReviews;
+    if (reviews.isEmpty) return 0;
+    final total = reviews.fold<num>(0, (sum, r) => sum + (r['rating'] as num));
+    return total / reviews.length;
+  }
+
+  double get _profileCompletion {
+    final checks = <bool>[
+      _fullName.trim().isNotEmpty,
+      _qualifications.trim().isNotEmpty,
+      _bio.trim().isNotEmpty,
+      _preferredHubs.trim().isNotEmpty,
+      _isVerified,
+    ];
+    return checks.where((c) => c).length / checks.length;
+  }
+
+  Widget _buildStatTile(String value, String label, {IconData? icon}) {
+    return AppCard(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(value, style: AppTypography.headingSmall(AppColors.textLightPrimary)),
+              if (icon != null) ...[
+                const SizedBox(width: 2),
+                Icon(icon, color: AppColors.amber, size: 16),
+              ],
+            ],
+          ),
+          const SizedBox(height: 2),
+          Text(label, style: AppTypography.bodySmall(AppColors.textLightMuted)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReviewLinkCard({
+    required String title,
+    required double rating,
+    required int count,
+    required VoidCallback onTap,
+  }) {
+    return AppCard(
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: AppTypography.labelBold(AppColors.textLightPrimary)),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              const Icon(Icons.star_rounded, color: AppColors.amber, size: 18),
+              const SizedBox(width: 4),
+              Text(rating.toStringAsFixed(1), style: AppTypography.headingSmall(AppColors.textLightPrimary)),
+              const SizedBox(width: 4),
+              Text('($count)', style: AppTypography.bodySmall(AppColors.textLightMuted)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMyDutyTile({
+    required Map<String, dynamic> duty,
+    required Map<String, dynamic> conversation,
+  }) {
+    return AppCard(
+      onTap: () => context.push('/chat', extra: conversation),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+            ),
+            child: const Icon(Icons.local_hospital_rounded, color: AppColors.primary, size: 20),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  duty['facilityName'] as String,
+                  style: AppTypography.labelBold(AppColors.textLightPrimary),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${duty['specialtyName']} • ${duty['startAt']}',
+                  style: AppTypography.bodySmall(AppColors.textLightMuted),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          StatusBadge(status: conversation['dutyStatus'] as String),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAccountTile({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    Color? color,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Row(
+          children: [
+            Icon(icon, color: color ?? AppColors.primary, size: 22),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Text(label, style: AppTypography.labelBold(color ?? AppColors.textLightPrimary)),
+            ),
+            Icon(Icons.arrow_forward_ios_rounded, color: AppColors.textLightMuted, size: 16),
+          ],
+        ),
+      ),
+    );
+  }
 
   void _showEditProfileSheet() {
     final nameCtrl = TextEditingController(text: _fullName);
@@ -43,7 +182,7 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppColors.surfaceDark,
+      backgroundColor: AppColors.surfaceLight,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(AppSpacing.radiusLg)),
       ),
@@ -65,9 +204,9 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Edit Doctor Profile', style: AppTypography.headingSmall(AppColors.textDarkPrimary)),
+                        Text('Edit Doctor Profile', style: AppTypography.headingSmall(AppColors.textLightPrimary)),
                         IconButton(
-                          icon: const Icon(Icons.close_rounded, color: AppColors.textDarkMuted),
+                          icon: const Icon(Icons.close_rounded, color: AppColors.textLightMuted),
                           onPressed: () => Navigator.pop(ctx),
                         ),
                       ],
@@ -102,18 +241,18 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
                     const SizedBox(height: AppSpacing.md),
                     AppTextField(label: 'QUALIFICATIONS', controller: qualCtrl),
                     const SizedBox(height: AppSpacing.md),
-                    Text('PRIMARY SPECIALTY', style: AppTypography.labelBold(AppColors.textDarkSecondary)),
+                    Text('PRIMARY SPECIALTY', style: AppTypography.labelBold(AppColors.textLightSecondary)),
                     const SizedBox(height: 6),
                     DropdownButtonFormField<String>(
                       value: selectedSpec,
-                      dropdownColor: AppColors.surfaceElevatedDark,
-                      style: AppTypography.bodyLarge(AppColors.textDarkPrimary),
+                      dropdownColor: AppColors.surfaceElevatedLight,
+                      style: AppTypography.bodyLarge(AppColors.textLightPrimary),
                       decoration: InputDecoration(
                         filled: true,
-                        fillColor: AppColors.surfaceElevatedDark,
+                        fillColor: AppColors.surfaceElevatedLight,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                          borderSide: const BorderSide(color: AppColors.borderDark),
+                          borderSide: const BorderSide(color: AppColors.borderLight),
                         ),
                       ),
                       items: AppConstants.specialties.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
@@ -238,7 +377,7 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
                                 children: [
                                   Text(
                                     _fullName,
-                                    style: AppTypography.headingSmall(AppColors.textDarkPrimary),
+                                    style: AppTypography.headingSmall(AppColors.textLightPrimary),
                                   ),
                                   const SizedBox(width: 6),
                                   Icon(
@@ -249,8 +388,8 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
                                 ],
                               ),
                               const SizedBox(height: 2),
-                              Text(_qualifications, style: AppTypography.bodyMedium(AppColors.textDarkSecondary)),
-                              Text('$_experienceYears Years Clinical Experience', style: AppTypography.bodySmall(AppColors.textDarkMuted)),
+                              Text(_qualifications, style: AppTypography.bodyMedium(AppColors.textLightSecondary)),
+                              Text('$_experienceYears Years Clinical Experience', style: AppTypography.bodySmall(AppColors.textLightMuted)),
                             ],
                           ),
                         ),
@@ -262,10 +401,52 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
                       label: const Text('Edit Profile & Bio'),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.primaryLight,
-                        side: const BorderSide(color: AppColors.borderDark),
+                        side: const BorderSide(color: AppColors.borderLight),
                         minimumSize: const Size.fromHeight(40),
                       ),
                       onPressed: _showEditProfileSheet,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+
+              // Quick Stats
+              Row(
+                children: [
+                  Expanded(child: _buildStatTile('$_experienceYears yrs', 'Experience')),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(child: _buildStatTile('${_specialtyChips.length + 1}', 'Specialties')),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(child: _buildStatTile(_doctorRating.toStringAsFixed(1), 'Rating', icon: Icons.star_rounded)),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.md),
+
+              // Profile Completion
+              AppCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Profile Strength', style: AppTypography.labelBold(AppColors.textLightPrimary)),
+                        Text(
+                          '${(_profileCompletion * 100).round()}%',
+                          style: AppTypography.labelBold(AppColors.emerald),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusPill),
+                      child: LinearProgressIndicator(
+                        value: _profileCompletion,
+                        minHeight: 6,
+                        backgroundColor: AppColors.surfaceElevatedLight,
+                        valueColor: const AlwaysStoppedAnimation<Color>(AppColors.emerald),
+                      ),
                     ),
                   ],
                 ),
@@ -287,7 +468,7 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Medical Council Verification', style: AppTypography.labelBold(AppColors.textDarkPrimary)),
+                          Text('Medical Council Verification', style: AppTypography.labelBold(AppColors.textLightPrimary)),
                           Text(
                             _isVerified
                                 ? 'Tamil Nadu Medical Council • Verified'
@@ -297,25 +478,25 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
                         ],
                       ),
                     ),
-                    const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.textDarkMuted, size: 16),
+                    const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.textLightMuted, size: 16),
                   ],
                 ),
               ),
               const SizedBox(height: AppSpacing.md),
 
               // Clinical Bio
-              Text('Professional Summary', style: AppTypography.headingSmall(AppColors.textDarkPrimary)),
+              Text('Professional Summary', style: AppTypography.headingSmall(AppColors.textLightPrimary)),
               const SizedBox(height: AppSpacing.xs),
               AppCard(
                 child: Text(
                   _bio,
-                  style: AppTypography.bodyMedium(AppColors.textDarkSecondary),
+                  style: AppTypography.bodyMedium(AppColors.textLightSecondary),
                 ),
               ),
               const SizedBox(height: AppSpacing.md),
 
               // Specialty Areas
-              Text('Clinical Specialties', style: AppTypography.headingSmall(AppColors.textDarkPrimary)),
+              Text('Clinical Specialties', style: AppTypography.headingSmall(AppColors.textLightPrimary)),
               const SizedBox(height: AppSpacing.xs),
               AppCard(
                 child: Wrap(
@@ -327,15 +508,12 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
                       backgroundColor: AppColors.primary.withOpacity(0.15),
                       labelStyle: const TextStyle(color: AppColors.primaryLight, fontWeight: FontWeight.bold),
                     ),
-                    Chip(
-                      label: const Text('Emergency Triage'),
-                      backgroundColor: AppColors.surfaceElevatedDark,
-                      labelStyle: const TextStyle(color: AppColors.textDarkSecondary),
-                    ),
-                    Chip(
-                      label: const Text('Critical Care Coverage'),
-                      backgroundColor: AppColors.surfaceElevatedDark,
-                      labelStyle: const TextStyle(color: AppColors.textDarkSecondary),
+                    ..._specialtyChips.map(
+                      (specialty) => Chip(
+                        label: Text(specialty),
+                        backgroundColor: AppColors.surfaceElevatedLight,
+                        labelStyle: const TextStyle(color: AppColors.textLightSecondary),
+                      ),
                     ),
                   ],
                 ),
@@ -343,14 +521,133 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
               const SizedBox(height: AppSpacing.md),
 
               // Preferred Hubs
-              Text('Preferred Work Hubs', style: AppTypography.headingSmall(AppColors.textDarkPrimary)),
+              Text('Preferred Work Hubs', style: AppTypography.headingSmall(AppColors.textLightPrimary)),
               const SizedBox(height: AppSpacing.xs),
               AppCard(
                 child: Row(
                   children: [
-                    const Icon(Icons.location_on_outlined, color: AppColors.textDarkMuted, size: 20),
+                    const Icon(Icons.location_on_outlined, color: AppColors.textLightMuted, size: 20),
                     const SizedBox(width: 8),
-                    Text(_preferredHubs, style: AppTypography.bodyMedium(AppColors.textDarkPrimary)),
+                    Text(_preferredHubs, style: AppTypography.bodyMedium(AppColors.textLightPrimary)),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+
+              // My Duties — duties the doctor is actively engaged with,
+              // derived from MockData.conversations (no separate model).
+              if (MockData.myDuties.isNotEmpty) ...[
+                Text('My Duties', style: AppTypography.headingSmall(AppColors.textLightPrimary)),
+                const SizedBox(height: AppSpacing.xs),
+                ...MockData.myDuties.map((entry) => Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                      child: _buildMyDutyTile(
+                        duty: entry['duty'] as Map<String, dynamic>,
+                        conversation: entry['conversation'] as Map<String, dynamic>,
+                      ),
+                    )),
+                const SizedBox(height: AppSpacing.xs),
+              ],
+
+              // Hospital / Clinic
+              Text('Hospital / Clinic', style: AppTypography.headingSmall(AppColors.textLightPrimary)),
+              const SizedBox(height: AppSpacing.xs),
+              AppCard(
+                onTap: () => context.push('/hospital-info'),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                      ),
+                      child: const Icon(Icons.local_hospital_rounded, color: AppColors.primary, size: 24),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  MockData.hospitalProfile['name'] as String,
+                                  style: AppTypography.labelBold(AppColors.textLightPrimary),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              if (MockData.hospitalProfile['isVerified'] == true) ...[
+                                const SizedBox(width: 4),
+                                const Icon(Icons.verified_rounded, color: AppColors.emerald, size: 16),
+                              ],
+                            ],
+                          ),
+                          Text(
+                            MockData.hospitalProfile['city'] as String,
+                            style: AppTypography.bodySmall(AppColors.textLightMuted),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.textLightMuted, size: 16),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+
+              // Reviews
+              Text('Reviews', style: AppTypography.headingSmall(AppColors.textLightPrimary)),
+              const SizedBox(height: AppSpacing.xs),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildReviewLinkCard(
+                      title: 'Doctor Reviews',
+                      rating: _doctorRating,
+                      count: MockData.doctorReviews.length,
+                      onTap: () => context.push('/reviews', extra: {
+                        'title': 'Doctor Reviews',
+                        'reviews': MockData.doctorReviews,
+                      }),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: _buildReviewLinkCard(
+                      title: 'Hospital Reviews',
+                      rating: MockData.hospitalProfile['rating'] as double,
+                      count: MockData.hospitalReviews.length,
+                      onTap: () => context.push('/reviews', extra: {
+                        'title': 'Hospital Reviews',
+                        'reviews': MockData.hospitalReviews,
+                      }),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.md),
+
+              // Account
+              Text('Account', style: AppTypography.headingSmall(AppColors.textLightPrimary)),
+              const SizedBox(height: AppSpacing.xs),
+              AppCard(
+                child: Column(
+                  children: [
+                    _buildAccountTile(
+                      icon: Icons.settings_outlined,
+                      label: 'Settings',
+                      onTap: () => context.push('/settings'),
+                    ),
+                    const Divider(),
+                    _buildAccountTile(
+                      icon: Icons.logout_rounded,
+                      label: 'Logout',
+                      color: AppColors.rose,
+                      onTap: () => context.go('/login'),
+                    ),
                   ],
                 ),
               ),

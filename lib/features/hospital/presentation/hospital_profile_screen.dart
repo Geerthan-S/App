@@ -97,9 +97,9 @@ class _HospitalProfileScreenState extends ConsumerState<HospitalProfileScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surfaceDark,
+        backgroundColor: AppColors.surfaceLight,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSpacing.radiusMd)),
-        title: Text('Register New Facility', style: AppTypography.headingSmall(AppColors.textDarkPrimary)),
+        title: Text('Register New Facility', style: AppTypography.headingSmall(AppColors.textLightPrimary)),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -123,7 +123,7 @@ class _HospitalProfileScreenState extends ConsumerState<HospitalProfileScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel', style: TextStyle(color: AppColors.textDarkMuted)),
+            child: const Text('Cancel', style: TextStyle(color: AppColors.textLightMuted)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.emerald),
@@ -188,8 +188,8 @@ class _HospitalProfileScreenState extends ConsumerState<HospitalProfileScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(_displayName, style: AppTypography.headingMedium(AppColors.textDarkPrimary)),
-                              Text(_legalName, style: AppTypography.bodySmall(AppColors.textDarkMuted)),
+                              Text(_displayName, style: AppTypography.headingMedium(AppColors.textLightPrimary)),
+                              Text(_legalName, style: AppTypography.bodySmall(AppColors.textLightMuted)),
                             ],
                           ),
                         ),
@@ -215,7 +215,7 @@ class _HospitalProfileScreenState extends ConsumerState<HospitalProfileScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Registered Facilities (${_facilities.length})', style: AppTypography.headingSmall(AppColors.textDarkPrimary)),
+                  Text('Registered Facilities (${_facilities.length})', style: AppTypography.headingSmall(AppColors.textLightPrimary)),
                   IconButton(
                     icon: const Icon(Icons.add_location_alt_rounded, color: AppColors.primaryLight),
                     tooltip: 'Add Facility',
@@ -238,20 +238,20 @@ class _HospitalProfileScreenState extends ConsumerState<HospitalProfileScreen> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(fac['name'] as String, style: AppTypography.labelBold(AppColors.textDarkPrimary)),
+                            Text(fac['name'] as String, style: AppTypography.labelBold(AppColors.textLightPrimary)),
                             const Icon(Icons.check_circle_rounded, color: AppColors.emerald, size: 16),
                           ],
                         ),
                         const SizedBox(height: 4),
-                        Text(fac['address'] as String, style: AppTypography.bodySmall(AppColors.textDarkSecondary)),
+                        Text(fac['address'] as String, style: AppTypography.bodySmall(AppColors.textLightSecondary)),
                         const SizedBox(height: 6),
                         Row(
                           children: [
                             const Icon(Icons.gps_fixed_rounded, size: 14, color: AppColors.primaryLight),
                             const SizedBox(width: 4),
-                            Text('${fac['lat']}, ${fac['lng']}', style: AppTypography.bodySmall(AppColors.textDarkMuted)),
+                            Text('${fac['lat']}, ${fac['lng']}', style: AppTypography.bodySmall(AppColors.textLightMuted)),
                             const Spacer(),
-                            Text(fac['deskPhone'] as String, style: AppTypography.bodySmall(AppColors.textDarkSecondary)),
+                            Text(fac['deskPhone'] as String, style: AppTypography.bodySmall(AppColors.textLightSecondary)),
                           ],
                         ),
                       ],
@@ -262,7 +262,7 @@ class _HospitalProfileScreenState extends ConsumerState<HospitalProfileScreen> {
               const SizedBox(height: AppSpacing.lg),
 
               // Establishment Licenses & Verification Proof
-              Text('Establishment Evidence (Private Vault)', style: AppTypography.headingSmall(AppColors.textDarkPrimary)),
+              Text('Establishment Evidence (Private Vault)', style: AppTypography.headingSmall(AppColors.textLightPrimary)),
               const SizedBox(height: AppSpacing.xs),
               AppCard(
                 child: Column(
@@ -273,7 +273,7 @@ class _HospitalProfileScreenState extends ConsumerState<HospitalProfileScreen> {
                         children: [
                           const Icon(Icons.file_present_rounded, color: AppColors.primaryLight, size: 22),
                           const SizedBox(width: 8),
-                          Expanded(child: Text(lic, style: AppTypography.bodyMedium(AppColors.textDarkPrimary))),
+                          Expanded(child: Text(lic, style: AppTypography.bodyMedium(AppColors.textLightPrimary))),
                           const Icon(Icons.lock_rounded, color: AppColors.emerald, size: 16),
                         ],
                       ),
@@ -283,7 +283,7 @@ class _HospitalProfileScreenState extends ConsumerState<HospitalProfileScreen> {
                       label: 'Upload Hospital Establishment License',
                       isLoading: _isUploading,
                       icon: Icons.upload_file_rounded,
-                      backgroundColor: AppColors.surfaceElevatedDark,
+                      backgroundColor: AppColors.surfaceElevatedLight,
                       onPressed: _uploadLicense,
                     ),
                   ],
@@ -304,10 +304,10 @@ class _HospitalProfileScreenState extends ConsumerState<HospitalProfileScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: AppTypography.bodySmall(AppColors.textDarkMuted)),
+          Text(label, style: AppTypography.bodySmall(AppColors.textLightMuted)),
           const SizedBox(width: 16),
           Expanded(
-            child: Text(value, textAlign: TextAlign.right, style: AppTypography.bodySmall(AppColors.textDarkPrimary)),
+            child: Text(value, textAlign: TextAlign.right, style: AppTypography.bodySmall(AppColors.textLightPrimary)),
           ),
         ],
       ),

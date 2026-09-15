@@ -85,7 +85,7 @@ class _ApplicationsScreenState extends ConsumerState<ApplicationsScreen> {
                     children: [
                       Text(
                         app['facilityName'] as String,
-                        style: AppTypography.headingSmall(AppColors.textDarkPrimary),
+                        style: AppTypography.headingSmall(AppColors.textLightPrimary),
                       ),
                       StatusBadge(status: app['status'] as String),
                     ],
@@ -93,12 +93,12 @@ class _ApplicationsScreenState extends ConsumerState<ApplicationsScreen> {
                   const SizedBox(height: 2),
                   Text(
                     '${app['specialtyName']} • Applied ${app['appliedAt']}',
-                    style: AppTypography.bodySmall(AppColors.textDarkMuted),
+                    style: AppTypography.bodySmall(AppColors.textLightMuted),
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   Text(
                     app['timing'] as String,
-                    style: AppTypography.bodyMedium(AppColors.textDarkSecondary),
+                    style: AppTypography.bodyMedium(AppColors.textLightSecondary),
                   ),
                   const SizedBox(height: 4),
                   Text(

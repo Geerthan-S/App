@@ -27,12 +27,12 @@ class RoleSelectionScreen extends ConsumerWidget {
             children: [
               Text(
                 'How will you use HealthForce?',
-                style: AppTypography.headingLarge(AppColors.textDarkPrimary),
+                style: AppTypography.headingLarge(AppColors.textLightPrimary),
               ),
               const SizedBox(height: AppSpacing.xs),
               Text(
                 'Select your primary operational role on the platform.',
-                style: AppTypography.bodyMedium(AppColors.textDarkSecondary),
+                style: AppTypography.bodyMedium(AppColors.textLightSecondary),
               ),
               const SizedBox(height: AppSpacing.xl),
               AppCard(
@@ -54,17 +54,17 @@ class RoleSelectionScreen extends ConsumerWidget {
                         children: [
                           Text(
                             'Licensed Doctor / Consultant',
-                            style: AppTypography.headingSmall(AppColors.textDarkPrimary),
+                            style: AppTypography.headingSmall(AppColors.textLightPrimary),
                           ),
                           const SizedBox(height: 2),
                           Text(
                             'Find verified hospital duties, shifts, and immediate on-demand coverage.',
-                            style: AppTypography.bodySmall(AppColors.textDarkSecondary),
+                            style: AppTypography.bodySmall(AppColors.textLightSecondary),
                           ),
                         ],
                       ),
                     ),
-                    const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.textDarkMuted, size: 16),
+                    const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.textLightMuted, size: 16),
                   ],
                 ),
               ),
@@ -88,17 +88,17 @@ class RoleSelectionScreen extends ConsumerWidget {
                         children: [
                           Text(
                             'Hospital / Clinic Coordinator',
-                            style: AppTypography.headingSmall(AppColors.textDarkPrimary),
+                            style: AppTypography.headingSmall(AppColors.textLightPrimary),
                           ),
                           const SizedBox(height: 2),
                           Text(
                             'Post genuine duty requirements, review verified doctors, and assign atomically.',
-                            style: AppTypography.bodySmall(AppColors.textDarkSecondary),
+                            style: AppTypography.bodySmall(AppColors.textLightSecondary),
                           ),
                         ],
                       ),
                     ),
-                    const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.textDarkMuted, size: 16),
+                    const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.textLightMuted, size: 16),
                   ],
                 ),
               ),

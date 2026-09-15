@@ -102,7 +102,7 @@ class _AssignmentsScreenState extends ConsumerState<AssignmentsScreen> {
                       children: [
                         Text(
                           'Apollo Specialty Hospital',
-                          style: AppTypography.headingMedium(AppColors.textDarkPrimary),
+                          style: AppTypography.headingMedium(AppColors.textLightPrimary),
                         ),
                         StatusBadge(status: _shiftStatus),
                       ],
@@ -110,7 +110,7 @@ class _AssignmentsScreenState extends ConsumerState<AssignmentsScreen> {
                     const SizedBox(height: 4),
                     Text(
                       'General Medicine • ICU & Emergency Triage',
-                      style: AppTypography.bodyMedium(AppColors.textDarkSecondary),
+                      style: AppTypography.bodyMedium(AppColors.textLightSecondary),
                     ),
                     const SizedBox(height: AppSpacing.sm),
                     Text(
@@ -170,7 +170,7 @@ class _AssignmentsScreenState extends ConsumerState<AssignmentsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Frozen Terms & Settlement', style: AppTypography.headingSmall(AppColors.textDarkPrimary)),
+                    Text('Frozen Terms & Settlement', style: AppTypography.headingSmall(AppColors.textLightPrimary)),
                     const SizedBox(height: AppSpacing.sm),
                     _buildRow('Agreed Compensation', '₹6,500 per shift'),
                     const Divider(),
@@ -203,7 +203,7 @@ class _AssignmentsScreenState extends ConsumerState<AssignmentsScreen> {
               // Structured Feedback Form (Visible upon completion)
               if (_shiftStatus == 'completed') ...[
                 const SizedBox(height: AppSpacing.md),
-                Text('Structured Shift Feedback', style: AppTypography.headingSmall(AppColors.textDarkPrimary)),
+                Text('Structured Shift Feedback', style: AppTypography.headingSmall(AppColors.textLightPrimary)),
                 const SizedBox(height: AppSpacing.xs),
                 AppCard(
                   child: Column(
@@ -225,7 +225,7 @@ class _AssignmentsScreenState extends ConsumerState<AssignmentsScreen> {
                       ] else ...[
                         Text(
                           'Provide objective feedback on clinical readiness and facility support.',
-                          style: AppTypography.bodySmall(AppColors.textDarkSecondary),
+                          style: AppTypography.bodySmall(AppColors.textLightSecondary),
                         ),
                         const SizedBox(height: AppSpacing.sm),
                         _buildRatingRow('Clinical Handover & Triage', _ratingPreparedness, (r) => setState(() => _ratingPreparedness = r)),
@@ -236,7 +236,7 @@ class _AssignmentsScreenState extends ConsumerState<AssignmentsScreen> {
                         const SizedBox(height: AppSpacing.md),
                         AppButton(
                           label: 'Submit Shift Feedback',
-                          backgroundColor: AppColors.surfaceElevatedDark,
+                          backgroundColor: AppColors.surfaceElevatedLight,
                           onPressed: _submitFeedback,
                         ),
                       ],
@@ -258,7 +258,7 @@ class _AssignmentsScreenState extends ConsumerState<AssignmentsScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Expanded(child: Text(title, style: AppTypography.bodySmall(AppColors.textDarkPrimary))),
+          Expanded(child: Text(title, style: AppTypography.bodySmall(AppColors.textLightPrimary))),
           Row(
             children: List.generate(5, (index) {
               final star = index + 1;
@@ -266,7 +266,7 @@ class _AssignmentsScreenState extends ConsumerState<AssignmentsScreen> {
                 onTap: () => onRatingChanged(star),
                 child: Icon(
                   star <= currentRating ? Icons.star_rounded : Icons.star_outline_rounded,
-                  color: star <= currentRating ? AppColors.amber : AppColors.textDarkMuted,
+                  color: star <= currentRating ? AppColors.amber : AppColors.textLightMuted,
                   size: 22,
                 ),
               );
@@ -283,8 +283,8 @@ class _AssignmentsScreenState extends ConsumerState<AssignmentsScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: AppTypography.bodyMedium(AppColors.textDarkMuted)),
-          Text(value, style: AppTypography.labelBold(AppColors.textDarkPrimary)),
+          Text(label, style: AppTypography.bodyMedium(AppColors.textLightMuted)),
+          Text(value, style: AppTypography.labelBold(AppColors.textLightPrimary)),
         ],
       ),
     );

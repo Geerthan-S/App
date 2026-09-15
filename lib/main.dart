@@ -37,7 +37,7 @@ class HealthcareWorkforceApp extends StatelessWidget {
     return MaterialApp.router(
       title: 'HealthForce',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.darkTheme,
+      theme: AppTheme.lightTheme,
       routerConfig: appRouter,
     );
   }

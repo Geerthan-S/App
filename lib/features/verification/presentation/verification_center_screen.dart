@@ -129,26 +129,26 @@ class _VerificationCenterScreenState extends ConsumerState<VerificationCenterScr
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surfaceDark,
+        backgroundColor: AppColors.surfaceLight,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSpacing.radiusMd)),
-        title: Text('Submit Verification Appeal', style: AppTypography.headingSmall(AppColors.textDarkPrimary)),
+        title: Text('Submit Verification Appeal', style: AppTypography.headingSmall(AppColors.textLightPrimary)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               'If your council registration details were recently renewed or updated, explain the situation below for human reviewer consideration.',
-              style: AppTypography.bodySmall(AppColors.textDarkSecondary),
+              style: AppTypography.bodySmall(AppColors.textLightSecondary),
             ),
             const SizedBox(height: AppSpacing.sm),
             TextField(
               controller: appealController,
               maxLines: 4,
-              style: AppTypography.bodyMedium(AppColors.textDarkPrimary),
+              style: AppTypography.bodyMedium(AppColors.textLightPrimary),
               decoration: const InputDecoration(
                 hintText: 'Enter reason for appeal or updated council circular reference...',
                 filled: true,
-                fillColor: AppColors.surfaceElevatedDark,
+                fillColor: AppColors.surfaceElevatedLight,
                 border: OutlineInputBorder(),
               ),
             ),
@@ -157,7 +157,7 @@ class _VerificationCenterScreenState extends ConsumerState<VerificationCenterScr
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel', style: TextStyle(color: AppColors.textDarkMuted)),
+            child: const Text('Cancel', style: TextStyle(color: AppColors.textLightMuted)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
@@ -208,7 +208,7 @@ class _VerificationCenterScreenState extends ConsumerState<VerificationCenterScr
                       children: [
                         Text(
                           loc.translate('verificationStatus'),
-                          style: AppTypography.headingSmall(AppColors.textDarkPrimary),
+                          style: AppTypography.headingSmall(AppColors.textLightPrimary),
                         ),
                         StatusBadge(status: _caseStatus),
                       ],
@@ -220,7 +220,7 @@ class _VerificationCenterScreenState extends ConsumerState<VerificationCenterScr
                           : (_caseStatus == 'needs_information'
                               ? 'Your registration was not found in the automated index. Please upload certificate proof for verifier inspection.'
                               : 'Your registration proof is currently undergoing verification against the official council register.'),
-                      style: AppTypography.bodyMedium(AppColors.textDarkSecondary),
+                      style: AppTypography.bodyMedium(AppColors.textLightSecondary),
                     ),
                   ],
                 ),
@@ -230,26 +230,26 @@ class _VerificationCenterScreenState extends ConsumerState<VerificationCenterScr
               // Interactive Verification Input Form
               Text(
                 'Registration Credentials & Authority',
-                style: AppTypography.headingSmall(AppColors.textDarkPrimary),
+                style: AppTypography.headingSmall(AppColors.textLightPrimary),
               ),
               const SizedBox(height: AppSpacing.xs),
               AppCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('MEDICAL COUNCIL', style: AppTypography.labelBold(AppColors.textDarkSecondary)),
+                    Text('MEDICAL COUNCIL', style: AppTypography.labelBold(AppColors.textLightSecondary)),
                     const SizedBox(height: 6),
                     DropdownButtonFormField<String>(
                       value: _selectedCouncil,
                       isExpanded: true,
-                      dropdownColor: AppColors.surfaceElevatedDark,
-                      style: AppTypography.bodyLarge(AppColors.textDarkPrimary),
+                      dropdownColor: AppColors.surfaceElevatedLight,
+                      style: AppTypography.bodyLarge(AppColors.textLightPrimary),
                       decoration: InputDecoration(
                         filled: true,
-                        fillColor: AppColors.surfaceElevatedDark,
+                        fillColor: AppColors.surfaceElevatedLight,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                          borderSide: const BorderSide(color: AppColors.borderDark),
+                          borderSide: const BorderSide(color: AppColors.borderLight),
                         ),
                       ),
                       items: AppConstants.medicalCouncils
@@ -289,7 +289,7 @@ class _VerificationCenterScreenState extends ConsumerState<VerificationCenterScr
               if (_lastResult != null) ...[
                 Text(
                   'Authoritative Comparison Engine',
-                  style: AppTypography.headingSmall(AppColors.textDarkPrimary),
+                  style: AppTypography.headingSmall(AppColors.textLightPrimary),
                 ),
                 const SizedBox(height: AppSpacing.xs),
                 AppCard(
@@ -331,12 +331,12 @@ class _VerificationCenterScreenState extends ConsumerState<VerificationCenterScr
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
-                              color: AppColors.surfaceDark,
+                              color: AppColors.surfaceLight,
                               borderRadius: BorderRadius.circular(AppSpacing.radiusPill),
                             ),
                             child: Text(
                               'Confidence ${_lastResult!.confidenceScore}%',
-                              style: AppTypography.bodySmall(AppColors.textDarkMuted),
+                              style: AppTypography.bodySmall(AppColors.textLightMuted),
                             ),
                           ),
                         ],
@@ -370,11 +370,11 @@ class _VerificationCenterScreenState extends ConsumerState<VerificationCenterScr
                               const SizedBox(width: 8),
                               Expanded(
                                 flex: 2,
-                                child: Text(cmp.field, style: AppTypography.bodySmall(AppColors.textDarkMuted)),
+                                child: Text(cmp.field, style: AppTypography.bodySmall(AppColors.textLightMuted)),
                               ),
                               Expanded(
                                 flex: 3,
-                                child: Text(cmp.submitted, style: AppTypography.bodySmall(AppColors.textDarkPrimary)),
+                                child: Text(cmp.submitted, style: AppTypography.bodySmall(AppColors.textLightPrimary)),
                               ),
                               Expanded(
                                 flex: 3,
@@ -393,7 +393,7 @@ class _VerificationCenterScreenState extends ConsumerState<VerificationCenterScr
               // Private Evidence Documents Vault
               Text(
                 'Private Evidence Vault (Zero Public Access)',
-                style: AppTypography.headingSmall(AppColors.textDarkPrimary),
+                style: AppTypography.headingSmall(AppColors.textLightPrimary),
               ),
               const SizedBox(height: AppSpacing.xs),
               ListView.separated(
@@ -412,8 +412,8 @@ class _VerificationCenterScreenState extends ConsumerState<VerificationCenterScr
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(doc['fileName'] as String, style: AppTypography.labelBold(AppColors.textDarkPrimary)),
-                              Text('${doc['size']} • Stored in private vault', style: AppTypography.bodySmall(AppColors.textDarkMuted)),
+                              Text(doc['fileName'] as String, style: AppTypography.labelBold(AppColors.textLightPrimary)),
+                              Text('${doc['size']} • Stored in private vault', style: AppTypography.bodySmall(AppColors.textLightMuted)),
                             ],
                           ),
                         ),
@@ -428,7 +428,7 @@ class _VerificationCenterScreenState extends ConsumerState<VerificationCenterScr
                 label: 'Upload Registration Certificate (PDF / Image)',
                 isLoading: _isUploading,
                 icon: Icons.upload_file_rounded,
-                backgroundColor: AppColors.surfaceElevatedDark,
+                backgroundColor: AppColors.surfaceElevatedLight,
                 onPressed: _uploadEvidenceDocument,
               ),
               const SizedBox(height: AppSpacing.md),

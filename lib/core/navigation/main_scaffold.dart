@@ -1,10 +1,12 @@
 /**
- * Main Doctor Bottom Navigation Shell
+ * Main Bottom Navigation Shell
+ * Home / Search / Add Post / Messages / Profile
  */
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../design_system/app_colors.dart';
+import 'app_bottom_nav_bar.dart';
 
 class MainScaffold extends StatelessWidget {
   final StatefulNavigationShell navigationShell;
@@ -17,8 +19,10 @@ class MainScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.bgLight,
+      extendBody: true,
       body: navigationShell,
-      bottomNavigationBar: BottomNavigationBar(
+      bottomNavigationBar: AppBottomNavBar(
         currentIndex: navigationShell.currentIndex,
         onTap: (index) {
           navigationShell.goBranch(
@@ -26,28 +30,6 @@ class MainScaffold extends StatelessWidget {
             initialLocation: index == navigationShell.currentIndex,
           );
         },
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.local_hospital_outlined),
-            activeIcon: Icon(Icons.local_hospital_rounded),
-            label: 'Duties',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.assignment_outlined),
-            activeIcon: Icon(Icons.assignment_rounded),
-            label: 'Applications',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.event_available_outlined),
-            activeIcon: Icon(Icons.event_available_rounded),
-            label: 'Shifts',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline_rounded),
-            activeIcon: Icon(Icons.person_rounded),
-            label: 'Profile',
-          ),
-        ],
       ),
     );
   }

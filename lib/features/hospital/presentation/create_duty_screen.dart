@@ -56,7 +56,7 @@ class _CreateDutyScreenState extends ConsumerState<CreateDutyScreen> {
         setState(() => _isSavingDraft = false);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            backgroundColor: AppColors.surfaceElevatedDark,
+            backgroundColor: AppColors.surfaceElevatedLight,
             content: Text('Duty requirement saved as Draft in hospital workspace.'),
           ),
         );
@@ -94,7 +94,7 @@ class _CreateDutyScreenState extends ConsumerState<CreateDutyScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppColors.surfaceDark,
+      backgroundColor: AppColors.surfaceLight,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(AppSpacing.radiusLg)),
       ),
@@ -108,7 +108,7 @@ class _CreateDutyScreenState extends ConsumerState<CreateDutyScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Duty Preview (Doctor View)', style: AppTypography.headingSmall(AppColors.textDarkPrimary)),
+                  Text('Duty Preview (Doctor View)', style: AppTypography.headingSmall(AppColors.textLightPrimary)),
                   const StatusBadge(status: 'published'),
                 ],
               ),
@@ -117,9 +117,9 @@ class _CreateDutyScreenState extends ConsumerState<CreateDutyScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(_selectedFacility, style: AppTypography.headingSmall(AppColors.textDarkPrimary)),
+                    Text(_selectedFacility, style: AppTypography.headingSmall(AppColors.textLightPrimary)),
                     const SizedBox(height: 2),
-                    Text('${_selectedSpecialty} • ${_departmentController.text}', style: AppTypography.bodyMedium(AppColors.textDarkSecondary)),
+                    Text('${_selectedSpecialty} • ${_departmentController.text}', style: AppTypography.bodyMedium(AppColors.textLightSecondary)),
                     const SizedBox(height: AppSpacing.sm),
                     Text(
                       'Timing: ${_startTime.format(context)} - ${_endTime.format(context)} (8 hrs)',
@@ -134,10 +134,10 @@ class _CreateDutyScreenState extends ConsumerState<CreateDutyScreen> {
                       ],
                     ),
                     const Divider(),
-                    Text('Qualification: ${_qualificationController.text}', style: AppTypography.bodySmall(AppColors.textDarkMuted)),
+                    Text('Qualification: ${_qualificationController.text}', style: AppTypography.bodySmall(AppColors.textLightMuted)),
                     if (_notesController.text.isNotEmpty) ...[
                       const SizedBox(height: 4),
-                      Text('Notes: ${_notesController.text}', style: AppTypography.bodySmall(AppColors.textDarkMuted)),
+                      Text('Notes: ${_notesController.text}', style: AppTypography.bodySmall(AppColors.textLightMuted)),
                     ],
                   ],
                 ),
@@ -201,29 +201,29 @@ class _CreateDutyScreenState extends ConsumerState<CreateDutyScreen> {
               children: [
                 Text(
                   'Post Clinical Duty Requirement',
-                  style: AppTypography.headingLarge(AppColors.textDarkPrimary),
+                  style: AppTypography.headingLarge(AppColors.textLightPrimary),
                 ),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
                   'Published requirements are matched atomically with verified doctors.',
-                  style: AppTypography.bodyMedium(AppColors.textDarkSecondary),
+                  style: AppTypography.bodyMedium(AppColors.textLightSecondary),
                 ),
                 const SizedBox(height: AppSpacing.lg),
 
                 // 1. Facility Selector
-                Text('HOSPITAL FACILITY / BRANCH', style: AppTypography.labelBold(AppColors.textDarkSecondary)),
+                Text('HOSPITAL FACILITY / BRANCH', style: AppTypography.labelBold(AppColors.textLightSecondary)),
                 const SizedBox(height: 6),
                 DropdownButtonFormField<String>(
                   value: _selectedFacility,
                   isExpanded: true,
-                  dropdownColor: AppColors.surfaceElevatedDark,
-                  style: AppTypography.bodyLarge(AppColors.textDarkPrimary),
+                  dropdownColor: AppColors.surfaceElevatedLight,
+                  style: AppTypography.bodyLarge(AppColors.textLightPrimary),
                   decoration: InputDecoration(
                     filled: true,
-                    fillColor: AppColors.surfaceElevatedDark,
+                    fillColor: AppColors.surfaceElevatedLight,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                      borderSide: const BorderSide(color: AppColors.borderDark),
+                      borderSide: const BorderSide(color: AppColors.borderLight),
                     ),
                   ),
                   items: _facilities.map((f) => DropdownMenuItem(value: f, child: Text(f, overflow: TextOverflow.ellipsis))).toList(),
@@ -232,19 +232,19 @@ class _CreateDutyScreenState extends ConsumerState<CreateDutyScreen> {
                 const SizedBox(height: AppSpacing.md),
 
                 // 2. Specialty & Department
-                Text('SPECIALTY REQUIRED', style: AppTypography.labelBold(AppColors.textDarkSecondary)),
+                Text('SPECIALTY REQUIRED', style: AppTypography.labelBold(AppColors.textLightSecondary)),
                 const SizedBox(height: 6),
                 DropdownButtonFormField<String>(
                   value: _selectedSpecialty,
                   isExpanded: true,
-                  dropdownColor: AppColors.surfaceElevatedDark,
-                  style: AppTypography.bodyLarge(AppColors.textDarkPrimary),
+                  dropdownColor: AppColors.surfaceElevatedLight,
+                  style: AppTypography.bodyLarge(AppColors.textLightPrimary),
                   decoration: InputDecoration(
                     filled: true,
-                    fillColor: AppColors.surfaceElevatedDark,
+                    fillColor: AppColors.surfaceElevatedLight,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                      borderSide: const BorderSide(color: AppColors.borderDark),
+                      borderSide: const BorderSide(color: AppColors.borderLight),
                     ),
                   ),
                   items: AppConstants.specialties.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
@@ -271,7 +271,7 @@ class _CreateDutyScreenState extends ConsumerState<CreateDutyScreen> {
                 const SizedBox(height: AppSpacing.md),
 
                 // 4. Shift Date & Times
-                Text('SHIFT SCHEDULE', style: AppTypography.labelBold(AppColors.textDarkSecondary)),
+                Text('SHIFT SCHEDULE', style: AppTypography.labelBold(AppColors.textLightSecondary)),
                 const SizedBox(height: 6),
                 AppCard(
                   child: Row(
@@ -280,14 +280,14 @@ class _CreateDutyScreenState extends ConsumerState<CreateDutyScreen> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Shift Date', style: AppTypography.bodySmall(AppColors.textDarkMuted)),
-                          Text('${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}', style: AppTypography.labelBold(AppColors.textDarkPrimary)),
+                          Text('Shift Date', style: AppTypography.bodySmall(AppColors.textLightMuted)),
+                          Text('${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}', style: AppTypography.labelBold(AppColors.textLightPrimary)),
                         ],
                       ),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Hours', style: AppTypography.bodySmall(AppColors.textDarkMuted)),
+                          Text('Hours', style: AppTypography.bodySmall(AppColors.textLightMuted)),
                           Text('${_startTime.format(context)} - ${_endTime.format(context)}', style: AppTypography.labelBold(AppColors.primaryLight)),
                         ],
                       ),
@@ -316,7 +316,7 @@ class _CreateDutyScreenState extends ConsumerState<CreateDutyScreen> {
                   keyboardType: TextInputType.number,
                   prefixIcon: const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                    child: Text('₹', style: TextStyle(color: AppColors.textDarkPrimary, fontWeight: FontWeight.bold)),
+                    child: Text('₹', style: TextStyle(color: AppColors.textLightPrimary, fontWeight: FontWeight.bold)),
                   ),
                 ),
                 const SizedBox(height: AppSpacing.md),
@@ -337,8 +337,8 @@ class _CreateDutyScreenState extends ConsumerState<CreateDutyScreen> {
                         icon: const Icon(Icons.drafts_outlined, size: 18),
                         label: Text(loc.translate('saveDraft')),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.textDarkSecondary,
-                          side: const BorderSide(color: AppColors.borderDark),
+                          foregroundColor: AppColors.textLightSecondary,
+                          side: const BorderSide(color: AppColors.borderLight),
                           padding: const EdgeInsets.symmetric(vertical: 14),
                         ),
                         onPressed: _isSavingDraft ? null : _saveDraft,

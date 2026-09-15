@@ -34,7 +34,7 @@ class _DoctorOnboardingScreenState extends ConsumerState<DoctorOnboardingScreen>
     Future.delayed(const Duration(milliseconds: 700), () {
       if (mounted) {
         setState(() => _isLoading = false);
-        context.go('/marketplace');
+        context.go('/home');
       }
     });
   }
@@ -53,12 +53,12 @@ class _DoctorOnboardingScreenState extends ConsumerState<DoctorOnboardingScreen>
             children: [
               Text(
                 'Professional Identity',
-                style: AppTypography.headingLarge(AppColors.textDarkPrimary),
+                style: AppTypography.headingLarge(AppColors.textLightPrimary),
               ),
               const SizedBox(height: AppSpacing.xs),
               Text(
                 'Enter your official details as registered with the medical council.',
-                style: AppTypography.bodyMedium(AppColors.textDarkSecondary),
+                style: AppTypography.bodyMedium(AppColors.textLightSecondary),
               ),
               const SizedBox(height: AppSpacing.lg),
               AppTextField(
@@ -68,19 +68,19 @@ class _DoctorOnboardingScreenState extends ConsumerState<DoctorOnboardingScreen>
               const SizedBox(height: AppSpacing.md),
               Text(
                 'MEDICAL COUNCIL',
-                style: AppTypography.labelBold(AppColors.textDarkSecondary),
+                style: AppTypography.labelBold(AppColors.textLightSecondary),
               ),
               const SizedBox(height: AppSpacing.xs),
               DropdownButtonFormField<String>(
                 value: _selectedCouncil,
-                dropdownColor: AppColors.surfaceElevatedDark,
-                style: AppTypography.bodyLarge(AppColors.textDarkPrimary),
+                dropdownColor: AppColors.surfaceElevatedLight,
+                style: AppTypography.bodyLarge(AppColors.textLightPrimary),
                 decoration: InputDecoration(
                   filled: true,
-                  fillColor: AppColors.surfaceElevatedDark,
+                  fillColor: AppColors.surfaceElevatedLight,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                    borderSide: const BorderSide(color: AppColors.borderDark),
+                    borderSide: const BorderSide(color: AppColors.borderLight),
                   ),
                 ),
                 items: AppConstants.medicalCouncils
@@ -101,19 +101,19 @@ class _DoctorOnboardingScreenState extends ConsumerState<DoctorOnboardingScreen>
               const SizedBox(height: AppSpacing.md),
               Text(
                 'PRIMARY CLINICAL SPECIALTY',
-                style: AppTypography.labelBold(AppColors.textDarkSecondary),
+                style: AppTypography.labelBold(AppColors.textLightSecondary),
               ),
               const SizedBox(height: AppSpacing.xs),
               DropdownButtonFormField<String>(
                 value: _selectedSpecialty,
-                dropdownColor: AppColors.surfaceElevatedDark,
-                style: AppTypography.bodyLarge(AppColors.textDarkPrimary),
+                dropdownColor: AppColors.surfaceElevatedLight,
+                style: AppTypography.bodyLarge(AppColors.textLightPrimary),
                 decoration: InputDecoration(
                   filled: true,
-                  fillColor: AppColors.surfaceElevatedDark,
+                  fillColor: AppColors.surfaceElevatedLight,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                    borderSide: const BorderSide(color: AppColors.borderDark),
+                    borderSide: const BorderSide(color: AppColors.borderLight),
                   ),
                 ),
                 items: AppConstants.specialties
@@ -130,19 +130,19 @@ class _DoctorOnboardingScreenState extends ConsumerState<DoctorOnboardingScreen>
               const SizedBox(height: AppSpacing.md),
               Text(
                 'PREFERRED WORK CITY',
-                style: AppTypography.labelBold(AppColors.textDarkSecondary),
+                style: AppTypography.labelBold(AppColors.textLightSecondary),
               ),
               const SizedBox(height: AppSpacing.xs),
               DropdownButtonFormField<String>(
                 value: _selectedCity,
-                dropdownColor: AppColors.surfaceElevatedDark,
-                style: AppTypography.bodyLarge(AppColors.textDarkPrimary),
+                dropdownColor: AppColors.surfaceElevatedLight,
+                style: AppTypography.bodyLarge(AppColors.textLightPrimary),
                 decoration: InputDecoration(
                   filled: true,
-                  fillColor: AppColors.surfaceElevatedDark,
+                  fillColor: AppColors.surfaceElevatedLight,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                    borderSide: const BorderSide(color: AppColors.borderDark),
+                    borderSide: const BorderSide(color: AppColors.borderLight),
                   ),
                 ),
                 items: AppConstants.majorCities
