@@ -33,11 +33,12 @@ class _DutyDetailsScreenState extends ConsumerState<DutyDetailsScreen> {
     final noteCtrl = TextEditingController();
     bool confirmAvailability = false;
     bool acknowledgeTerms = false;
+    final colors = context.appColors;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppColors.surfaceLight,
+      backgroundColor: colors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(AppSpacing.radiusLg)),
       ),
@@ -59,9 +60,9 @@ class _DutyDetailsScreenState extends ConsumerState<DutyDetailsScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Submit Duty Application', style: AppTypography.headingSmall(AppColors.textLightPrimary)),
+                        Text('Submit Duty Application', style: AppTypography.headingSmall(colors.textPrimary)),
                         IconButton(
-                          icon: const Icon(Icons.close_rounded, color: AppColors.textLightMuted),
+                          icon: Icon(Icons.close_rounded, color: colors.textMuted),
                           onPressed: () => Navigator.pop(ctx),
                         ),
                       ],
@@ -69,7 +70,7 @@ class _DutyDetailsScreenState extends ConsumerState<DutyDetailsScreen> {
                     const SizedBox(height: AppSpacing.sm),
 
                     // Immutable Profile Snapshot Preview
-                    Text('IMMUTABLE CREDENTIAL SNAPSHOT', style: AppTypography.labelBold(AppColors.textLightSecondary)),
+                    Text('IMMUTABLE CREDENTIAL SNAPSHOT', style: AppTypography.labelBold(colors.textSecondary)),
                     const SizedBox(height: 6),
                     AppCard(
                       child: Column(
@@ -77,14 +78,14 @@ class _DutyDetailsScreenState extends ConsumerState<DutyDetailsScreen> {
                         children: [
                           Row(
                             children: [
-                              Text('Dr. Aravind Swaminathan', style: AppTypography.labelBold(AppColors.textLightPrimary)),
+                              Text('Dr. Aravind Swaminathan', style: AppTypography.labelBold(colors.textPrimary)),
                               const SizedBox(width: 4),
                               const Icon(Icons.verified_rounded, color: AppColors.emerald, size: 14),
                             ],
                           ),
                           const SizedBox(height: 2),
-                          Text('TNMC_98234 • Tamil Nadu Medical Council', style: AppTypography.bodySmall(AppColors.textLightMuted)),
-                          Text('MBBS, MD (General Medicine) • 5 yrs clinical experience', style: AppTypography.bodySmall(AppColors.textLightSecondary)),
+                          Text('TNMC_98234 • Tamil Nadu Medical Council', style: AppTypography.bodySmall(colors.textMuted)),
+                          Text('MBBS, MD (General Medicine) • 5 yrs clinical experience', style: AppTypography.bodySmall(colors.textSecondary)),
                         ],
                       ),
                     ),
@@ -106,7 +107,7 @@ class _DutyDetailsScreenState extends ConsumerState<DutyDetailsScreen> {
                       activeColor: AppColors.primary,
                       title: Text(
                         'I confirm my full clinical availability during this shift window.',
-                        style: AppTypography.bodySmall(AppColors.textLightPrimary),
+                        style: AppTypography.bodySmall(colors.textPrimary),
                       ),
                       onChanged: (val) => setModalState(() => confirmAvailability = val ?? false),
                     ),
@@ -118,7 +119,7 @@ class _DutyDetailsScreenState extends ConsumerState<DutyDetailsScreen> {
                       activeColor: AppColors.primary,
                       title: Text(
                         'I accept the agreed compensation of ₹${widget.duty['amount']} and hospital operational guidelines.',
-                        style: AppTypography.bodySmall(AppColors.textLightPrimary),
+                        style: AppTypography.bodySmall(colors.textPrimary),
                       ),
                       onChanged: (val) => setModalState(() => acknowledgeTerms = val ?? false),
                     ),
@@ -139,7 +140,7 @@ class _DutyDetailsScreenState extends ConsumerState<DutyDetailsScreen> {
                     Center(
                       child: Text(
                         'Duplicate applications are prevented server-side.',
-                        style: AppTypography.bodySmall(AppColors.textLightMuted),
+                        style: AppTypography.bodySmall(colors.textMuted),
                       ),
                     ),
                   ],
@@ -171,20 +172,21 @@ class _DutyDetailsScreenState extends ConsumerState<DutyDetailsScreen> {
   }
 
   void _reportDuty() {
+    final colors = context.appColors;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surfaceLight,
+        backgroundColor: colors.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSpacing.radiusMd)),
-        title: Text('Report Duty Requirement', style: AppTypography.headingSmall(AppColors.textLightPrimary)),
+        title: Text('Report Duty Requirement', style: AppTypography.headingSmall(colors.textPrimary)),
         content: Text(
           'Report this duty if it contains misleading compensation, abusive terms, or safety violations. It will be routed to Platform Moderation.',
-          style: AppTypography.bodySmall(AppColors.textLightSecondary),
+          style: AppTypography.bodySmall(colors.textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel', style: TextStyle(color: AppColors.textLightMuted)),
+            child: Text('Cancel', style: TextStyle(color: colors.textMuted)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.rose),
@@ -206,6 +208,7 @@ class _DutyDetailsScreenState extends ConsumerState<DutyDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final duty = widget.duty;
     final loc = ref.watch(localizationProvider);
 
@@ -241,7 +244,7 @@ class _DutyDetailsScreenState extends ConsumerState<DutyDetailsScreen> {
                         Expanded(
                           child: Text(
                             duty['facilityName'] as String,
-                            style: AppTypography.headingMedium(AppColors.textLightPrimary),
+                            style: AppTypography.headingMedium(colors.textPrimary),
                           ),
                         ),
                         if (duty['isVerifiedOrg'] == true)
@@ -255,7 +258,7 @@ class _DutyDetailsScreenState extends ConsumerState<DutyDetailsScreen> {
                     const SizedBox(height: 4),
                     Text(
                       '${duty['city']} • ${duty['distanceKm']} km away',
-                      style: AppTypography.bodyMedium(AppColors.textLightMuted),
+                      style: AppTypography.bodyMedium(colors.textMuted),
                     ),
                     const SizedBox(height: AppSpacing.sm),
                     OutlinedButton.icon(
@@ -263,7 +266,7 @@ class _DutyDetailsScreenState extends ConsumerState<DutyDetailsScreen> {
                       label: Text(loc.translate('openInMaps')),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.primaryLight,
-                        side: const BorderSide(color: AppColors.borderLight),
+                        side: BorderSide(color: colors.border),
                       ),
                       onPressed: () {
                         LocationService.launchNavigationIntent(13.0827, 80.2707, label: duty['facilityName'] as String);
@@ -281,7 +284,7 @@ class _DutyDetailsScreenState extends ConsumerState<DutyDetailsScreen> {
                   children: [
                     Text(
                       'Shift Schedule & Terms',
-                      style: AppTypography.headingSmall(AppColors.textLightPrimary),
+                      style: AppTypography.headingSmall(colors.textPrimary),
                     ),
                     const SizedBox(height: AppSpacing.sm),
                     _buildRow('Department', duty['department'] as String),
@@ -305,7 +308,7 @@ class _DutyDetailsScreenState extends ConsumerState<DutyDetailsScreen> {
                   children: [
                     Text(
                       'Clinical Requirements',
-                      style: AppTypography.headingSmall(AppColors.textLightPrimary),
+                      style: AppTypography.headingSmall(colors.textPrimary),
                     ),
                     const SizedBox(height: AppSpacing.sm),
                     _buildRow('Required Degree', duty['qualificationRequired'] as String),
@@ -329,7 +332,7 @@ class _DutyDetailsScreenState extends ConsumerState<DutyDetailsScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text('Application Submitted', style: AppTypography.labelBold(AppColors.emerald)),
-                            Text('Awaiting hospital review and selection decision.', style: AppTypography.bodySmall(AppColors.textLightMuted)),
+                            Text('Awaiting hospital review and selection decision.', style: AppTypography.bodySmall(colors.textMuted)),
                           ],
                         ),
                       ),
@@ -347,7 +350,7 @@ class _DutyDetailsScreenState extends ConsumerState<DutyDetailsScreen> {
               Center(
                 child: Text(
                   'Applying creates an immutable snapshot of your council credentials.',
-                  style: AppTypography.bodySmall(AppColors.textLightMuted),
+                  style: AppTypography.bodySmall(colors.textMuted),
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -359,13 +362,14 @@ class _DutyDetailsScreenState extends ConsumerState<DutyDetailsScreen> {
   }
 
   Widget _buildRow(String label, String value) {
+    final colors = context.appColors;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: AppTypography.bodyMedium(AppColors.textLightMuted)),
-          Text(value, style: AppTypography.labelBold(AppColors.textLightPrimary)),
+          Text(label, style: AppTypography.bodyMedium(colors.textMuted)),
+          Text(value, style: AppTypography.labelBold(colors.textPrimary)),
         ],
       ),
     );

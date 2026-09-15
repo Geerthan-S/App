@@ -27,12 +27,13 @@ class _MessagesScreenState extends State<MessagesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final conversations = MockData.conversations;
 
     return Scaffold(
-      backgroundColor: AppColors.bgLight,
+      backgroundColor: colors.bg,
       appBar: AppBar(
-        title: Text('Messages', style: AppTypography.headingMedium(AppColors.textLightPrimary)),
+        title: Text('Messages', style: AppTypography.headingMedium(colors.textPrimary)),
       ),
       body: SafeArea(
         child: conversations.isEmpty
@@ -51,6 +52,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
   }
 
   Widget _buildConversationTile(Map<String, dynamic> conversation) {
+    final colors = context.appColors;
     final unreadCount = conversation['unreadCount'] as int;
     final isUnread = unreadCount > 0;
 
@@ -76,7 +78,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
                       Expanded(
                         child: Text(
                           conversation['hospitalName'] as String,
-                          style: AppTypography.labelBold(AppColors.textLightPrimary),
+                          style: AppTypography.labelBold(colors.textPrimary),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -84,7 +86,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
                       Text(
                         conversation['lastMessageTime'] as String,
                         style: AppTypography.bodySmall(
-                          isUnread ? AppColors.primary : AppColors.textLightMuted,
+                          isUnread ? AppColors.primary : colors.textMuted,
                         ),
                       ),
                     ],
@@ -98,8 +100,8 @@ class _MessagesScreenState extends State<MessagesScreen> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: isUnread
-                              ? AppTypography.bodyMedium(AppColors.textLightPrimary).copyWith(fontWeight: FontWeight.w600)
-                              : AppTypography.bodyMedium(AppColors.textLightSecondary),
+                              ? AppTypography.bodyMedium(colors.textPrimary).copyWith(fontWeight: FontWeight.w600)
+                              : AppTypography.bodyMedium(colors.textSecondary),
                         ),
                       ),
                       if (isUnread) ...[

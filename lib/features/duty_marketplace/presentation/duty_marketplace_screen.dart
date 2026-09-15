@@ -29,6 +29,7 @@ class _DutyMarketplaceScreenState extends ConsumerState<DutyMarketplaceScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final loc = ref.watch(localizationProvider);
     final filteredDuties = _selectedSpecialty == 'All'
         ? MockData.duties
@@ -57,17 +58,17 @@ class _DutyMarketplaceScreenState extends ConsumerState<DutyMarketplaceScreen> {
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
               child: TextField(
                 controller: _searchController,
-                style: AppTypography.bodyMedium(AppColors.textLightPrimary),
+                style: AppTypography.bodyMedium(colors.textPrimary),
                 decoration: InputDecoration(
                   hintText: 'Search by specialty, hospital or area...',
-                  hintStyle: AppTypography.bodyMedium(AppColors.textLightMuted),
-                  prefixIcon: const Icon(Icons.search_rounded, color: AppColors.textLightMuted),
+                  hintStyle: AppTypography.bodyMedium(colors.textMuted),
+                  prefixIcon: Icon(Icons.search_rounded, color: colors.textMuted),
                   filled: true,
-                  fillColor: AppColors.surfaceElevatedLight,
+                  fillColor: colors.surfaceElevated,
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                    borderSide: const BorderSide(color: AppColors.borderLight),
+                    borderSide: BorderSide(color: colors.border),
                   ),
                 ),
               ),
@@ -106,19 +107,20 @@ class _DutyMarketplaceScreenState extends ConsumerState<DutyMarketplaceScreen> {
   }
 
   Widget _buildFilterChip(String label) {
+    final colors = context.appColors;
     final isSelected = _selectedSpecialty == label;
     return Padding(
       padding: const EdgeInsets.only(right: 8),
       child: FilterChip(
         label: Text(label),
         selected: isSelected,
-        labelStyle: AppTypography.labelBold(isSelected ? Colors.white : AppColors.textLightSecondary),
-        backgroundColor: AppColors.surfaceElevatedLight,
+        labelStyle: AppTypography.labelBold(isSelected ? Colors.white : colors.textSecondary),
+        backgroundColor: colors.surfaceElevated,
         selectedColor: AppColors.primary,
         checkmarkColor: Colors.white,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppSpacing.radiusPill),
-          side: BorderSide(color: isSelected ? AppColors.primary : AppColors.borderLight),
+          side: BorderSide(color: isSelected ? AppColors.primary : colors.border),
         ),
         onSelected: (_) => setState(() => _selectedSpecialty = label),
       ),
@@ -126,6 +128,7 @@ class _DutyMarketplaceScreenState extends ConsumerState<DutyMarketplaceScreen> {
   }
 
   Widget _buildDutyCard(BuildContext context, Map<String, dynamic> duty) {
+    final colors = context.appColors;
     return AppCard(
       onTap: () => context.push('/duty-details', extra: duty),
       child: Column(
@@ -138,7 +141,7 @@ class _DutyMarketplaceScreenState extends ConsumerState<DutyMarketplaceScreen> {
                 children: [
                   Text(
                     duty['facilityName'] as String,
-                    style: AppTypography.headingSmall(AppColors.textLightPrimary),
+                    style: AppTypography.headingSmall(colors.textPrimary),
                   ),
                   const SizedBox(width: 6),
                   if (duty['isVerifiedOrg'] == true)
@@ -151,13 +154,13 @@ class _DutyMarketplaceScreenState extends ConsumerState<DutyMarketplaceScreen> {
           const SizedBox(height: 2),
           Text(
             '${duty['city']} • ${duty['distanceKm']} km away',
-            style: AppTypography.bodySmall(AppColors.textLightMuted),
+            style: AppTypography.bodySmall(colors.textMuted),
           ),
           const SizedBox(height: AppSpacing.sm),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-              color: AppColors.surfaceElevatedLight,
+              color: colors.surfaceElevated,
               borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
             ),
             child: Row(
@@ -169,7 +172,7 @@ class _DutyMarketplaceScreenState extends ConsumerState<DutyMarketplaceScreen> {
                     const SizedBox(width: 6),
                     Text(
                       duty['specialtyName'] as String,
-                      style: AppTypography.labelBold(AppColors.textLightPrimary),
+                      style: AppTypography.labelBold(colors.textPrimary),
                     ),
                   ],
                 ),
@@ -183,11 +186,11 @@ class _DutyMarketplaceScreenState extends ConsumerState<DutyMarketplaceScreen> {
           const SizedBox(height: AppSpacing.sm),
           Row(
             children: [
-              const Icon(Icons.access_time_rounded, size: 14, color: AppColors.textLightMuted),
+              Icon(Icons.access_time_rounded, size: 14, color: colors.textMuted),
               const SizedBox(width: 4),
               Text(
                 '${duty['startAt']} - ${duty['endAt']}',
-                style: AppTypography.bodySmall(AppColors.textLightSecondary),
+                style: AppTypography.bodySmall(colors.textSecondary),
               ),
               const Spacer(),
               Text(

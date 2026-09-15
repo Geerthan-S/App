@@ -142,23 +142,24 @@ class _AddPostScreenState extends State<AddPostScreen> {
     });
   }
 
-  InputDecoration _dropdownDecoration() {
+  InputDecoration _dropdownDecoration(AppColorsExtension colors) {
     return InputDecoration(
       filled: true,
-      fillColor: AppColors.surfaceElevatedLight,
+      fillColor: colors.surfaceElevated,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-        borderSide: const BorderSide(color: AppColors.borderLight),
+        borderSide: BorderSide(color: colors.border),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Scaffold(
-      backgroundColor: AppColors.bgLight,
+      backgroundColor: colors.bg,
       appBar: AppBar(
-        title: Text('Create Post', style: AppTypography.headingMedium(AppColors.textLightPrimary)),
+        title: Text('Create Post', style: AppTypography.headingMedium(colors.textPrimary)),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -168,11 +169,11 @@ class _AddPostScreenState extends State<AddPostScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Post a Duty Opportunity', style: AppTypography.headingLarge(AppColors.textLightPrimary)),
+                Text('Post a Duty Opportunity', style: AppTypography.headingLarge(colors.textPrimary)),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
                   'Share a duty opening so other doctors can find it and start a chat with you.',
-                  style: AppTypography.bodyMedium(AppColors.textLightSecondary),
+                  style: AppTypography.bodyMedium(colors.textSecondary),
                 ),
                 const SizedBox(height: AppSpacing.lg),
 
@@ -184,14 +185,14 @@ class _AddPostScreenState extends State<AddPostScreen> {
                 ),
                 const SizedBox(height: AppSpacing.md),
 
-                Text('SPECIALTY', style: AppTypography.labelBold(AppColors.textLightSecondary)),
+                Text('SPECIALTY', style: AppTypography.labelBold(colors.textSecondary)),
                 const SizedBox(height: 6),
                 DropdownButtonFormField<String>(
                   value: _selectedSpecialty,
                   isExpanded: true,
-                  dropdownColor: AppColors.surfaceElevatedLight,
-                  style: AppTypography.bodyLarge(AppColors.textLightPrimary),
-                  decoration: _dropdownDecoration(),
+                  dropdownColor: colors.surfaceElevated,
+                  style: AppTypography.bodyLarge(colors.textPrimary),
+                  decoration: _dropdownDecoration(colors),
                   items: AppConstants.specialties.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
                   onChanged: (val) => setState(() => _selectedSpecialty = val!),
                 ),
@@ -205,20 +206,20 @@ class _AddPostScreenState extends State<AddPostScreen> {
                 ),
                 const SizedBox(height: AppSpacing.md),
 
-                Text('LOCATION', style: AppTypography.labelBold(AppColors.textLightSecondary)),
+                Text('LOCATION', style: AppTypography.labelBold(colors.textSecondary)),
                 const SizedBox(height: 6),
                 DropdownButtonFormField<String>(
                   value: _selectedCity,
                   isExpanded: true,
-                  dropdownColor: AppColors.surfaceElevatedLight,
-                  style: AppTypography.bodyLarge(AppColors.textLightPrimary),
-                  decoration: _dropdownDecoration(),
+                  dropdownColor: colors.surfaceElevated,
+                  style: AppTypography.bodyLarge(colors.textPrimary),
+                  decoration: _dropdownDecoration(colors),
                   items: AppConstants.majorCities.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
                   onChanged: (val) => setState(() => _selectedCity = val!),
                 ),
                 const SizedBox(height: AppSpacing.md),
 
-                Text('SHIFT DATE & TIME', style: AppTypography.labelBold(AppColors.textLightSecondary)),
+                Text('SHIFT DATE & TIME', style: AppTypography.labelBold(colors.textSecondary)),
                 const SizedBox(height: 6),
                 AppCard(
                   child: Column(
@@ -230,17 +231,17 @@ class _AddPostScreenState extends State<AddPostScreen> {
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Date', style: AppTypography.bodySmall(AppColors.textLightMuted)),
+                              Text('Date', style: AppTypography.bodySmall(colors.textMuted)),
                               Text(
                                 DateFormat('d MMM yyyy').format(_selectedDate),
-                                style: AppTypography.labelBold(AppColors.textLightPrimary),
+                                style: AppTypography.labelBold(colors.textPrimary),
                               ),
                             ],
                           ),
                           OutlinedButton(
                             style: OutlinedButton.styleFrom(
                               foregroundColor: AppColors.primaryLight,
-                              side: const BorderSide(color: AppColors.borderLight),
+                              side: BorderSide(color: colors.border),
                             ),
                             onPressed: _pickDate,
                             child: const Text('Change'),
@@ -277,9 +278,9 @@ class _AddPostScreenState extends State<AddPostScreen> {
                   hintText: 'e.g. 6500',
                   controller: _amountController,
                   keyboardType: TextInputType.number,
-                  prefixIcon: const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                    child: Text('₹', style: TextStyle(color: AppColors.textLightPrimary, fontWeight: FontWeight.bold)),
+                  prefixIcon: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                    child: Text('₹', style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.bold)),
                   ),
                   validator: (v) {
                     final amount = double.tryParse((v ?? '').trim());
@@ -323,26 +324,27 @@ class _TimePickerTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: AppColors.surfaceElevatedLight,
+          color: colors.surfaceElevated,
           borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-          border: Border.all(color: AppColors.borderLight),
+          border: Border.all(color: colors.border),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(label, style: AppTypography.bodySmall(AppColors.textLightMuted)),
+            Text(label, style: AppTypography.bodySmall(colors.textMuted)),
             const SizedBox(height: 2),
             Row(
               children: [
                 const Icon(Icons.access_time_rounded, size: 16, color: AppColors.primaryLight),
                 const SizedBox(width: 6),
-                Text(time.format(context), style: AppTypography.labelBold(AppColors.textLightPrimary)),
+                Text(time.format(context), style: AppTypography.labelBold(colors.textPrimary)),
               ],
             ),
           ],

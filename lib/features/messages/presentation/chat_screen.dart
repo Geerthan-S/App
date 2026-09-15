@@ -107,11 +107,12 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final duty = _duty;
     final hospitalName = widget.conversation['hospitalName'] as String;
 
     return Scaffold(
-      backgroundColor: AppColors.bgLight,
+      backgroundColor: colors.bg,
       appBar: AppBar(
         titleSpacing: 0,
         title: Row(
@@ -129,12 +130,12 @@ class _ChatScreenState extends State<ChatScreen> {
                 children: [
                   Text(
                     hospitalName,
-                    style: AppTypography.labelBold(AppColors.textLightPrimary),
+                    style: AppTypography.labelBold(colors.textPrimary),
                     overflow: TextOverflow.ellipsis,
                   ),
                   Text(
                     'Duty Coordinator',
-                    style: AppTypography.bodySmall(AppColors.textLightMuted),
+                    style: AppTypography.bodySmall(colors.textMuted),
                   ),
                 ],
               ),
@@ -151,7 +152,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   ? Center(
                       child: Text(
                         'Say hello to start the conversation.',
-                        style: AppTypography.bodyMedium(AppColors.textLightMuted),
+                        style: AppTypography.bodyMedium(colors.textMuted),
                       ),
                     )
                   : ListView.builder(
@@ -170,11 +171,12 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildQuickReplies() {
+    final colors = context.appColors;
     final suggestions = _quickReplies;
     if (suggestions.isEmpty) return const SizedBox.shrink();
 
     return Container(
-      color: AppColors.surfaceLight,
+      color: colors.surface,
       padding: const EdgeInsets.only(top: 8),
       child: SizedBox(
         height: 36,
@@ -192,9 +194,9 @@ class _ChatScreenState extends State<ChatScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 14),
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: AppColors.surfaceElevatedLight,
+                  color: colors.surfaceElevated,
                   borderRadius: BorderRadius.circular(AppSpacing.radiusPill),
-                  border: Border.all(color: AppColors.borderLight),
+                  border: Border.all(color: colors.border),
                 ),
                 child: Text(
                   suggestion,
@@ -211,13 +213,14 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildDutyContextCard(Map<String, dynamic> duty) {
+    final colors = context.appColors;
     return Container(
       margin: const EdgeInsets.fromLTRB(12, 8, 12, 4),
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: AppColors.surfaceElevatedLight,
+        color: colors.surfaceElevated,
         borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-        border: Border.all(color: AppColors.borderLight),
+        border: Border.all(color: colors.border),
       ),
       child: Row(
         children: [
@@ -229,12 +232,12 @@ class _ChatScreenState extends State<ChatScreen> {
               children: [
                 Text(
                   '${duty['specialtyName']} • ${duty['shiftType']}',
-                  style: AppTypography.labelBold(AppColors.textLightPrimary),
+                  style: AppTypography.labelBold(colors.textPrimary),
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
                   '${duty['startAt']} - ${duty['endAt']}',
-                  style: AppTypography.bodySmall(AppColors.textLightMuted),
+                  style: AppTypography.bodySmall(colors.textMuted),
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
@@ -250,6 +253,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildMessageBubble(Map<String, dynamic> message) {
+    final colors = context.appColors;
     final isDoctor = message['sender'] == 'doctor';
 
     return Align(
@@ -259,7 +263,7 @@ class _ChatScreenState extends State<ChatScreen> {
         margin: const EdgeInsets.symmetric(vertical: 4),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: isDoctor ? AppColors.primary : AppColors.surfaceElevatedLight,
+          color: isDoctor ? AppColors.primary : colors.surfaceElevated,
           borderRadius: BorderRadius.only(
             topLeft: const Radius.circular(AppSpacing.radiusMd),
             topRight: const Radius.circular(AppSpacing.radiusMd),
@@ -273,12 +277,12 @@ class _ChatScreenState extends State<ChatScreen> {
           children: [
             Text(
               message['text'] as String,
-              style: AppTypography.bodyMedium(isDoctor ? Colors.white : AppColors.textLightPrimary),
+              style: AppTypography.bodyMedium(isDoctor ? Colors.white : colors.textPrimary),
             ),
             const SizedBox(height: 2),
             Text(
               message['time'] as String,
-              style: AppTypography.bodySmall(isDoctor ? Colors.white.withOpacity(0.75) : AppColors.textLightMuted),
+              style: AppTypography.bodySmall(isDoctor ? Colors.white.withOpacity(0.75) : colors.textMuted),
             ),
           ],
         ),
@@ -287,11 +291,12 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildInputBar() {
+    final colors = context.appColors;
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-      decoration: const BoxDecoration(
-        color: AppColors.surfaceLight,
-        border: Border(top: BorderSide(color: AppColors.borderLight)),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        border: Border(top: BorderSide(color: colors.border)),
       ),
       child: Row(
         children: [
@@ -299,19 +304,19 @@ class _ChatScreenState extends State<ChatScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               decoration: BoxDecoration(
-                color: AppColors.surfaceElevatedLight,
+                color: colors.surfaceElevated,
                 borderRadius: BorderRadius.circular(AppSpacing.radiusPill),
-                border: Border.all(color: AppColors.borderLight),
+                border: Border.all(color: colors.border),
               ),
               child: TextField(
                 controller: _inputController,
                 minLines: 1,
                 maxLines: 4,
                 textCapitalization: TextCapitalization.sentences,
-                style: AppTypography.bodyMedium(AppColors.textLightPrimary),
+                style: AppTypography.bodyMedium(colors.textPrimary),
                 decoration: InputDecoration(
                   hintText: 'Type a message...',
-                  hintStyle: AppTypography.bodyMedium(AppColors.textLightMuted),
+                  hintStyle: AppTypography.bodyMedium(colors.textMuted),
                   border: InputBorder.none,
                   isDense: true,
                   contentPadding: const EdgeInsets.symmetric(vertical: 12),

@@ -26,10 +26,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final duties = MockData.duties;
 
     return Scaffold(
-      backgroundColor: AppColors.bgLight,
+      backgroundColor: colors.bg,
       body: SafeArea(
         child: CustomScrollView(
           slivers: [
@@ -45,7 +46,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         Expanded(
                           child: Text(
                             'Hello, ${MockData.currentDoctorName}',
-                            style: AppTypography.headingLarge(AppColors.textLightPrimary),
+                            style: AppTypography.headingLarge(colors.textPrimary),
                           ),
                         ),
                         _buildNotificationBell(),
@@ -54,12 +55,12 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(height: 4),
                     Text(
                       '${duties.length} duty opportunities recommended for you',
-                      style: AppTypography.bodyMedium(AppColors.textLightSecondary),
+                      style: AppTypography.bodyMedium(colors.textSecondary),
                     ),
                     const SizedBox(height: AppSpacing.lg),
                     Text(
                       'Recommended For You',
-                      style: AppTypography.headingSmall(AppColors.textLightPrimary),
+                      style: AppTypography.headingSmall(colors.textPrimary),
                     ),
                     const SizedBox(height: AppSpacing.sm),
                   ],
@@ -81,6 +82,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildNotificationBell() {
+    final colors = context.appColors;
     final unreadCount = MockData.unreadNotificationCount;
 
     return IconButton(
@@ -88,7 +90,7 @@ class _HomeScreenState extends State<HomeScreen> {
       icon: Stack(
         clipBehavior: Clip.none,
         children: [
-          const Icon(Icons.notifications_outlined, color: AppColors.textLightPrimary),
+          Icon(Icons.notifications_outlined, color: colors.textPrimary),
           if (unreadCount > 0)
             Positioned(
               right: -2,

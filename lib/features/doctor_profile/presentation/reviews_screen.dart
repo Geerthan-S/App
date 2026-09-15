@@ -29,10 +29,11 @@ class ReviewsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Scaffold(
-      backgroundColor: AppColors.bgLight,
+      backgroundColor: colors.bg,
       appBar: AppBar(
-        title: Text(title, style: AppTypography.headingMedium(AppColors.textLightPrimary)),
+        title: Text(title, style: AppTypography.headingMedium(colors.textPrimary)),
       ),
       body: SafeArea(
         child: reviews.isEmpty
@@ -51,13 +52,13 @@ class ReviewsScreen extends StatelessWidget {
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Overall Rating', style: AppTypography.bodySmall(AppColors.textLightMuted)),
+                            Text('Overall Rating', style: AppTypography.bodySmall(colors.textMuted)),
                             const SizedBox(height: 2),
                             Row(
                               children: [
                                 Text(
                                   _averageRating.toStringAsFixed(1),
-                                  style: AppTypography.headingLarge(AppColors.textLightPrimary),
+                                  style: AppTypography.headingLarge(colors.textPrimary),
                                 ),
                                 const SizedBox(width: 6),
                                 const Icon(Icons.star_rounded, color: AppColors.amber, size: 22),
@@ -67,7 +68,7 @@ class ReviewsScreen extends StatelessWidget {
                         ),
                         Text(
                           '${reviews.length} review${reviews.length == 1 ? '' : 's'}',
-                          style: AppTypography.bodyMedium(AppColors.textLightSecondary),
+                          style: AppTypography.bodyMedium(colors.textSecondary),
                         ),
                       ],
                     ),
@@ -86,7 +87,7 @@ class ReviewsScreen extends StatelessWidget {
                                 Expanded(
                                   child: Text(
                                     review['reviewerName'] as String,
-                                    style: AppTypography.labelBold(AppColors.textLightPrimary),
+                                    style: AppTypography.labelBold(colors.textPrimary),
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
@@ -96,7 +97,7 @@ class ReviewsScreen extends StatelessWidget {
                             const SizedBox(height: 6),
                             Text(
                               review['comment'] as String,
-                              style: AppTypography.bodyMedium(AppColors.textLightSecondary),
+                              style: AppTypography.bodyMedium(colors.textSecondary),
                             ),
                           ],
                         ),

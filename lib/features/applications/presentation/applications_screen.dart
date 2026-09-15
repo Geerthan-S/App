@@ -62,6 +62,7 @@ class _ApplicationsScreenState extends ConsumerState<ApplicationsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Scaffold(
       appBar: AppBar(
         title: const Text('My Applications & Offers'),
@@ -85,7 +86,7 @@ class _ApplicationsScreenState extends ConsumerState<ApplicationsScreen> {
                     children: [
                       Text(
                         app['facilityName'] as String,
-                        style: AppTypography.headingSmall(AppColors.textLightPrimary),
+                        style: AppTypography.headingSmall(colors.textPrimary),
                       ),
                       StatusBadge(status: app['status'] as String),
                     ],
@@ -93,12 +94,12 @@ class _ApplicationsScreenState extends ConsumerState<ApplicationsScreen> {
                   const SizedBox(height: 2),
                   Text(
                     '${app['specialtyName']} • Applied ${app['appliedAt']}',
-                    style: AppTypography.bodySmall(AppColors.textLightMuted),
+                    style: AppTypography.bodySmall(colors.textMuted),
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   Text(
                     app['timing'] as String,
-                    style: AppTypography.bodyMedium(AppColors.textLightSecondary),
+                    style: AppTypography.bodyMedium(colors.textSecondary),
                   ),
                   const SizedBox(height: 4),
                   Text(

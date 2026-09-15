@@ -18,12 +18,13 @@ class HospitalInfoScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     const hospital = MockData.hospitalProfile;
 
     return Scaffold(
-      backgroundColor: AppColors.bgLight,
+      backgroundColor: colors.bg,
       appBar: AppBar(
-        title: Text('Hospital Profile', style: AppTypography.headingMedium(AppColors.textLightPrimary)),
+        title: Text('Hospital Profile', style: AppTypography.headingMedium(colors.textPrimary)),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -57,7 +58,7 @@ class HospitalInfoScreen extends StatelessWidget {
                                   Expanded(
                                     child: Text(
                                       hospital['name'] as String,
-                                      style: AppTypography.headingSmall(AppColors.textLightPrimary),
+                                      style: AppTypography.headingSmall(colors.textPrimary),
                                     ),
                                   ),
                                   if (hospital['isVerified'] == true) ...[
@@ -69,7 +70,7 @@ class HospitalInfoScreen extends StatelessWidget {
                               const SizedBox(height: 2),
                               Text(
                                 hospital['orgType'] as String,
-                                style: AppTypography.bodySmall(AppColors.textLightSecondary),
+                                style: AppTypography.bodySmall(colors.textSecondary),
                               ),
                             ],
                           ),
@@ -83,7 +84,7 @@ class HospitalInfoScreen extends StatelessWidget {
                         const SizedBox(width: 4),
                         Text(
                           '${hospital['rating']} rating',
-                          style: AppTypography.labelBold(AppColors.textLightPrimary),
+                          style: AppTypography.labelBold(colors.textPrimary),
                         ),
                       ],
                     ),
@@ -92,26 +93,26 @@ class HospitalInfoScreen extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.md),
 
-              Text('About', style: AppTypography.headingSmall(AppColors.textLightPrimary)),
+              Text('About', style: AppTypography.headingSmall(colors.textPrimary)),
               const SizedBox(height: AppSpacing.xs),
               AppCard(
                 child: Text(
                   hospital['about'] as String,
-                  style: AppTypography.bodyMedium(AppColors.textLightSecondary),
+                  style: AppTypography.bodyMedium(colors.textSecondary),
                 ),
               ),
               const SizedBox(height: AppSpacing.md),
 
-              Text('Contact & Location', style: AppTypography.headingSmall(AppColors.textLightPrimary)),
+              Text('Contact & Location', style: AppTypography.headingSmall(colors.textPrimary)),
               const SizedBox(height: AppSpacing.xs),
               AppCard(
                 child: Column(
                   children: [
-                    _infoRow(Icons.location_on_outlined, hospital['address'] as String),
+                    _infoRow(colors, Icons.location_on_outlined, hospital['address'] as String),
                     const Divider(),
-                    _infoRow(Icons.call_outlined, hospital['phone'] as String),
+                    _infoRow(colors, Icons.call_outlined, hospital['phone'] as String),
                     const Divider(),
-                    _infoRow(Icons.location_city_outlined, hospital['city'] as String),
+                    _infoRow(colors, Icons.location_city_outlined, hospital['city'] as String),
                   ],
                 ),
               ),
@@ -124,7 +125,7 @@ class HospitalInfoScreen extends StatelessWidget {
                   label: const Text('View Hospital Reviews'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.primaryLight,
-                    side: const BorderSide(color: AppColors.borderLight),
+                    side: BorderSide(color: colors.border),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
                   onPressed: () => context.push(
@@ -144,14 +145,14 @@ class HospitalInfoScreen extends StatelessWidget {
     );
   }
 
-  Widget _infoRow(IconData icon, String text) {
+  Widget _infoRow(AppColorsExtension colors, IconData icon, String text) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
           Icon(icon, color: AppColors.primaryLight, size: 20),
           const SizedBox(width: AppSpacing.sm),
-          Expanded(child: Text(text, style: AppTypography.bodyMedium(AppColors.textLightPrimary))),
+          Expanded(child: Text(text, style: AppTypography.bodyMedium(colors.textPrimary))),
         ],
       ),
     );

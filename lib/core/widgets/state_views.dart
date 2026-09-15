@@ -15,6 +15,7 @@ class LoadingView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -26,7 +27,7 @@ class LoadingView extends StatelessWidget {
             const SizedBox(height: AppSpacing.md),
             Text(
               message!,
-              style: AppTypography.bodyMedium(AppColors.textLightSecondary),
+              style: AppTypography.bodyMedium(colors.textSecondary),
             ),
           ],
         ],
@@ -47,6 +48,7 @@ class ErrorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Center(
       child: Padding(
         padding: AppSpacing.paddingScreen,
@@ -57,13 +59,13 @@ class ErrorView extends StatelessWidget {
             const SizedBox(height: AppSpacing.md),
             Text(
               'Something Went Wrong',
-              style: AppTypography.headingSmall(AppColors.textLightPrimary),
+              style: AppTypography.headingSmall(colors.textPrimary),
             ),
             const SizedBox(height: AppSpacing.xs),
             Text(
               message,
               textAlign: TextAlign.center,
-              style: AppTypography.bodyMedium(AppColors.textLightSecondary),
+              style: AppTypography.bodyMedium(colors.textSecondary),
             ),
             if (onRetry != null) ...[
               const SizedBox(height: AppSpacing.lg),
@@ -98,23 +100,24 @@ class EmptyStateView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Center(
       child: Padding(
         padding: AppSpacing.paddingScreen,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: AppColors.textLightMuted, size: 56),
+            Icon(icon, color: colors.textMuted, size: 56),
             const SizedBox(height: AppSpacing.md),
             Text(
               title,
-              style: AppTypography.headingSmall(AppColors.textLightPrimary),
+              style: AppTypography.headingSmall(colors.textPrimary),
             ),
             const SizedBox(height: AppSpacing.xs),
             Text(
               description,
               textAlign: TextAlign.center,
-              style: AppTypography.bodyMedium(AppColors.textLightSecondary),
+              style: AppTypography.bodyMedium(colors.textSecondary),
             ),
             if (actionLabel != null && onAction != null) ...[
               const SizedBox(height: AppSpacing.lg),

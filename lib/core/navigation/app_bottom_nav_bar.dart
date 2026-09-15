@@ -59,6 +59,7 @@ class AppBottomNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final double bottomInset = MediaQuery.of(context).padding.bottom;
 
     // Full-bleed bar flush against both screen edges and the bottom, rather
@@ -66,12 +67,12 @@ class AppBottomNavBar extends StatelessWidget {
     return Container(
       padding: EdgeInsets.only(bottom: bottomInset),
       decoration: BoxDecoration(
-        color: AppColors.surfaceElevatedLight,
+        color: colors.surfaceElevated,
         borderRadius: const BorderRadius.only(
           topLeft: Radius.circular(AppSpacing.radiusLg),
           topRight: Radius.circular(AppSpacing.radiusLg),
         ),
-        border: const Border(top: BorderSide(color: AppColors.borderLight)),
+        border: Border(top: BorderSide(color: colors.border)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.08),
@@ -85,14 +86,14 @@ class AppBottomNavBar extends StatelessWidget {
         child: Row(
           children: List.generate(
             _destinations.length,
-            (index) => _buildNavItem(index),
+            (index) => _buildNavItem(colors, index),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildNavItem(int index) {
+  Widget _buildNavItem(AppColorsExtension colors, int index) {
     final destination = _destinations[index];
     final bool isActive = index == currentIndex;
 
@@ -123,7 +124,7 @@ class AppBottomNavBar extends StatelessWidget {
                     Icon(
                       isActive ? destination.activeIcon : destination.icon,
                       size: 22,
-                      color: isActive ? Colors.white : AppColors.textLightSecondary,
+                      color: isActive ? Colors.white : colors.textSecondary,
                     ),
                     if (isActive) ...[
                       const SizedBox(width: 6),

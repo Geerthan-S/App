@@ -19,6 +19,7 @@ class DutyPostCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return AppCard(
       onTap: () => context.push('/post-details', extra: duty),
       child: Column(
@@ -46,7 +47,7 @@ class DutyPostCard extends StatelessWidget {
                         Expanded(
                           child: Text(
                             duty['facilityName'] as String,
-                            style: AppTypography.headingSmall(AppColors.textLightPrimary),
+                            style: AppTypography.headingSmall(colors.textPrimary),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
@@ -59,7 +60,7 @@ class DutyPostCard extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       '${duty['specialtyName']} • ${duty['city']}',
-                      style: AppTypography.bodySmall(AppColors.textLightMuted),
+                      style: AppTypography.bodySmall(colors.textMuted),
                     ),
                   ],
                 ),
@@ -71,17 +72,17 @@ class DutyPostCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-              color: AppColors.surfaceElevatedLight,
+              color: colors.surfaceElevated,
               borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
             ),
             child: Row(
               children: [
-                const Icon(Icons.access_time_rounded, size: 14, color: AppColors.textLightMuted),
+                Icon(Icons.access_time_rounded, size: 14, color: colors.textMuted),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     '${duty['startAt']} - ${duty['endAt']}',
-                    style: AppTypography.bodySmall(AppColors.textLightSecondary),
+                    style: AppTypography.bodySmall(colors.textSecondary),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
@@ -95,11 +96,11 @@ class DutyPostCard extends StatelessWidget {
           const SizedBox(height: AppSpacing.xs),
           Row(
             children: [
-              const Icon(Icons.location_on_outlined, size: 14, color: AppColors.textLightMuted),
+              Icon(Icons.location_on_outlined, size: 14, color: colors.textMuted),
               const SizedBox(width: 4),
               Text(
                 '${duty['distanceKm']} km away',
-                style: AppTypography.bodySmall(AppColors.textLightMuted),
+                style: AppTypography.bodySmall(colors.textMuted),
               ),
               const Spacer(),
               Text(

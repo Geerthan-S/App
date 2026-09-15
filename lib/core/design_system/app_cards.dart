@@ -24,13 +24,14 @@ class AppCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final cardWidget = Container(
       padding: padding ?? AppSpacing.paddingCard,
       decoration: BoxDecoration(
-        color: AppColors.surfaceLight,
+        color: colors.surface,
         borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
         border: Border.all(
-          color: borderColor ?? AppColors.borderLight,
+          color: borderColor ?? colors.border,
           width: 1,
         ),
       ),

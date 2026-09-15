@@ -35,12 +35,13 @@ class AppTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
-          style: AppTypography.labelBold(AppColors.textLightSecondary),
+          style: AppTypography.labelBold(colors.textSecondary),
         ),
         const SizedBox(height: AppSpacing.xs),
         TextFormField(
@@ -50,22 +51,22 @@ class AppTextField extends StatelessWidget {
           obscureText: obscureText,
           maxLines: maxLines,
           onChanged: onChanged,
-          style: AppTypography.bodyLarge(AppColors.textLightPrimary),
+          style: AppTypography.bodyLarge(colors.textPrimary),
           decoration: InputDecoration(
             hintText: hintText,
-            hintStyle: AppTypography.bodyMedium(AppColors.textLightMuted),
+            hintStyle: AppTypography.bodyMedium(colors.textMuted),
             prefixIcon: prefixIcon,
             suffixIcon: suffixIcon,
             filled: true,
-            fillColor: AppColors.surfaceElevatedLight,
+            fillColor: colors.surfaceElevated,
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-              borderSide: const BorderSide(color: AppColors.borderLight),
+              borderSide: BorderSide(color: colors.border),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-              borderSide: const BorderSide(color: AppColors.borderLight),
+              borderSide: BorderSide(color: colors.border),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(AppSpacing.radiusSm),

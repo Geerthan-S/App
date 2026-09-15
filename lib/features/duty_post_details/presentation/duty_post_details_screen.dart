@@ -22,10 +22,11 @@ class DutyPostDetailsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Scaffold(
-      backgroundColor: AppColors.bgLight,
+      backgroundColor: colors.bg,
       appBar: AppBar(
-        title: Text('Duty Details', style: AppTypography.headingMedium(AppColors.textLightPrimary)),
+        title: Text('Duty Details', style: AppTypography.headingMedium(colors.textPrimary)),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -60,7 +61,7 @@ class DutyPostDetailsScreen extends StatelessWidget {
                                   Expanded(
                                     child: Text(
                                       duty['facilityName'] as String,
-                                      style: AppTypography.headingSmall(AppColors.textLightPrimary),
+                                      style: AppTypography.headingSmall(colors.textPrimary),
                                     ),
                                   ),
                                   if (duty['isVerifiedOrg'] == true) ...[
@@ -72,7 +73,7 @@ class DutyPostDetailsScreen extends StatelessWidget {
                               const SizedBox(height: 2),
                               Text(
                                 duty['specialtyName'] as String,
-                                style: AppTypography.bodyMedium(AppColors.textLightSecondary),
+                                style: AppTypography.bodyMedium(colors.textSecondary),
                               ),
                             ],
                           ),
@@ -84,11 +85,11 @@ class DutyPostDetailsScreen extends StatelessWidget {
                       children: [
                         StatusBadge(status: duty['status'] as String),
                         const SizedBox(width: AppSpacing.sm),
-                        const Icon(Icons.location_on_outlined, size: 14, color: AppColors.textLightMuted),
+                        Icon(Icons.location_on_outlined, size: 14, color: colors.textMuted),
                         const SizedBox(width: 2),
                         Text(
                           '${duty['city']} • ${duty['distanceKm']} km away',
-                          style: AppTypography.bodySmall(AppColors.textLightMuted),
+                          style: AppTypography.bodySmall(colors.textMuted),
                         ),
                       ],
                     ),
@@ -97,38 +98,38 @@ class DutyPostDetailsScreen extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.md),
 
-              Text('Schedule & Compensation', style: AppTypography.headingSmall(AppColors.textLightPrimary)),
+              Text('Schedule & Compensation', style: AppTypography.headingSmall(colors.textPrimary)),
               const SizedBox(height: AppSpacing.xs),
               AppCard(
                 child: Column(
                   children: [
-                    _buildRow('Duty Type', duty['shiftType'] as String),
+                    _buildRow(colors, 'Duty Type', duty['shiftType'] as String),
                     const Divider(),
-                    _buildRow('Department', duty['department'] as String),
+                    _buildRow(colors, 'Department', duty['department'] as String),
                     const Divider(),
-                    _buildRow('Starts', duty['startAt'] as String),
+                    _buildRow(colors, 'Starts', duty['startAt'] as String),
                     const Divider(),
-                    _buildRow('Ends', duty['endAt'] as String),
+                    _buildRow(colors, 'Ends', duty['endAt'] as String),
                     const Divider(),
-                    _buildRow('Compensation', '₹${duty['amount']} (${duty['basis']})', valueColor: AppColors.emerald),
+                    _buildRow(colors, 'Compensation', '₹${duty['amount']} (${duty['basis']})', valueColor: AppColors.emerald),
                     const Divider(),
-                    _buildRow('Open Positions', '${duty['remainingHeadcount']} of ${duty['headcount']}'),
+                    _buildRow(colors, 'Open Positions', '${duty['remainingHeadcount']} of ${duty['headcount']}'),
                   ],
                 ),
               ),
               const SizedBox(height: AppSpacing.md),
 
-              Text('Description', style: AppTypography.headingSmall(AppColors.textLightPrimary)),
+              Text('Description', style: AppTypography.headingSmall(colors.textPrimary)),
               const SizedBox(height: AppSpacing.xs),
               AppCard(
                 child: Text(
                   '${duty['shiftType']} covering ${duty['department']} at ${duty['facilityName']}, ${duty['city']}.',
-                  style: AppTypography.bodyMedium(AppColors.textLightSecondary),
+                  style: AppTypography.bodyMedium(colors.textSecondary),
                 ),
               ),
               const SizedBox(height: AppSpacing.md),
 
-              Text('Requirements / Qualifications', style: AppTypography.headingSmall(AppColors.textLightPrimary)),
+              Text('Requirements / Qualifications', style: AppTypography.headingSmall(colors.textPrimary)),
               const SizedBox(height: AppSpacing.xs),
               AppCard(
                 child: Row(
@@ -138,7 +139,7 @@ class DutyPostDetailsScreen extends StatelessWidget {
                     Expanded(
                       child: Text(
                         duty['qualificationRequired'] as String,
-                        style: AppTypography.bodyMedium(AppColors.textLightPrimary),
+                        style: AppTypography.bodyMedium(colors.textPrimary),
                       ),
                     ),
                   ],
@@ -159,20 +160,20 @@ class DutyPostDetailsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildRow(String label, String value, {Color? valueColor}) {
+  Widget _buildRow(AppColorsExtension colors, String label, String value, {Color? valueColor}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: AppTypography.bodyMedium(AppColors.textLightMuted)),
+          Text(label, style: AppTypography.bodyMedium(colors.textMuted)),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
               value,
               textAlign: TextAlign.right,
-              style: AppTypography.labelBold(valueColor ?? AppColors.textLightPrimary),
+              style: AppTypography.labelBold(valueColor ?? colors.textPrimary),
             ),
           ),
         ],

@@ -36,3 +36,105 @@ class AppColors {
   static const Color textLightSecondary = Color(0xFF475569);
   static const Color textLightMuted = Color(0xFF94A3B8);
 }
+
+/// Theme-aware neutral tokens (background/surface/text/accent) that flip
+/// between the light and dark palettes above. Brand/status colors
+/// (primary, teal, emerald, amber, rose) stay constant across themes and
+/// are used directly from [AppColors] — only surfaces, text, and the
+/// on-background accent shade need to adapt.
+class AppColorsExtension extends ThemeExtension<AppColorsExtension> {
+  final Color bg;
+  final Color surface;
+  final Color surfaceElevated;
+  final Color border;
+  final Color textPrimary;
+  final Color textSecondary;
+  final Color textMuted;
+  final Color accent;
+  final Color onAccent;
+
+  const AppColorsExtension({
+    required this.bg,
+    required this.surface,
+    required this.surfaceElevated,
+    required this.border,
+    required this.textPrimary,
+    required this.textSecondary,
+    required this.textMuted,
+    required this.accent,
+    required this.onAccent,
+  });
+
+  static const light = AppColorsExtension(
+    bg: AppColors.bgLight,
+    surface: AppColors.surfaceLight,
+    surfaceElevated: AppColors.surfaceElevatedLight,
+    border: AppColors.borderLight,
+    textPrimary: AppColors.textLightPrimary,
+    textSecondary: AppColors.textLightSecondary,
+    textMuted: AppColors.textLightMuted,
+    accent: AppColors.primary,
+    onAccent: Colors.white,
+  );
+
+  static const dark = AppColorsExtension(
+    bg: AppColors.bgDark,
+    surface: AppColors.surfaceDark,
+    surfaceElevated: AppColors.surfaceElevatedDark,
+    border: AppColors.borderDark,
+    textPrimary: AppColors.textDarkPrimary,
+    textSecondary: AppColors.textDarkSecondary,
+    textMuted: AppColors.textDarkMuted,
+    // Lighter accent shade so the primary blue keeps proper contrast when
+    // used as bare icon/text color directly on a dark surface.
+    accent: AppColors.primaryLight,
+    onAccent: AppColors.bgDark,
+  );
+
+  @override
+  AppColorsExtension copyWith({
+    Color? bg,
+    Color? surface,
+    Color? surfaceElevated,
+    Color? border,
+    Color? textPrimary,
+    Color? textSecondary,
+    Color? textMuted,
+    Color? accent,
+    Color? onAccent,
+  }) {
+    return AppColorsExtension(
+      bg: bg ?? this.bg,
+      surface: surface ?? this.surface,
+      surfaceElevated: surfaceElevated ?? this.surfaceElevated,
+      border: border ?? this.border,
+      textPrimary: textPrimary ?? this.textPrimary,
+      textSecondary: textSecondary ?? this.textSecondary,
+      textMuted: textMuted ?? this.textMuted,
+      accent: accent ?? this.accent,
+      onAccent: onAccent ?? this.onAccent,
+    );
+  }
+
+  @override
+  AppColorsExtension lerp(ThemeExtension<AppColorsExtension>? other, double t) {
+    if (other is! AppColorsExtension) return this;
+    return AppColorsExtension(
+      bg: Color.lerp(bg, other.bg, t)!,
+      surface: Color.lerp(surface, other.surface, t)!,
+      surfaceElevated: Color.lerp(surfaceElevated, other.surfaceElevated, t)!,
+      border: Color.lerp(border, other.border, t)!,
+      textPrimary: Color.lerp(textPrimary, other.textPrimary, t)!,
+      textSecondary: Color.lerp(textSecondary, other.textSecondary, t)!,
+      textMuted: Color.lerp(textMuted, other.textMuted, t)!,
+      accent: Color.lerp(accent, other.accent, t)!,
+      onAccent: Color.lerp(onAccent, other.onAccent, t)!,
+    );
+  }
+}
+
+/// Convenience accessor so screens can write `context.appColors.textPrimary`
+/// instead of `Theme.of(context).extension<AppColorsExtension>()!`.
+extension AppColorsContextX on BuildContext {
+  AppColorsExtension get appColors => Theme.of(this).extension<AppColorsExtension>()!;
+}

@@ -16,16 +16,13 @@ class LanguageSelectorDialog extends ConsumerWidget {
   static void show(BuildContext context) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: AppColors.surfaceLight,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppSpacing.radiusLg)),
-      ),
       builder: (context) => const LanguageSelectorDialog(),
     );
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final colors = context.appColors;
     final currentLang = ref.watch(languageProvider);
     final loc = ref.watch(localizationProvider);
 
@@ -40,10 +37,10 @@ class LanguageSelectorDialog extends ConsumerWidget {
             children: [
               Text(
                 loc.translate('selectLanguage'),
-                style: AppTypography.headingSmall(AppColors.textLightPrimary),
+                style: AppTypography.headingSmall(colors.textPrimary),
               ),
               IconButton(
-                icon: const Icon(Icons.close_rounded, color: AppColors.textLightMuted),
+                icon: Icon(Icons.close_rounded, color: colors.textMuted),
                 onPressed: () => Navigator.pop(context),
               ),
             ],
@@ -58,11 +55,7 @@ class LanguageSelectorDialog extends ConsumerWidget {
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    backgroundColor: AppColors.surfaceElevatedLight,
-                    content: Text(
-                      'Language set to ${entry.value}',
-                      style: const TextStyle(color: Colors.white),
-                    ),
+                    content: Text('Language set to ${entry.value}'),
                     duration: const Duration(seconds: 1),
                   ),
                 );
@@ -71,10 +64,10 @@ class LanguageSelectorDialog extends ConsumerWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 margin: const EdgeInsets.symmetric(vertical: 4),
                 decoration: BoxDecoration(
-                  color: isSelected ? AppColors.primary.withOpacity(0.15) : AppColors.surfaceElevatedLight,
+                  color: isSelected ? colors.accent.withOpacity(0.15) : colors.surfaceElevated,
                   borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
                   border: Border.all(
-                    color: isSelected ? AppColors.primary : AppColors.borderLight,
+                    color: isSelected ? colors.accent : colors.border,
                   ),
                 ),
                 child: Row(
@@ -83,11 +76,11 @@ class LanguageSelectorDialog extends ConsumerWidget {
                     Text(
                       entry.value,
                       style: AppTypography.labelBold(
-                        isSelected ? AppColors.primaryLight : AppColors.textLightPrimary,
+                        isSelected ? colors.accent : colors.textPrimary,
                       ),
                     ),
                     if (isSelected)
-                      const Icon(Icons.check_circle_rounded, color: AppColors.primary, size: 20),
+                      Icon(Icons.check_circle_rounded, color: colors.accent, size: 20),
                   ],
                 ),
               ),

@@ -74,6 +74,7 @@ class _AssignmentsScreenState extends ConsumerState<AssignmentsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final loc = ref.watch(localizationProvider);
 
     return Scaffold(
@@ -102,7 +103,7 @@ class _AssignmentsScreenState extends ConsumerState<AssignmentsScreen> {
                       children: [
                         Text(
                           'Apollo Specialty Hospital',
-                          style: AppTypography.headingMedium(AppColors.textLightPrimary),
+                          style: AppTypography.headingMedium(colors.textPrimary),
                         ),
                         StatusBadge(status: _shiftStatus),
                       ],
@@ -110,7 +111,7 @@ class _AssignmentsScreenState extends ConsumerState<AssignmentsScreen> {
                     const SizedBox(height: 4),
                     Text(
                       'General Medicine • ICU & Emergency Triage',
-                      style: AppTypography.bodyMedium(AppColors.textLightSecondary),
+                      style: AppTypography.bodyMedium(colors.textSecondary),
                     ),
                     const SizedBox(height: AppSpacing.sm),
                     Text(
@@ -147,11 +148,11 @@ class _AssignmentsScreenState extends ConsumerState<AssignmentsScreen> {
                       ],
                     ),
                     const SizedBox(height: AppSpacing.sm),
-                    _buildRow('Hospital Coordinator', 'Dr. Ramesh Nathan (Medical Supt)'),
+                    _buildRow(colors, 'Hospital Coordinator', 'Dr. Ramesh Nathan (Medical Supt)'),
                     const Divider(),
-                    _buildRow('Duty Desk Direct Line', '+91 44 2829 0200'),
+                    _buildRow(colors, 'Duty Desk Direct Line', '+91 44 2829 0200'),
                     const Divider(),
-                    _buildRow('Facility Address', '21 Greams Lane, Thousand Lights, Chennai'),
+                    _buildRow(colors, 'Facility Address', '21 Greams Lane, Thousand Lights, Chennai'),
                     const SizedBox(height: AppSpacing.sm),
                     OutlinedButton.icon(
                       icon: const Icon(Icons.navigation_outlined, size: 16),
@@ -170,13 +171,14 @@ class _AssignmentsScreenState extends ConsumerState<AssignmentsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Frozen Terms & Settlement', style: AppTypography.headingSmall(AppColors.textLightPrimary)),
+                    Text('Frozen Terms & Settlement', style: AppTypography.headingSmall(colors.textPrimary)),
                     const SizedBox(height: AppSpacing.sm),
-                    _buildRow('Agreed Compensation', '₹6,500 per shift'),
+                    _buildRow(colors, 'Agreed Compensation', '₹6,500 per shift'),
                     const Divider(),
-                    _buildRow('Payment Schedule', 'Immediate post-shift acknowledgment'),
+                    _buildRow(colors, 'Payment Schedule', 'Immediate post-shift acknowledgment'),
                     const Divider(),
                     _buildRow(
+                      colors,
                       'Payment Status',
                       _paymentAcknowledged ? '✅ Acknowledged by Hospital Finance' : 'Pending Shift Completion',
                     ),
@@ -203,7 +205,7 @@ class _AssignmentsScreenState extends ConsumerState<AssignmentsScreen> {
               // Structured Feedback Form (Visible upon completion)
               if (_shiftStatus == 'completed') ...[
                 const SizedBox(height: AppSpacing.md),
-                Text('Structured Shift Feedback', style: AppTypography.headingSmall(AppColors.textLightPrimary)),
+                Text('Structured Shift Feedback', style: AppTypography.headingSmall(colors.textPrimary)),
                 const SizedBox(height: AppSpacing.xs),
                 AppCard(
                   child: Column(
@@ -225,18 +227,18 @@ class _AssignmentsScreenState extends ConsumerState<AssignmentsScreen> {
                       ] else ...[
                         Text(
                           'Provide objective feedback on clinical readiness and facility support.',
-                          style: AppTypography.bodySmall(AppColors.textLightSecondary),
+                          style: AppTypography.bodySmall(colors.textSecondary),
                         ),
                         const SizedBox(height: AppSpacing.sm),
-                        _buildRatingRow('Clinical Handover & Triage', _ratingPreparedness, (r) => setState(() => _ratingPreparedness = r)),
+                        _buildRatingRow(colors, 'Clinical Handover & Triage', _ratingPreparedness, (r) => setState(() => _ratingPreparedness = r)),
                         const Divider(),
-                        _buildRatingRow('Facility Infrastructure Support', _ratingSupport, (r) => setState(() => _ratingSupport = r)),
+                        _buildRatingRow(colors, 'Facility Infrastructure Support', _ratingSupport, (r) => setState(() => _ratingSupport = r)),
                         const Divider(),
-                        _buildRatingRow('Staff Coordination & Punctuality', _ratingCoordination, (r) => setState(() => _ratingCoordination = r)),
+                        _buildRatingRow(colors, 'Staff Coordination & Punctuality', _ratingCoordination, (r) => setState(() => _ratingCoordination = r)),
                         const SizedBox(height: AppSpacing.md),
                         AppButton(
                           label: 'Submit Shift Feedback',
-                          backgroundColor: AppColors.surfaceElevatedLight,
+                          backgroundColor: colors.surfaceElevated,
                           onPressed: _submitFeedback,
                         ),
                       ],
@@ -252,13 +254,13 @@ class _AssignmentsScreenState extends ConsumerState<AssignmentsScreen> {
     );
   }
 
-  Widget _buildRatingRow(String title, int currentRating, ValueChanged<int> onRatingChanged) {
+  Widget _buildRatingRow(AppColorsExtension colors, String title, int currentRating, ValueChanged<int> onRatingChanged) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Expanded(child: Text(title, style: AppTypography.bodySmall(AppColors.textLightPrimary))),
+          Expanded(child: Text(title, style: AppTypography.bodySmall(colors.textPrimary))),
           Row(
             children: List.generate(5, (index) {
               final star = index + 1;
@@ -266,7 +268,7 @@ class _AssignmentsScreenState extends ConsumerState<AssignmentsScreen> {
                 onTap: () => onRatingChanged(star),
                 child: Icon(
                   star <= currentRating ? Icons.star_rounded : Icons.star_outline_rounded,
-                  color: star <= currentRating ? AppColors.amber : AppColors.textLightMuted,
+                  color: star <= currentRating ? AppColors.amber : colors.textMuted,
                   size: 22,
                 ),
               );
@@ -277,14 +279,14 @@ class _AssignmentsScreenState extends ConsumerState<AssignmentsScreen> {
     );
   }
 
-  Widget _buildRow(String label, String value) {
+  Widget _buildRow(AppColorsExtension colors, String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: AppTypography.bodyMedium(AppColors.textLightMuted)),
-          Text(value, style: AppTypography.labelBold(AppColors.textLightPrimary)),
+          Text(label, style: AppTypography.bodyMedium(colors.textMuted)),
+          Text(value, style: AppTypography.labelBold(colors.textPrimary)),
         ],
       ),
     );

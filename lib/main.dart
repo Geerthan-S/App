@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'core/design_system/app_theme.dart';
+import 'core/design_system/theme_provider.dart';
 import 'core/navigation/app_router.dart';
 import 'core/logging/app_logger.dart';
 
@@ -29,15 +30,18 @@ void main() async {
   );
 }
 
-class HealthcareWorkforceApp extends StatelessWidget {
+class HealthcareWorkforceApp extends ConsumerWidget {
   const HealthcareWorkforceApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeMode = ref.watch(themeModeProvider);
     return MaterialApp.router(
       title: 'HealthForce',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: themeMode,
       routerConfig: appRouter,
     );
   }

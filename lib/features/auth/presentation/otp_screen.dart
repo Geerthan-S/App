@@ -111,6 +111,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Verify Phone'),
@@ -123,12 +124,12 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
             children: [
               Text(
                 'Enter 6-Digit OTP',
-                style: AppTypography.headingLarge(AppColors.textLightPrimary),
+                style: AppTypography.headingLarge(colors.textPrimary),
               ),
               const SizedBox(height: AppSpacing.xs),
               Text(
                 'Sent via SMS to ${widget.phoneNumber}',
-                style: AppTypography.bodyMedium(AppColors.textLightSecondary),
+                style: AppTypography.bodyMedium(colors.textSecondary),
               ),
               const SizedBox(height: AppSpacing.xl),
               AppTextField(

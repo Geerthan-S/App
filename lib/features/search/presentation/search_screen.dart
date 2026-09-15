@@ -47,11 +47,12 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final results = _matchingDuties;
     final isSearching = _query.trim().isNotEmpty;
 
     return Scaffold(
-      backgroundColor: AppColors.bgLight,
+      backgroundColor: colors.bg,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -61,14 +62,14 @@ class _SearchScreenState extends State<SearchScreen> {
               child: TextField(
                 controller: _searchController,
                 onChanged: (value) => setState(() => _query = value),
-                style: AppTypography.bodyMedium(AppColors.textLightPrimary),
+                style: AppTypography.bodyMedium(colors.textPrimary),
                 decoration: InputDecoration(
                   hintText: 'Search by facility, specialty or city...',
-                  hintStyle: AppTypography.bodyMedium(AppColors.textLightMuted),
-                  prefixIcon: const Icon(Icons.search_rounded, color: AppColors.textLightMuted),
+                  hintStyle: AppTypography.bodyMedium(colors.textMuted),
+                  prefixIcon: Icon(Icons.search_rounded, color: colors.textMuted),
                   suffixIcon: isSearching
                       ? IconButton(
-                          icon: const Icon(Icons.close_rounded, color: AppColors.textLightMuted),
+                          icon: Icon(Icons.close_rounded, color: colors.textMuted),
                           onPressed: () => setState(() {
                             _searchController.clear();
                             _query = '';
@@ -76,15 +77,15 @@ class _SearchScreenState extends State<SearchScreen> {
                         )
                       : null,
                   filled: true,
-                  fillColor: AppColors.surfaceElevatedLight,
+                  fillColor: colors.surfaceElevated,
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                    borderSide: const BorderSide(color: AppColors.borderLight),
+                    borderSide: BorderSide(color: colors.border),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                    borderSide: const BorderSide(color: AppColors.borderLight),
+                    borderSide: BorderSide(color: colors.border),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
@@ -97,7 +98,7 @@ class _SearchScreenState extends State<SearchScreen> {
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
               child: Text(
                 isSearching ? 'Search Results' : 'Recommended For You',
-                style: AppTypography.headingSmall(AppColors.textLightPrimary),
+                style: AppTypography.headingSmall(colors.textPrimary),
               ),
             ),
             Expanded(

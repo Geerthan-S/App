@@ -9,6 +9,8 @@ import '../../../core/design_system/app_colors.dart';
 import '../../../core/design_system/app_typography.dart';
 import '../../../core/design_system/app_spacing.dart';
 import '../../../core/design_system/app_cards.dart';
+import '../../../core/design_system/theme_provider.dart';
+import '../../../core/widgets/theme_selector_dialog.dart';
 import '../../auth/data/auth_repository.dart';
 
 class SettingsScreen extends ConsumerWidget {
@@ -16,6 +18,9 @@ class SettingsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final colors = context.appColors;
+    final themeMode = ref.watch(themeModeProvider);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Settings & Security'),
@@ -26,30 +31,42 @@ class SettingsScreen extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Security & Preferences', style: AppTypography.headingSmall(AppColors.textLightPrimary)),
+              Text('Security & Preferences', style: AppTypography.headingSmall(colors.textPrimary)),
               const SizedBox(height: AppSpacing.sm),
               AppCard(
                 child: Column(
                   children: [
                     _buildSettingTile(
+                      colors: colors,
                       icon: Icons.shield_outlined,
                       title: 'App Integrity Status',
                       subtitle: 'Play Integrity Active (Production Mode)',
                       trailing: const Icon(Icons.check_circle_rounded, color: AppColors.emerald, size: 20),
                     ),
-                    const Divider(),
+                    Divider(color: colors.border),
                     _buildSettingTile(
+                      colors: colors,
                       icon: Icons.notifications_none_rounded,
                       title: 'Urgent Duty Push Alerts',
                       subtitle: 'Transactional SMS & FCM notifications',
                       trailing: Switch(value: true, onChanged: (_) {}),
                     ),
-                    const Divider(),
+                    Divider(color: colors.border),
                     _buildSettingTile(
+                      colors: colors,
+                      icon: Icons.brightness_6_outlined,
+                      title: 'Theme',
+                      subtitle: themeModeLabel(themeMode),
+                      trailing: Icon(Icons.arrow_forward_ios_rounded, color: colors.textMuted, size: 16),
+                      onTap: () => ThemeSelectorDialog.show(context),
+                    ),
+                    Divider(color: colors.border),
+                    _buildSettingTile(
+                      colors: colors,
                       icon: Icons.description_outlined,
                       title: 'Terms of Use & Integrity Charter',
                       subtitle: 'Version v1.0_2026',
-                      trailing: const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.textLightMuted, size: 16),
+                      trailing: Icon(Icons.arrow_forward_ios_rounded, color: colors.textMuted, size: 16),
                     ),
                   ],
                 ),
@@ -79,29 +96,39 @@ class SettingsScreen extends ConsumerWidget {
   }
 
   Widget _buildSettingTile({
+    required AppColorsExtension colors,
     required IconData icon,
     required String title,
     required String subtitle,
     required Widget trailing,
+    VoidCallback? onTap,
   }) {
-    return Padding(
+    final tile = Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
-          Icon(icon, color: AppColors.primary, size: 22),
+          Icon(icon, color: colors.accent, size: 22),
           const SizedBox(width: AppSpacing.md),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: AppTypography.labelBold(AppColors.textLightPrimary)),
-                Text(subtitle, style: AppTypography.bodySmall(AppColors.textLightMuted)),
+                Text(title, style: AppTypography.labelBold(colors.textPrimary)),
+                Text(subtitle, style: AppTypography.bodySmall(colors.textMuted)),
               ],
             ),
           ),
           trailing,
         ],
       ),
+    );
+
+    if (onTap == null) return tile;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+      child: tile,
     );
   }
 }

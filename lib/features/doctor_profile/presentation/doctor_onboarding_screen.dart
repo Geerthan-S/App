@@ -41,6 +41,7 @@ class _DoctorOnboardingScreenState extends ConsumerState<DoctorOnboardingScreen>
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Doctor Registration'),
@@ -53,12 +54,12 @@ class _DoctorOnboardingScreenState extends ConsumerState<DoctorOnboardingScreen>
             children: [
               Text(
                 'Professional Identity',
-                style: AppTypography.headingLarge(AppColors.textLightPrimary),
+                style: AppTypography.headingLarge(colors.textPrimary),
               ),
               const SizedBox(height: AppSpacing.xs),
               Text(
                 'Enter your official details as registered with the medical council.',
-                style: AppTypography.bodyMedium(AppColors.textLightSecondary),
+                style: AppTypography.bodyMedium(colors.textSecondary),
               ),
               const SizedBox(height: AppSpacing.lg),
               AppTextField(
@@ -68,19 +69,19 @@ class _DoctorOnboardingScreenState extends ConsumerState<DoctorOnboardingScreen>
               const SizedBox(height: AppSpacing.md),
               Text(
                 'MEDICAL COUNCIL',
-                style: AppTypography.labelBold(AppColors.textLightSecondary),
+                style: AppTypography.labelBold(colors.textSecondary),
               ),
               const SizedBox(height: AppSpacing.xs),
               DropdownButtonFormField<String>(
                 value: _selectedCouncil,
-                dropdownColor: AppColors.surfaceElevatedLight,
-                style: AppTypography.bodyLarge(AppColors.textLightPrimary),
+                dropdownColor: colors.surfaceElevated,
+                style: AppTypography.bodyLarge(colors.textPrimary),
                 decoration: InputDecoration(
                   filled: true,
-                  fillColor: AppColors.surfaceElevatedLight,
+                  fillColor: colors.surfaceElevated,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                    borderSide: const BorderSide(color: AppColors.borderLight),
+                    borderSide: BorderSide(color: colors.border),
                   ),
                 ),
                 items: AppConstants.medicalCouncils
@@ -101,19 +102,19 @@ class _DoctorOnboardingScreenState extends ConsumerState<DoctorOnboardingScreen>
               const SizedBox(height: AppSpacing.md),
               Text(
                 'PRIMARY CLINICAL SPECIALTY',
-                style: AppTypography.labelBold(AppColors.textLightSecondary),
+                style: AppTypography.labelBold(colors.textSecondary),
               ),
               const SizedBox(height: AppSpacing.xs),
               DropdownButtonFormField<String>(
                 value: _selectedSpecialty,
-                dropdownColor: AppColors.surfaceElevatedLight,
-                style: AppTypography.bodyLarge(AppColors.textLightPrimary),
+                dropdownColor: colors.surfaceElevated,
+                style: AppTypography.bodyLarge(colors.textPrimary),
                 decoration: InputDecoration(
                   filled: true,
-                  fillColor: AppColors.surfaceElevatedLight,
+                  fillColor: colors.surfaceElevated,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                    borderSide: const BorderSide(color: AppColors.borderLight),
+                    borderSide: BorderSide(color: colors.border),
                   ),
                 ),
                 items: AppConstants.specialties
@@ -130,19 +131,19 @@ class _DoctorOnboardingScreenState extends ConsumerState<DoctorOnboardingScreen>
               const SizedBox(height: AppSpacing.md),
               Text(
                 'PREFERRED WORK CITY',
-                style: AppTypography.labelBold(AppColors.textLightSecondary),
+                style: AppTypography.labelBold(colors.textSecondary),
               ),
               const SizedBox(height: AppSpacing.xs),
               DropdownButtonFormField<String>(
                 value: _selectedCity,
-                dropdownColor: AppColors.surfaceElevatedLight,
-                style: AppTypography.bodyLarge(AppColors.textLightPrimary),
+                dropdownColor: colors.surfaceElevated,
+                style: AppTypography.bodyLarge(colors.textPrimary),
                 decoration: InputDecoration(
                   filled: true,
-                  fillColor: AppColors.surfaceElevatedLight,
+                  fillColor: colors.surfaceElevated,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                    borderSide: const BorderSide(color: AppColors.borderLight),
+                    borderSide: BorderSide(color: colors.border),
                   ),
                 ),
                 items: AppConstants.majorCities

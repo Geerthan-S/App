@@ -58,12 +58,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final notifications = MockData.notifications;
 
     return Scaffold(
-      backgroundColor: AppColors.bgLight,
+      backgroundColor: colors.bg,
       appBar: AppBar(
-        title: Text('Notifications', style: AppTypography.headingMedium(AppColors.textLightPrimary)),
+        title: Text('Notifications', style: AppTypography.headingMedium(colors.textPrimary)),
       ),
       body: SafeArea(
         child: notifications.isEmpty
@@ -83,6 +84,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   Widget _buildNotificationCard(Map<String, dynamic> notification) {
+    final colors = context.appColors;
     final isUnread = notification['isRead'] == false;
     final icon = _iconByType[notification['type']] ?? Icons.notifications_active_rounded;
 
@@ -95,13 +97,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: isUnread ? AppColors.primary.withOpacity(0.15) : AppColors.surfaceElevatedLight,
+              color: isUnread ? AppColors.primary.withOpacity(0.15) : colors.surfaceElevated,
               borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
             ),
             child: Icon(
               icon,
               size: 20,
-              color: isUnread ? AppColors.primary : AppColors.textLightMuted,
+              color: isUnread ? AppColors.primary : colors.textMuted,
             ),
           ),
           const SizedBox(width: AppSpacing.sm),
@@ -111,17 +113,17 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               children: [
                 Text(
                   notification['title'] as String,
-                  style: AppTypography.labelBold(AppColors.textLightPrimary),
+                  style: AppTypography.labelBold(colors.textPrimary),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   notification['body'] as String,
-                  style: AppTypography.bodyMedium(AppColors.textLightSecondary),
+                  style: AppTypography.bodyMedium(colors.textSecondary),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   notification['time'] as String,
-                  style: AppTypography.bodySmall(AppColors.textLightMuted),
+                  style: AppTypography.bodySmall(colors.textMuted),
                 ),
               ],
             ),

@@ -16,6 +16,7 @@ class ConsentScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final colors = context.appColors;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Terms & Privacy'),
@@ -28,12 +29,12 @@ class ConsentScreen extends ConsumerWidget {
             children: [
               Text(
                 'Healthcare Integrity Consent',
-                style: AppTypography.headingLarge(AppColors.textLightPrimary),
+                style: AppTypography.headingLarge(colors.textPrimary),
               ),
               const SizedBox(height: AppSpacing.xs),
               Text(
                 'Please review our professional operational terms before selecting your role.',
-                style: AppTypography.bodyMedium(AppColors.textLightSecondary),
+                style: AppTypography.bodyMedium(colors.textSecondary),
               ),
               const SizedBox(height: AppSpacing.lg),
               Expanded(
@@ -46,12 +47,12 @@ class ConsentScreen extends ConsumerWidget {
                           children: [
                             Text(
                               '1. Verified Medical Identity',
-                              style: AppTypography.headingSmall(AppColors.textLightPrimary),
+                              style: AppTypography.headingSmall(colors.textPrimary),
                             ),
                             const SizedBox(height: AppSpacing.xs),
                             Text(
                               'All doctors must hold active, valid registration with the National Medical Commission (NMC) or relevant State Medical Council. False claims result in permanent revocation.',
-                              style: AppTypography.bodyMedium(AppColors.textLightSecondary),
+                              style: AppTypography.bodyMedium(colors.textSecondary),
                             ),
                           ],
                         ),
@@ -63,12 +64,12 @@ class ConsentScreen extends ConsumerWidget {
                           children: [
                             Text(
                               '2. Atomic Shift Contract',
-                              style: AppTypography.headingSmall(AppColors.textLightPrimary),
+                              style: AppTypography.headingSmall(colors.textPrimary),
                             ),
                             const SizedBox(height: AppSpacing.xs),
                             Text(
                               'Confirmed duty shifts represent binding operational commitments. Contact details are released strictly after mutual confirmation.',
-                              style: AppTypography.bodyMedium(AppColors.textLightSecondary),
+                              style: AppTypography.bodyMedium(colors.textSecondary),
                             ),
                           ],
                         ),
@@ -80,12 +81,12 @@ class ConsentScreen extends ConsumerWidget {
                           children: [
                             Text(
                               '3. Privacy & Clinical Record Policy',
-                              style: AppTypography.headingSmall(AppColors.textLightPrimary),
+                              style: AppTypography.headingSmall(colors.textPrimary),
                             ),
                             const SizedBox(height: AppSpacing.xs),
                             Text(
                               'This platform is strictly for duty staffing coordination. No patient clinical records, diagnoses, or prescriptions are stored or processed.',
-                              style: AppTypography.bodyMedium(AppColors.textLightSecondary),
+                              style: AppTypography.bodyMedium(colors.textSecondary),
                             ),
                           ],
                         ),

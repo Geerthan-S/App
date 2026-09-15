@@ -74,11 +74,12 @@ class _HospitalDashboardScreenState extends ConsumerState<HospitalDashboardScree
         'isVerified': true,
       },
     ];
+    final colors = context.appColors;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppColors.surfaceLight,
+      backgroundColor: colors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(AppSpacing.radiusLg)),
       ),
@@ -92,9 +93,9 @@ class _HospitalDashboardScreenState extends ConsumerState<HospitalDashboardScree
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Review Verified Applicants', style: AppTypography.headingSmall(AppColors.textLightPrimary)),
+                  Text('Review Verified Applicants', style: AppTypography.headingSmall(colors.textPrimary)),
                   IconButton(
-                    icon: const Icon(Icons.close_rounded, color: AppColors.textLightMuted),
+                    icon: Icon(Icons.close_rounded, color: colors.textMuted),
                     onPressed: () => Navigator.pop(ctx),
                   ),
                 ],
@@ -102,7 +103,7 @@ class _HospitalDashboardScreenState extends ConsumerState<HospitalDashboardScree
               const SizedBox(height: AppSpacing.xs),
               Text(
                 'Atomic selection locks duty headcount and dispatches an offer with a 12-hour expiry timer.',
-                style: AppTypography.bodySmall(AppColors.textLightMuted),
+                style: AppTypography.bodySmall(colors.textMuted),
               ),
               const SizedBox(height: AppSpacing.md),
 
@@ -135,12 +136,12 @@ class _HospitalDashboardScreenState extends ConsumerState<HospitalDashboardScree
                               children: [
                                 Row(
                                   children: [
-                                    Text(app['name'] as String, style: AppTypography.labelBold(AppColors.textLightPrimary)),
+                                    Text(app['name'] as String, style: AppTypography.labelBold(colors.textPrimary)),
                                     const SizedBox(width: 4),
                                     const Icon(Icons.verified_rounded, color: AppColors.emerald, size: 14),
                                   ],
                                 ),
-                                Text('${app['regNo']} • ${app['experience']}', style: AppTypography.bodySmall(AppColors.textLightMuted)),
+                                Text('${app['regNo']} • ${app['experience']}', style: AppTypography.bodySmall(colors.textMuted)),
                               ],
                             ),
                           ),
@@ -161,12 +162,12 @@ class _HospitalDashboardScreenState extends ConsumerState<HospitalDashboardScree
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: AppColors.surfaceLight,
+                          color: colors.surface,
                           borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
                         ),
                         child: Text(
                           '"${app['note']}"',
-                          style: AppTypography.bodySmall(AppColors.textLightSecondary),
+                          style: AppTypography.bodySmall(colors.textSecondary),
                         ),
                       ),
                       const SizedBox(height: AppSpacing.sm),
@@ -180,7 +181,7 @@ class _HospitalDashboardScreenState extends ConsumerState<HospitalDashboardScree
                                 const SnackBar(content: Text('Applicant shortlisted for duty.')),
                               );
                             },
-                            child: const Text('Shortlist', style: TextStyle(color: AppColors.textLightMuted)),
+                            child: Text('Shortlist', style: TextStyle(color: colors.textMuted)),
                           ),
                           const SizedBox(width: 8),
                           ElevatedButton(
@@ -244,6 +245,7 @@ class _HospitalDashboardScreenState extends ConsumerState<HospitalDashboardScree
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final loc = ref.watch(localizationProvider);
 
     return Scaffold(
@@ -279,19 +281,19 @@ class _HospitalDashboardScreenState extends ConsumerState<HospitalDashboardScree
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Apollo Specialty Hospital', style: AppTypography.headingSmall(AppColors.textLightPrimary)),
+                        Text('Apollo Specialty Hospital', style: AppTypography.headingSmall(colors.textPrimary)),
                         const StatusBadge(status: 'approved'),
                       ],
                     ),
                     const SizedBox(height: 2),
-                    Text('Thousand Lights, Chennai • Verified Establishment', style: AppTypography.bodySmall(AppColors.textLightMuted)),
+                    Text('Thousand Lights, Chennai • Verified Establishment', style: AppTypography.bodySmall(colors.textMuted)),
                     const SizedBox(height: AppSpacing.sm),
                     OutlinedButton.icon(
                       icon: const Icon(Icons.apartment_rounded, size: 16),
                       label: const Text('Manage Organization & Facilities'),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.primaryLight,
-                        side: const BorderSide(color: AppColors.borderLight),
+                        side: BorderSide(color: colors.border),
                       ),
                       onPressed: () => context.push('/hospital-profile'),
                     ),
@@ -310,7 +312,7 @@ class _HospitalDashboardScreenState extends ConsumerState<HospitalDashboardScree
 
               // Active Assignment / Selected Doctor Card (with 12-Hour Expiry Timer)
               if (_selectedAssignment != null) ...[
-                Text('Active Selection & Expiry Countdown', style: AppTypography.headingSmall(AppColors.textLightPrimary)),
+                Text('Active Selection & Expiry Countdown', style: AppTypography.headingSmall(colors.textPrimary)),
                 const SizedBox(height: AppSpacing.xs),
                 AppCard(
                   borderColor: AppColors.emerald.withOpacity(0.5),
@@ -331,8 +333,8 @@ class _HospitalDashboardScreenState extends ConsumerState<HospitalDashboardScree
                         ],
                       ),
                       const SizedBox(height: AppSpacing.sm),
-                      Text(_selectedAssignment!['doctorName'] as String, style: AppTypography.headingSmall(AppColors.textLightPrimary)),
-                      Text('${_selectedAssignment!['regNo']} • General Medicine', style: AppTypography.bodySmall(AppColors.textLightMuted)),
+                      Text(_selectedAssignment!['doctorName'] as String, style: AppTypography.headingSmall(colors.textPrimary)),
+                      Text('${_selectedAssignment!['regNo']} • General Medicine', style: AppTypography.bodySmall(colors.textMuted)),
                       const Divider(),
 
                       // Released Contact (Tokenized Access)
@@ -347,7 +349,7 @@ class _HospitalDashboardScreenState extends ConsumerState<HospitalDashboardScree
                         ],
                       ),
                       const SizedBox(height: 4),
-                      Text('Contact released under active selection grant. Direct duty coordination enabled.', style: AppTypography.bodySmall(AppColors.textLightMuted)),
+                      Text('Contact released under active selection grant. Direct duty coordination enabled.', style: AppTypography.bodySmall(colors.textMuted)),
                       const SizedBox(height: AppSpacing.md),
 
                       OutlinedButton(
@@ -365,7 +367,7 @@ class _HospitalDashboardScreenState extends ConsumerState<HospitalDashboardScree
               ],
 
               // Active Requirements
-              Text(loc.translate('activeDuties'), style: AppTypography.headingSmall(AppColors.textLightPrimary)),
+              Text(loc.translate('activeDuties'), style: AppTypography.headingSmall(colors.textPrimary)),
               const SizedBox(height: AppSpacing.sm),
               ListView.separated(
                 shrinkWrap: true,
@@ -381,14 +383,14 @@ class _HospitalDashboardScreenState extends ConsumerState<HospitalDashboardScree
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(duty['specialtyName'] as String, style: AppTypography.headingSmall(AppColors.textLightPrimary)),
+                            Text(duty['specialtyName'] as String, style: AppTypography.headingSmall(colors.textPrimary)),
                             StatusBadge(status: duty['status'] as String),
                           ],
                         ),
                         const SizedBox(height: 2),
-                        Text(duty['department'] as String, style: AppTypography.bodySmall(AppColors.textLightMuted)),
+                        Text(duty['department'] as String, style: AppTypography.bodySmall(colors.textMuted)),
                         const SizedBox(height: AppSpacing.sm),
-                        Text(duty['timing'] as String, style: AppTypography.bodyMedium(AppColors.textLightSecondary)),
+                        Text(duty['timing'] as String, style: AppTypography.bodyMedium(colors.textSecondary)),
                         const SizedBox(height: AppSpacing.sm),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -398,7 +400,7 @@ class _HospitalDashboardScreenState extends ConsumerState<HospitalDashboardScree
                               icon: const Icon(Icons.people_outline_rounded, size: 16),
                               label: Text('${loc.translate('reviewApplicants')} (${duty['applicantsCount']})'),
                               style: OutlinedButton.styleFrom(
-                                side: const BorderSide(color: AppColors.borderLight),
+                                side: BorderSide(color: colors.border),
                                 foregroundColor: AppColors.primaryLight,
                               ),
                               onPressed: () => _showApplicantsSheet(duty['dutyId'] as String),

@@ -100,6 +100,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Scaffold(
       body: SafeArea(
         child: Padding(
@@ -120,12 +121,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               const SizedBox(height: AppSpacing.lg),
               Text(
                 'Healthcare Workforce Platform',
-                style: AppTypography.headingLarge(AppColors.textLightPrimary),
+                style: AppTypography.headingLarge(colors.textPrimary),
               ),
               const SizedBox(height: AppSpacing.xs),
               Text(
                 'Verified on-demand duty coordination for licensed doctors and healthcare facilities.',
-                style: AppTypography.bodyMedium(AppColors.textLightSecondary),
+                style: AppTypography.bodyMedium(colors.textSecondary),
               ),
               if (_error != null) ...[
                 const SizedBox(height: AppSpacing.lg),
@@ -139,12 +140,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               const SizedBox(height: AppSpacing.lg),
               Row(
                 children: [
-                  const Expanded(child: Divider(color: AppColors.borderLight)),
+                  Expanded(child: Divider(color: colors.border)),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
-                    child: Text('OR', style: AppTypography.bodySmall(AppColors.textLightMuted)),
+                    child: Text('OR', style: AppTypography.bodySmall(colors.textMuted)),
                   ),
-                  const Expanded(child: Divider(color: AppColors.borderLight)),
+                  Expanded(child: Divider(color: colors.border)),
                 ],
               ),
               const SizedBox(height: AppSpacing.lg),
@@ -153,9 +154,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 hintText: '98765 43210',
                 controller: _phoneController,
                 keyboardType: TextInputType.phone,
-                prefixIcon: const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                  child: Text('+91', style: TextStyle(color: AppColors.textLightPrimary, fontWeight: FontWeight.bold)),
+                prefixIcon: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                  child: Text('+91', style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.bold)),
                 ),
               ),
               const SizedBox(height: AppSpacing.sm),
@@ -168,7 +169,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               Center(
                 child: Text(
                   'By continuing, you agree to verified identity & privacy standards',
-                  style: AppTypography.bodySmall(AppColors.textLightMuted),
+                  style: AppTypography.bodySmall(colors.textMuted),
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -189,13 +190,14 @@ class _GoogleSignInButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return SizedBox(
       width: double.infinity,
       height: 48,
       child: OutlinedButton(
         style: OutlinedButton.styleFrom(
-          backgroundColor: AppColors.surfaceLight,
-          side: const BorderSide(color: AppColors.borderLight),
+          backgroundColor: colors.surface,
+          side: BorderSide(color: colors.border),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
           ),
@@ -214,7 +216,7 @@ class _GoogleSignInButton extends StatelessWidget {
                   const SizedBox(width: AppSpacing.sm),
                   Text(
                     'Continue with Google',
-                    style: AppTypography.labelBold(AppColors.textLightPrimary),
+                    style: AppTypography.labelBold(colors.textPrimary),
                   ),
                 ],
               ),
