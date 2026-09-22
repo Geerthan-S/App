@@ -8,6 +8,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'main_scaffold.dart';
+import '../errors/error_screens.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/otp_screen.dart';
 import '../../features/auth/presentation/consent_screen.dart';
@@ -56,6 +57,7 @@ final appRouter = GoRouter(
   navigatorKey: _rootNavigatorKey,
   initialLocation: '/login',
   refreshListenable: GoRouterRefreshStream(FirebaseAuth.instance.authStateChanges()),
+  errorBuilder: (context, state) => NotFoundScreen(attemptedPath: state.uri.toString()),
   redirect: (context, state) {
     final isLoggedIn = FirebaseAuth.instance.currentUser != null;
     final isLoggingIn = state.matchedLocation == '/login';
@@ -112,15 +114,51 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/duty-details',
-      builder: (context, state) => DutyDetailsScreen(duty: state.extra as Map<String, dynamic>),
+      builder: (context, state) {
+        final duty = state.extra;
+        if (duty is! Map<String, dynamic>) {
+          return ContentNotFoundScreen(
+            title: 'Duty Not Found',
+            message: 'This duty may have been filled, removed, or is no longer available.',
+            icon: Icons.event_busy_outlined,
+            actionLabel: 'Back to Marketplace',
+            onAction: () => context.go('/marketplace'),
+          );
+        }
+        return DutyDetailsScreen(duty: duty);
+      },
     ),
     GoRoute(
       path: '/post-details',
-      builder: (context, state) => DutyPostDetailsScreen(duty: state.extra as Map<String, dynamic>),
+      builder: (context, state) {
+        final duty = state.extra;
+        if (duty is! Map<String, dynamic>) {
+          return ContentNotFoundScreen(
+            title: 'Post Not Found',
+            message: 'This post may have been removed by its author or is no longer available.',
+            icon: Icons.article_outlined,
+            actionLabel: 'Back to Home',
+            onAction: () => context.go('/home'),
+          );
+        }
+        return DutyPostDetailsScreen(duty: duty);
+      },
     ),
     GoRoute(
       path: '/chat',
-      builder: (context, state) => ChatScreen(conversation: state.extra as Map<String, dynamic>),
+      builder: (context, state) {
+        final conversation = state.extra;
+        if (conversation is! Map<String, dynamic>) {
+          return ContentNotFoundScreen(
+            title: 'Conversation Not Found',
+            message: 'This conversation may have been deleted or is no longer available.',
+            icon: Icons.forum_outlined,
+            actionLabel: 'Back to Messages',
+            onAction: () => context.go('/messages'),
+          );
+        }
+        return ChatScreen(conversation: conversation);
+      },
     ),
     GoRoute(
       path: '/verification',
