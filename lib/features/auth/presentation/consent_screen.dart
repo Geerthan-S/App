@@ -2,6 +2,8 @@
  * Authentication — Professional Consent & Privacy Notice
  */
 
+import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -10,12 +12,45 @@ import '../../../core/design_system/app_typography.dart';
 import '../../../core/design_system/app_spacing.dart';
 import '../../../core/design_system/app_buttons.dart';
 import '../../../core/design_system/app_cards.dart';
+import '../../../core/constants/app_constants.dart';
+import '../../../core/navigation/onboarding_gate.dart';
 
-class ConsentScreen extends ConsumerWidget {
+class ConsentScreen extends ConsumerStatefulWidget {
   const ConsentScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ConsentScreen> createState() => _ConsentScreenState();
+}
+
+class _ConsentScreenState extends ConsumerState<ConsentScreen> {
+  bool _submitting = false;
+  String? _error;
+
+  /// Onboarding only advances after the server has persisted this consent version.
+  Future<void> _accept() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+    try {
+      await FirebaseFunctions.instance.httpsCallable('recordConsent').call<Map<String, dynamic>>({
+        'consentVersion': AppConstants.currentConsentVersion,
+      });
+      OnboardingGate.markConsented(uid);
+      if (mounted) context.go('/role-selection');
+    } on FirebaseFunctionsException catch (e) {
+      if (mounted) setState(() => _error = e.message ?? 'Could not record your consent. Try again.');
+    } catch (_) {
+      if (mounted) setState(() => _error = 'Could not record your consent. Check your connection and try again.');
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final colors = context.appColors;
     return Scaffold(
       appBar: AppBar(
@@ -96,9 +131,13 @@ class ConsentScreen extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: AppSpacing.md),
+              if (_error != null) ...[
+                Text(_error!, style: AppTypography.bodySmall(AppColors.rose)),
+                const SizedBox(height: AppSpacing.xs),
+              ],
               AppButton(
-                label: 'I Accept & Agree',
-                onPressed: () => context.go('/role-selection'),
+                label: _submitting ? 'Recording consent…' : 'I Accept & Agree',
+                onPressed: _submitting ? null : _accept,
               ),
               const SizedBox(height: AppSpacing.xs),
             ],

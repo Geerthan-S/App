@@ -16,12 +16,15 @@ service firebase.storage {
         && request.resource.contentType.matches('image/(jpeg|png)|application/pdf');
     }
 
+    // Evidence is accepted only while the subject is preparing a case (draft) or
+    // answering a verifier (needs_information). Submitted and decided cases are
+    // locked so the evidence set a verifier reviews cannot change underneath them.
     function ownsDoctorCase(doctorUid, caseId) {
       return isOwner(doctorUid)
         && firestore.get(/databases/(default)/documents/verificationCases/$(caseId)).data.subjectType == 'doctor'
         && firestore.get(/databases/(default)/documents/verificationCases/$(caseId)).data.subjectId == doctorUid
         && firestore.get(/databases/(default)/documents/verificationCases/$(caseId)).data.status in
-          ['draft', 'submitted', 'under_review', 'needs_information'];
+          ['draft', 'needs_information'];
     }
 
     function isOrgAdmin(orgId) {
@@ -34,7 +37,7 @@ service firebase.storage {
         && firestore.get(/databases/(default)/documents/verificationCases/$(caseId)).data.subjectType == 'organization'
         && firestore.get(/databases/(default)/documents/verificationCases/$(caseId)).data.subjectId == orgId
         && firestore.get(/databases/(default)/documents/verificationCases/$(caseId)).data.status in
-          ['draft', 'submitted', 'under_review', 'needs_information'];
+          ['draft', 'needs_information'];
     }
 
     // Default Deny

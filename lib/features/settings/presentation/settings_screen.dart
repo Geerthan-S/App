@@ -12,6 +12,7 @@ import '../../../core/design_system/app_cards.dart';
 import '../../../core/design_system/theme_provider.dart';
 import '../../../core/widgets/theme_selector_dialog.dart';
 import '../../auth/data/auth_repository.dart';
+import '../../../core/services/push_registration_service.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -59,6 +60,31 @@ class SettingsScreen extends ConsumerWidget {
                       subtitle: themeModeLabel(themeMode),
                       trailing: Icon(Icons.arrow_forward_ios_rounded, color: colors.textMuted, size: 16),
                       onTap: () => ThemeSelectorDialog.show(context),
+                    ),
+                    Divider(color: colors.border),
+                    ValueListenableBuilder<PushRegistrationStatus>(
+                      valueListenable: PushRegistrationService.status,
+                      builder: (context, status, _) => _buildSettingTile(
+                        colors: colors,
+                        icon: Icons.notifications_active_outlined,
+                        title: 'Push Notifications',
+                        subtitle: switch (status) {
+                          PushRegistrationStatus.registered => 'This device is registered',
+                          PushRegistrationStatus.permissionDenied => 'Blocked in system settings',
+                          PushRegistrationStatus.failed => 'Registration failed — tap to retry',
+                          PushRegistrationStatus.unknown => 'Not registered yet — tap to register',
+                        },
+                        trailing: Icon(
+                          status == PushRegistrationStatus.registered
+                              ? Icons.check_circle_rounded
+                              : Icons.refresh_rounded,
+                          color: status == PushRegistrationStatus.registered ? AppColors.emerald : colors.textMuted,
+                          size: 18,
+                        ),
+                        onTap: status == PushRegistrationStatus.registered
+                            ? null
+                            : () => PushRegistrationService.register(),
+                      ),
                     ),
                     Divider(color: colors.border),
                     _buildSettingTile(

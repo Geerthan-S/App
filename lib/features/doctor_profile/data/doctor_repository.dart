@@ -93,9 +93,12 @@ class DoctorRepository {
             }).toList());
   }
 
-  static Future<void> confirmAssignment(String assignmentId) async {
+  /// [idempotencyKey] must stay the same across retries of one confirmation
+  /// so a double tap or network retry is recognised by the server as a replay.
+  static Future<void> confirmAssignment(String assignmentId, {required String idempotencyKey}) async {
     await _functions.httpsCallable('confirmAssignment').call<Map<String, dynamic>>({
       'assignmentId': assignmentId,
+      'idempotencyKey': idempotencyKey,
     });
   }
 
@@ -140,6 +143,10 @@ class DoctorRepository {
   static String _relTime(dynamic ts) {
     DateTime? dt;
     if (ts is Timestamp) dt = ts.toDate();
+    if (ts is String) dt = DateTime.tryParse(ts);
+    if (ts is Map && ts['_seconds'] is num) {
+      dt = DateTime.fromMillisecondsSinceEpoch(((ts['_seconds'] as num) * 1000).toInt());
+    }
     if (dt == null) return '';
     final diff = DateTime.now().difference(dt.toLocal());
     if (diff.inDays == 0) return 'Today';

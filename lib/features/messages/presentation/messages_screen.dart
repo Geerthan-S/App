@@ -1,6 +1,7 @@
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:uuid/uuid.dart';
 import '../../../core/design_system/app_colors.dart';
 import '../../../core/design_system/app_typography.dart';
 import '../../../core/design_system/app_spacing.dart';
@@ -8,6 +9,7 @@ import '../../../core/design_system/app_buttons.dart';
 import '../../../core/widgets/status_badge.dart';
 import '../../../core/widgets/state_views.dart';
 import '../../doctor_profile/data/doctor_repository.dart';
+import '../../../core/errors/error_envelope.dart';
 
 class MessagesScreen extends StatelessWidget {
   const MessagesScreen({super.key});
@@ -58,6 +60,8 @@ class _AssignmentTile extends StatefulWidget {
 }
 
 class _AssignmentTileState extends State<_AssignmentTile> {
+  // One key per confirmation intent, reused if the user retries after a failure.
+  final String _confirmIdempotencyKey = const Uuid().v4();
   bool _isConfirming = false;
   bool _isDeclining = false;
 
@@ -79,6 +83,7 @@ class _AssignmentTileState extends State<_AssignmentTile> {
     try {
       await DoctorRepository.confirmAssignment(
         widget.assignment['assignmentId'] as String,
+        idempotencyKey: _confirmIdempotencyKey,
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -90,7 +95,7 @@ class _AssignmentTileState extends State<_AssignmentTile> {
       }
     } on FirebaseFunctionsException catch (e) {
       if (mounted) {
-        final msg = e.code == 'OFFER_EXPIRED'
+        final msg = e.domainCode == 'OFFER_EXPIRED'
             ? 'This offer has expired and can no longer be accepted.'
             : e.message ?? 'Could not accept. Try again.';
         ScaffoldMessenger.of(context).showSnackBar(
@@ -355,7 +360,7 @@ class _AssignmentTileState extends State<_AssignmentTile> {
                             }
                           } on FirebaseFunctionsException catch (e) {
                             setSheet(() => submitting = false);
-                            final msg = e.code == 'already-exists'
+                            final msg = e.domainCode == 'APPLICATION_ALREADY_EXISTS'
                                 ? 'You already reviewed this assignment.'
                                 : e.message ?? 'Review failed. Try again.';
                             if (ctx.mounted) {

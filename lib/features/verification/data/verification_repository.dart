@@ -49,6 +49,9 @@ class VerificationRepository {
     }
   }
 
+  /// The server decides which case is current: it returns the open case for
+  /// the profile's current revision, or opens a new review cycle when the
+  /// previous case was decided or the credentials changed since.
   Future<String> currentDoctorCaseId() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) throw StateError('Sign in before submitting evidence.');
@@ -59,8 +62,6 @@ class VerificationRepository {
     if (!profile.exists) {
       throw StateError('Complete doctor onboarding first.');
     }
-    final caseId = profile.data()?['verificationCaseId'] as String?;
-    if (caseId != null && caseId.isNotEmpty) return caseId;
     final response = await _functions.httpsCallable('createVerificationCase')
         .call<Map<String, dynamic>>({'subjectType': 'doctor', 'subjectId': uid});
     final createdId = response.data['caseId'] as String?;

@@ -8,6 +8,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'main_scaffold.dart';
+import 'onboarding_gate.dart';
+import '../logging/app_logger.dart';
 import '../errors/error_screens.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/otp_screen.dart';
@@ -21,8 +23,6 @@ import '../../features/verification/presentation/verification_center_screen.dart
 import '../../features/duty_marketplace/presentation/duty_marketplace_screen.dart';
 import '../../features/duty_details/presentation/duty_details_screen.dart';
 import '../../features/duty_post_details/presentation/duty_post_details_screen.dart';
-import '../../features/applications/presentation/applications_screen.dart';
-import '../../features/assignments/presentation/assignments_screen.dart';
 import '../../features/hospital/presentation/hospital_dashboard_screen.dart';
 import '../../features/hospital/presentation/hospital_profile_screen.dart';
 import '../../features/hospital/presentation/create_duty_screen.dart';
@@ -58,17 +58,34 @@ final appRouter = GoRouter(
   initialLocation: '/login',
   refreshListenable: GoRouterRefreshStream(FirebaseAuth.instance.authStateChanges()),
   errorBuilder: (context, state) => NotFoundScreen(attemptedPath: state.uri.toString()),
-  redirect: (context, state) {
-    final isLoggedIn = FirebaseAuth.instance.currentUser != null;
-    final isLoggingIn = state.matchedLocation == '/login';
+  redirect: (context, state) async {
+    final user = FirebaseAuth.instance.currentUser;
+    final location = state.matchedLocation;
+    final isLoggingIn = location == '/login';
     // '/otp' is reached mid phone-verification, before Firebase has signed
     // the user in, so it must stay reachable without an active session.
-    final isPublicRoute = isLoggingIn || state.matchedLocation == '/otp';
+    final isPublicRoute = isLoggingIn || location == '/otp';
 
-    if (!isLoggedIn) {
+    if (user == null) {
+      OnboardingGate.reset();
       return isPublicRoute ? null : '/login';
     }
-    if (isLoggingIn) {
+
+    // Signed-in users resume onboarding from server-owned state: nothing past
+    // the consent screen is reachable until the current consent is recorded.
+    bool consented;
+    try {
+      consented = await OnboardingGate.hasCurrentConsent(user.uid);
+    } catch (e, st) {
+      // Callables enforce consent server-side regardless; do not trap the user
+      // on a screen when the state cannot be read (e.g. offline).
+      AppLogger.error('Could not read onboarding state', error: e, stackTrace: st);
+      return isLoggingIn ? '/home' : null;
+    }
+    if (!consented) {
+      return location == '/consent' ? null : '/consent';
+    }
+    if (isLoggingIn || location == '/otp') {
       return '/home';
     }
     return null;
@@ -197,13 +214,16 @@ final appRouter = GoRouter(
       path: '/marketplace',
       builder: (context, state) => const DutyMarketplaceScreen(),
     ),
+    // The former local-only demo screens for applications and assignments
+    // were retired; offers and duties are handled by the persisted workflow
+    // in My Duties, so old links land there.
     GoRoute(
       path: '/applications',
-      builder: (context, state) => const ApplicationsScreen(),
+      redirect: (context, state) => '/messages',
     ),
     GoRoute(
       path: '/assignments',
-      builder: (context, state) => const AssignmentsScreen(),
+      redirect: (context, state) => '/messages',
     ),
 
     // Stateful Nested Shell for Main Bottom Navigation

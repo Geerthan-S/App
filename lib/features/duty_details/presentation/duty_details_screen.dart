@@ -18,6 +18,7 @@ import '../../../core/widgets/language_selector_dialog.dart';
 import '../../../core/localization/language_provider.dart';
 import '../../duty_marketplace/data/duty_repository.dart';
 import '../../doctor_profile/data/doctor_repository.dart';
+import '../../../core/errors/error_envelope.dart';
 
 class DutyDetailsScreen extends ConsumerStatefulWidget {
   final Map<String, dynamic> duty;
@@ -194,7 +195,7 @@ class _DutyDetailsScreenState extends ConsumerState<DutyDetailsScreen> {
       }
     } on FirebaseFunctionsException catch (e) {
       if (mounted) {
-        final msg = switch (e.code) {
+        final msg = switch (e.domainCode) {
           'DOCTOR_NOT_VERIFIED' => 'Your profile must be verified before applying.',
           'APPLICATION_ALREADY_EXISTS' => 'You have already applied for this duty.',
           'DUTY_CAPACITY_FILLED' => 'This duty has been fully filled.',

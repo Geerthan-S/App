@@ -139,8 +139,14 @@ async function openCase(caseId) {
     ['Council',          details.subject?.council],
     ['Registration No.', details.subject?.registrationNo || details.subject?.registrationNumber],
     ['Qualification',    details.subject?.qualification],
+    ['Primary Specialty', details.subject?.primarySpecialty],
+    ['Experience (yrs)', details.subject?.yearsOfExperience],
     ['Subject ID',       currentCase.subjectId],
     ['Status',           currentCase.status],
+    // A stale case reviews an older profile revision; the server refuses to decide it.
+    ['Profile Revision', details.isStale
+      ? `STALE — case reviews r${currentCase.subjectRevision ?? 1}, profile is r${details.subject?.profileRevision ?? '?'}`
+      : `r${details.subject?.profileRevision ?? 1}`],
   ];
   for (const [label, value] of fields) {
     const card = mk('div', 'detail-item');

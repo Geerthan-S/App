@@ -14,6 +14,8 @@ export const PLATFORM_DEFAULTS = {
   STEP_UP_AUTH_MAX_AGE_SECONDS: 600, // 10 minutes
   MAX_EVIDENCE_FILE_SIZE_BYTES: 10 * 1024 * 1024, // 10 MB
   SIGNED_URL_EXPIRY_SECONDS: 300, // 5 minutes
+  /** Version of the terms & privacy notice the client must present and record. */
+  CURRENT_CONSENT_VERSION: 'v1.0_2026',
 };
 
 /**

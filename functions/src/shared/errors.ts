@@ -6,6 +6,8 @@ import { HttpsError, FunctionsErrorCode } from 'firebase-functions/v2/https';
 
 export type DomainErrorCode =
   | 'AUTH_REQUIRED'
+  | 'ACCOUNT_SUSPENDED'
+  | 'CONSENT_REQUIRED'
   | 'PERMISSION_DENIED'
   | 'STEP_UP_REQUIRED'
   | 'HOSPITAL_NOT_VERIFIED'
@@ -15,6 +17,7 @@ export type DomainErrorCode =
   | 'ASSIGNMENT_CONFLICT'
   | 'DUTY_CAPACITY_FILLED'
   | 'OFFER_EXPIRED'
+  | 'PROFILE_CHANGED'
   | 'FILE_NOT_ALLOWED'
   | 'RATE_LIMITED'
   | 'RESOURCE_NOT_FOUND'
@@ -50,6 +53,7 @@ export class DomainError extends Error {
         functionsCode = 'unauthenticated';
         break;
       case 'PERMISSION_DENIED':
+      case 'ACCOUNT_SUSPENDED':
       case 'STEP_UP_REQUIRED':
         functionsCode = 'permission-denied';
         break;
@@ -62,8 +66,15 @@ export class DomainError extends Error {
         functionsCode = 'already-exists';
         break;
       case 'VALIDATION_FAILED':
-      case 'INVALID_STATE_TRANSITION':
         functionsCode = 'invalid-argument';
+        break;
+      case 'CONSENT_REQUIRED':
+      case 'HOSPITAL_NOT_VERIFIED':
+      case 'DOCTOR_NOT_VERIFIED':
+      case 'INVALID_STATE_TRANSITION':
+      case 'PROFILE_CHANGED':
+      case 'FILE_NOT_ALLOWED':
+        functionsCode = 'failed-precondition';
         break;
       case 'RATE_LIMITED':
         functionsCode = 'resource-exhausted';
@@ -83,3 +94,18 @@ export class DomainError extends Error {
     });
   }
 }
+
+/**
+ * Converts any thrown value into the error the callable transport sends.
+ * Firebase turns every non-HttpsError into a bare INTERNAL response, so domain
+ * errors are translated here to keep their code and details for clients.
+ */
+export const toCallableError = (error: unknown, correlationId: string): HttpsError => {
+  if (error instanceof DomainError) return error.toHttpsError();
+  if (error instanceof HttpsError) return error;
+  console.error('Unhandled callable error', { correlationId, error });
+  return new HttpsError('internal', 'An internal error occurred', {
+    code: 'INTERNAL_ERROR',
+    correlationId,
+  });
+};

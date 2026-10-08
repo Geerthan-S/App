@@ -4,6 +4,11 @@
 
 import { z } from 'zod';
 
+/** Firestore document IDs accepted at the boundary: auto IDs, Auth UIDs and UUIDs. */
+export const DocIdSchema = z.string().min(1).max(128).regex(/^[A-Za-z0-9_-]+$/, 'Invalid identifier');
+
+export const IdempotencyKeySchema = z.string().min(8).max(128).regex(/^[A-Za-z0-9_-]+$/, 'Invalid idempotency key');
+
 export const PhoneSchema = z.string().regex(/^\+[1-9]\d{6,14}$/, 'Invalid E.164 phone number format');
 
 export const SubmitDoctorProfileSchema = z.object({
@@ -62,19 +67,35 @@ export const CreateDutySchema = z.object({
 });
 
 export const ApplyToDutySchema = z.object({
-  dutyId: z.string().min(1),
-  idempotencyKey: z.string().min(1),
+  dutyId: DocIdSchema,
+  idempotencyKey: IdempotencyKeySchema,
 });
 
 export const AtomicSelectDoctorSchema = z.object({
-  dutyId: z.string().min(1),
-  doctorId: z.string().min(1),
-  idempotencyKey: z.string().min(1),
+  dutyId: DocIdSchema,
+  doctorId: DocIdSchema,
+  idempotencyKey: IdempotencyKeySchema,
 });
 
 export const ConfirmAssignmentSchema = z.object({
-  assignmentId: z.string().min(1),
-  idempotencyKey: z.string().min(1),
+  assignmentId: DocIdSchema,
+  idempotencyKey: IdempotencyKeySchema,
+});
+
+/** Cancellation, completion and contact lookups on a single assignment. */
+export const AssignmentActionSchema = z.object({
+  assignmentId: DocIdSchema,
+  reason: z.string().min(2).max(64).regex(/^[A-Z0-9_]+$/).optional(),
+  outcome: z.enum(['SUCCESSFUL_SHIFT_COMPLETED', 'PARTIAL_SHIFT_COMPLETED']).optional(),
+});
+
+export const RecordConsentSchema = z.object({
+  consentVersion: z.string().min(1).max(32),
+});
+
+export const DeviceTokenSchema = z.object({
+  token: z.string().min(20).max(4096),
+  platform: z.enum(['android', 'ios', 'web']).default('android'),
 });
 
 export const VerificationDecisionSchema = z.object({

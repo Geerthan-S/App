@@ -1,5 +1,13 @@
 # Implementation Status Matrix
 
+## Release-blocker remediation (2026-10-08, branch `fix/production-blockers-2026-10-08`)
+
+- `TESTED` (Firestore/Storage emulator, `npm run test:emulator`): 12 Jest suites, 71 tests, 0 skipped. New suites `production_workflows.emulator.test.ts` (29 tests driving the real callables through the shared boundary) and `firestore_rules.emulator.test.ts` (5 tests). Mutation checks confirmed the new tests fail when the credential-revision, capacity-restore or membership-status fixes are reverted.
+- Fixed: material credential changes revoke verification and start a new profile revision; cases are bound to the reviewed revision, and a new case opens after a decision or credential change (old decisions kept as history); cancellation reads before writing and restores capacity exactly once; an offer-expiry worker releases overdue reservations and races safely with confirmation; suspension and membership status are enforced at every callable and inside contested transactions; selection re-checks doctor verification and organization approval.
+- Fixed: domain errors reach clients with their code (`details.code`); audit and outbox records commit atomically with state changes; registration uniqueness uses an atomic reservation; applications, confirmation, completion and feedback are idempotent; hospital notifications fan out to organization members with retry/lease recovery and deterministic inbox IDs; device tokens are registered server-side; consent is persisted before onboarding advances and is required by business operations.
+- Client: retired the local-only Applications/Assignments demo routes (redirect to My Duties); applicants are read from `duties/{id}/applications` with snapshots; confirmation sends a retry-stable idempotency key; marketplace indexes added. Flutter analyzer reports no errors (156 warnings/infos baseline); tests 4 passed / 2 skipped (emulator-only local-login tests). Local test login now passes through the consent screen, which needs the Functions emulator.
+- `BLOCKED_EXTERNAL`: malware scanner provisioning (contract in `docs/evidence-scanning.md`; approval stays fail-closed), App Check server enforcement, live cloud configuration, signed release build and real-device acceptance. Not yet done: removing the admin portal's hardcoded login gate and adding MFA, specialty/qualification eligibility rules, matching-doctor broadcast alerts.
+
 ## Deployment review (2026-10-08)
 
 - `IN_PROGRESS`: deployment readiness review of the current local changes is recorded in `docs/deployment-review-2026-10-08.md`. This snapshot is not production ready; earlier `TESTED` labels do not certify live workflows.

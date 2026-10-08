@@ -2,6 +2,63 @@
 
 Verdict: NOT READY for production. Preserve this branch as a reviewable snapshot; resolve the gates below before deploying.
 
+## Current-state follow-up review — 2026-10-08
+
+Reviewed source at `0a86a4d`, including existing dependencies beyond the prior working-tree diff. No application code was changed. This follow-up is local documentation; it has not been committed or pushed.
+
+### Additional release blockers
+
+| Priority | Finding and evidence | Minimum complete repair |
+| --- | --- | --- |
+| P0 | `cancelAssignment` queues duty/assignment writes before reading schedule documents through `tx.get` (`assignmentFunctions.ts:510-549`). An isolated Firestore emulator call throws `Firestore transactions require all reads to be executed before all writes`; the assignment remains selected. | Read current assignment, duty, grants and schedule records inside the transaction before writing anything. Revalidate status there, make repeat cancellation harmless, and test concurrent cancel/confirm/complete so headcount is restored once. |
+| P0 | `submitDoctorProfile` invalidates only registration/name changes (`doctorFunctions.ts:68-74`). Emulator reproduction changed qualification from MBBS to MD and retained `isVerified: true`. | Define all material credential fields, invalidate verification atomically when they change, and bind approval to the reviewed profile revision. Do not invalidate a harmless bio edit. |
+| P0 | Invalidated profiles keep `verificationCaseId`; `createVerificationCase` returns any existing ID without examining its state (`verificationFunctions.ts:94-95`). Emulator reproduction returned the approved old case after a name change. | Create an explicit new review revision/case for material changes and preserve old decisions as immutable history. Test approved-to-edited-to-resubmitted-to-approved and rejected/resubmission paths. |
+| P0 | `ApplicationsScreen` confirms a local list and claims contact grants (`applications_screen.dart:23-59`). `AssignmentsScreen` updates local strings and claims verified check-in, completion, payment acknowledgement and feedback (`assignments_screen.dart:36-70`). Both are registered application routes. | Connect the routes to canonical repositories and authorized server transitions, or remove/disable unfinished routes and their entry points. Never show success before a persisted backend acknowledgement. |
+| P0 | FCM token registration writes `users/{uid}` (`main.dart:53-65,83-94`), but Firestore rules deny those writes. Outbox delivery reads `deviceTokens`, not that user field. Initial save errors are suppressed. | Use the existing device-token collection and ownership rules consistently, handle token rotation/sign-out/revocation, surface delivery-registration failures and verify one actual device delivery. |
+| P0 | Moderation writes `users.status = suspended` (`adminFunctions.ts:69-73`), but `requireAuth` only checks token presence and membership guards only check document existence (`guards.ts:9-14,60-66`). Selection does not recheck current doctor verification. | Enforce account eligibility and active membership at trusted boundaries; recheck current doctor/org eligibility in contested transactions. Test a suspended doctor and revoked/suspended staff member cannot continue marketplace mutations. Define token/session revocation as part of suspension. |
+| P0 | Selection reserves capacity and schedule intervals as `selected`; expiry is checked only on confirmation. No expiration/recovery worker exists in `functions/src`. | Add an idempotent expiry transition that atomically releases capacity and locks, updates application/assignment/event/audit/outbox, and races safely with confirmation. Verify the duty state before reopening it. |
+| P1 | `DomainError` extends plain `Error`; `toHttpsError()` has no caller. Installed Firebase callable transport converts non-HttpsError exceptions to `INTERNAL`. | Convert domain errors at the shared callable boundary or use the platform error type while retaining existing domain details. Test actual HTTP callable responses, not just `.run()` exceptions. |
+| P1 | Consent acceptance only navigates (`consent_screen.dart:99-101`); router sends any signed-in user to `/home` (`app_router.dart:61-74`). The consent callable exists but this button never invokes it. | Persist versioned consent before advancing, resume incomplete onboarding from server-owned state, and enforce consent where business operations require it. |
+| P1 | Registration uniqueness is query-then-write; application and feedback deduplication are also check-then-write. The idempotency key is required by schemas but never used by handlers. | Enforce registration uniqueness through an atomic canonical registration reservation; make application/feedback creation atomic and implement operation replay semantics. Keep audit and outbox writes in the same commit. |
+| P1 | Duty creation accepts arbitrary facility IDs/display fields and two unrelated datetime strings; apply/select do not enforce specialty/qualification/experience eligibility. | Resolve facility ownership and display data server-side; validate end > start and bounded duration; define and enforce canonical eligibility server-side at application and selection. |
+| P1 | Phase 2 replacement/dispute handlers check flags but do not verify assignment-party authorization (`phase2Functions.ts:42-118`). | Keep these flags disabled. Before activation, add assignment ownership/membership checks, strict payload validation, audited transitions and negative tenant tests. A flag is not authorization. |
+| P1 | No `.github` CI workflow exists. Existing full-E2E/concurrency/idempotency tests mostly mutate in-memory objects rather than invoke production handlers. | Gate changes on Functions build, real emulator rules/callable/race tests, Flutter analyzer/widget tests and a signed staging build. Correct milestone claims to reflect actual evidence. |
+
+The first three findings were reproduced using synthetic records only in `demo-healthforce` with the Firestore emulator and the current compiled handlers. The reproduction includes assertions for each observed failure and lives at `A:/DevTools/tmp/healthforce-production-review.cjs`. It uses handler `.run()` directly: it proves business logic behavior against Firestore, not the HTTP authentication/App Check transport. The emulator was shut down after the run; no live Firebase records were touched.
+
+### Smallest release plan
+
+1. Repair trust and lifecycle failures first: credential revisions, suspension/tenant eligibility, cancellation/completion/expiry concurrency, truthful UI and atomic audit/outbox records.
+2. Repair the actual doctor-to-hospital workflow: applicants collection, confirmation contract, indexes, assignment snapshots, contacts, consent and FCM registration/delivery. Complete one persisted workflow end-to-end before expanding features.
+3. Complete private evidence scanning, profile-bound human review, reviewer conflict checks and MFA; test outages and denied paths. Stage server App Check enforcement after valid Android and web clients work.
+4. Replace misleading tests with real callable/emulator tests and pass CI. Existing checks from earlier in this chat apply to the unchanged source commit: Functions build passed; 30 Jest tests passed with one suite failing compilation and 7 skipped; the separate 7 emulator rules tests passed; Flutter analysis had 162 findings and the starter widget test failed. These broad suites were not needlessly rerun in the follow-up.
+5. Verify cloud configuration and build the signed release in a nonproduction environment; run real-device OTP/Google sign-in, evidence review, competing selection, expiry, cancellation, FCM and recovery checks. Then run a small consented Phase 1 pilot with rollback/incident ownership. Production console state, MFA, bucket/scanner, signing, monitoring and backup restore remain unverified in this follow-up.
+
+Retain the existing Firebase/Riverpod architecture. No backend rewrite or new general-purpose framework is needed to address these findings. Keep Phase 2 disabled until its own authorization and acceptance tests pass.
+
+## Remediation status — 2026-10-08
+
+Branch `fix/production-blockers-2026-10-08` addresses the release blockers above. The verdict is still **NOT READY**: external setup and device acceptance remain.
+
+| Finding | Status | Evidence |
+| --- | --- | --- |
+| Credential change retains verification | Fixed — fingerprinted material fields, profile revisions, open case superseded | emulator: qualification and name change tests |
+| Approved case reused after change | Fixed — new case per revision/decision, `previousCaseId` history, approval bound to the reviewed revision | emulator: approved → edited → new case, rejected → resubmission, stale approval refused |
+| Cancellation read-after-write | Fixed — all reads first, status revalidated in the transaction, replay-safe | emulator: concurrent cancels on 1- and 3-seat duties |
+| Local-only applications/assignments UI | Fixed — routes retired and redirected to the persisted My Duties flow | analyzer, router |
+| Suspension not enforced | Fixed — shared callable guard, in-transaction counterparty checks, membership status in rules, refresh-token revocation | emulator: suspended doctor/staff, removed member |
+| No offer expiry worker | Fixed — `expireAssignmentOffers` every 15 minutes | emulator: expiry, expiry-vs-confirm race |
+| Applicants collection / idempotency key / indexes | Fixed | rules test for applicant reads; confirmation replay test; `firestore.indexes.json` |
+| FCM tokens written to `/users` | Fixed — `registerDeviceToken` callable, sign-out unregistration, status in Settings | emulator: token reassignment. Real device delivery **not verified** |
+| Evidence approval race / scanner | Race fixed (evidence read in the transaction, generation-pinned). Scanner is `BLOCKED_EXTERNAL` | `docs/evidence-scanning.md` |
+| Notification retry, consent, INTERNAL errors | Fixed | emulator: lease recovery, organization fan-out, consent, error transport |
+| Phase 2 authorization | Party checks and payload validation added; flags stay disabled | emulator: non-party replacement denied |
+| CI | `.github/workflows/ci.yml` added (not yet run on GitHub) | — |
+
+Local results: `npm run test:emulator` — 12 suites, 71 tests passed, 0 skipped. Mutation checks confirmed the new tests fail when the credential-revision, capacity-restore or membership-status fixes are reverted. `flutter analyze`: no errors, 156 warnings/infos baseline. `flutter test`: 4 passed, 2 skipped (emulator-only local-login tests).
+
+Remaining before rollout: provision the scanner, validate App Check on Android and web then stage enforcement, remove the admin portal's hardcoded login gate and require MFA, define specialty/qualification eligibility, verify one real FCM delivery, build the signed release, run real-device acceptance, then a controlled Phase 1 pilot.
+
 ## Scope and changes
 
 Reviewed the working-tree changes against commit `4aa972d`, plus new repositories, feedback callable, evidence ingestion, local-login fixtures and documentation. Changes connect Flutter screens to Firebase, replace verifier demo data with authenticated callables, restrict sensitive client writes and evidence reads, add upload indexing/signature validation, and update Android tooling/signing. Existing selection/notification code was inspected where the new screens depend on its contracts.

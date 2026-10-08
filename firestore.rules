@@ -30,9 +30,12 @@ service cloud.firestore {
       return hasCustomClaim('isSuperAdmin');
     }
 
+    // Only active memberships grant tenant access. Memberships written before
+    // the status field existed are active.
     function isOrgMember(orgId) {
       return isAuthenticated() &&
-        exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid));
+        exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.get('status', 'active') == 'active';
     }
 
     // Default Deny
@@ -48,8 +51,15 @@ service cloud.firestore {
       allow write: if false; // Server functions own identity, consent and suspension fields.
     }
 
+    // Registered through registerDeviceToken/unregisterDeviceToken so a token
+    // can move between accounts on a shared device without a client takeover.
     match /deviceTokens/{tokenId} {
-      allow read, write: if isAuthenticated() && (resource == null || resource.data.uid == request.auth.uid) && request.resource.data.uid == request.auth.uid;
+      allow read: if isAuthenticated() && resource.data.uid == request.auth.uid;
+      allow write: if false;
+    }
+
+    match /registrationReservations/{registrationNoNorm} {
+      allow read, write: if false; // Server-owned uniqueness reservations
     }
 
     // =========================================================================
@@ -170,6 +180,7 @@ service cloud.firestore {
       allow read: if isAuthenticated() && (
         resource.data.authorId == request.auth.uid ||
         resource.data.targetId == request.auth.uid ||
+        (resource.data.targetType == 'organization' && isOrgMember(resource.data.targetId)) ||
         isSupportAdmin()
       );
       allow write: if false; // Server created only
@@ -248,12 +259,15 @@ service cloud.firestore {
     // =========================================================================
     // PHASE 2 (Behind Feature Flags)
     // =========================================================================
+    // Written only by flag-gated callables; direct client writes would bypass the flag.
     match /availabilityRules/{ruleId} {
-      allow read, write: if isAuthenticated() && (resource == null || resource.data.doctorId == request.auth.uid) && request.resource.data.doctorId == request.auth.uid;
+      allow read: if isAuthenticated() && resource.data.doctorId == request.auth.uid;
+      allow write: if false;
     }
 
     match /availabilityExceptions/{exceptionId} {
-      allow read, write: if isAuthenticated() && (resource == null || resource.data.doctorId == request.auth.uid) && request.resource.data.doctorId == request.auth.uid;
+      allow read: if isAuthenticated() && resource.data.doctorId == request.auth.uid;
+      allow write: if false;
     }
 
     match /reliabilitySnapshots/{snapshotId} {
@@ -262,13 +276,19 @@ service cloud.firestore {
     }
 
     match /replacementRequests/{requestId} {
-      allow read: if isAuthenticated();
+      allow read: if isAuthenticated() && (
+        resource.data.doctorId == request.auth.uid ||
+        isOrgMember(resource.data.organizationId) ||
+        isSupportAdmin()
+      );
       allow write: if false;
     }
 
     match /disputes/{disputeId} {
       allow read: if isAuthenticated() && (
         resource.data.openedBy == request.auth.uid ||
+        resource.data.doctorId == request.auth.uid ||
+        isOrgMember(resource.data.organizationId) ||
         isSupportAdmin() || isSuperAdmin()
       );
       allow write: if false;

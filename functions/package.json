@@ -12,7 +12,8 @@
     "test": "jest --runInBand",
     "test:rules": "jest tests/security_rules.test.ts --runInBand",
     "test:concurrency": "jest tests/atomic_selection.test.ts --runInBand",
-    "test:e2e": "jest tests/verification_workflow.test.ts --runInBand"
+    "test:e2e": "jest tests/verification_workflow.test.ts --runInBand",
+    "test:emulator": "firebase emulators:exec --only firestore,storage --project demo-healthforce \"jest --runInBand\""
   },
   "engines": {
     "node": "22"

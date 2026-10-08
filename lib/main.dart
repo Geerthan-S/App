@@ -13,7 +13,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'core/config/local_test_config.dart';
 import 'firebase_options.dart';
 import 'core/design_system/app_theme.dart';
@@ -22,6 +21,7 @@ import 'core/navigation/app_router.dart';
 import 'core/logging/app_logger.dart';
 import 'core/errors/error_screens.dart';
 import 'core/widgets/connectivity_gate.dart';
+import 'core/services/push_registration_service.dart';
 
 Future<void> initializeFirebaseServices() async {
   await Firebase.initializeApp(
@@ -50,21 +50,6 @@ Future<void> initializeFirebaseServices() async {
   }
 }
 
-Future<void> _saveFcmToken(String uid) async {
-  try {
-    final token = await FirebaseMessaging.instance.getToken();
-    if (token != null) {
-      await FirebaseFirestore.instance.collection('users').doc(uid).set(
-        {
-          'fcmToken': token,
-          'fcmTokenUpdatedAt': FieldValue.serverTimestamp(),
-        },
-        SetOptions(merge: true),
-      );
-    }
-  } catch (_) {}
-}
-
 void main() {
   runZonedGuarded(
     () async {
@@ -76,22 +61,8 @@ void main() {
           'Firebase initialized successfully for com.geerthan.healthcareworkforce',
         );
 
-        // Register FCM token whenever a user signs in or token rotates.
-        FirebaseAuth.instance.authStateChanges().listen((user) {
-          if (user != null) _saveFcmToken(user.uid);
-        });
-        FirebaseMessaging.instance.onTokenRefresh.listen((token) async {
-          final uid = FirebaseAuth.instance.currentUser?.uid;
-          if (uid != null) {
-            await FirebaseFirestore.instance.collection('users').doc(uid).set(
-              {
-                'fcmToken': token,
-                'fcmTokenUpdatedAt': FieldValue.serverTimestamp(),
-              },
-              SetOptions(merge: true),
-            );
-          }
-        });
+        // Register this device for push on every sign-in and token rotation.
+        PushRegistrationService.start();
       } catch (e, st) {
         AppLogger.error(
           'Firebase initialization skipped or failed in offline preview mode',

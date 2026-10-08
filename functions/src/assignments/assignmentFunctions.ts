@@ -1,26 +1,46 @@
 /**
  * Atomic Selection, Assignment Lifecycle, and Contact Privacy Cloud Functions
+ *
+ * Every lifecycle transition re-reads and revalidates state inside a Firestore
+ * transaction, performs all reads before writes, and commits the state change,
+ * assignment event, audit record and notification outbox entry atomically.
+ * Replaying a transition that already happened returns the recorded outcome.
  */
 
-import { onCall, CallableRequest } from 'firebase-functions/v2/https';
+import type { CallableRequest } from 'firebase-functions/v2/https';
 import { db, nowTimestamp, getDateIntervals, intervalsOverlap, sanitizeCorrelationId } from '../shared/firestoreHelpers';
-import { requireAuth, requireOrgMember } from '../security/guards';
-import { AtomicSelectDoctorSchema, ConfirmAssignmentSchema } from '../shared/schemas';
+import { domainCall } from '../shared/callable';
+import {
+  requireAuth,
+  requireOrgMember,
+  isActiveOrgMemberInTx,
+  assertAccountActiveInTx,
+} from '../security/guards';
+import { AtomicSelectDoctorSchema, ConfirmAssignmentSchema, AssignmentActionSchema } from '../shared/schemas';
 import { DomainError } from '../shared/errors';
-import { logAudit } from '../audit/auditLogger';
+import { logAudit, stageAudit } from '../audit/auditLogger';
+import { enqueueNotification } from '../notifications/outbox';
 import { ScheduleInterval } from '../shared/types';
 import { getOfferExpiryHours } from '../shared/platformConfig';
+import {
+  RESERVING_STATUSES,
+  applyRelease,
+  assignmentEvent,
+  readReservation,
+  scheduleRefsFor,
+  setScheduleIntervalStatus,
+} from './assignmentLifecycle';
+
+const BLOCKING_INTERVAL_STATUSES = ['selected', 'confirmed', 'in_progress'];
 
 /**
  * ATOMIC DOCTOR SELECTION
  * Concurrency protected via Firestore Transaction.
- * 1. Checks duty remaining headcount.
- * 2. Checks candidate application state.
- * 3. Checks doctorSchedules for overlapping interval conflicts across all covered calendar dates.
- * 4. Decrements capacity, updates application to 'selected', creates assignment with expiry,
- *    and inserts schedule lock into doctorSchedules.
+ * Revalidates hospital membership, organization verification, doctor
+ * verification and account status, duty capacity, application state and the
+ * doctor's schedule before reserving a seat and a schedule lock.
  */
-export const atomicSelectDoctor = onCall(async (request: CallableRequest) => {
+export const atomicSelectDoctor = domainCall(async (request: CallableRequest) => {
   const hospitalUid = requireAuth(request);
   const correlationId = sanitizeCorrelationId(request.data?.correlationId);
 
@@ -29,23 +49,13 @@ export const atomicSelectDoctor = onCall(async (request: CallableRequest) => {
     throw new DomainError('VALIDATION_FAILED', 'Invalid selection request', correlationId);
   }
 
-  const { dutyId, doctorId } = parsed.data;
-
-  // Verify hospital staff org membership
-  const dutyInitial = await db().collection('duties').doc(dutyId).get();
-  if (!dutyInitial.exists) {
-    throw new DomainError('RESOURCE_NOT_FOUND', 'Duty not found', correlationId);
-  }
-  const orgId = dutyInitial.data()!.organizationId;
-  await requireOrgMember(hospitalUid, orgId, correlationId);
+  const { dutyId, doctorId, idempotencyKey } = parsed.data;
 
   const dutyRef = db().collection('duties').doc(dutyId);
   const appRef = dutyRef.collection('applications').doc(doctorId);
   const assignmentRef = db().collection('assignments').doc();
-  const assignmentId = assignmentRef.id;
   const expiryHours = await getOfferExpiryHours();
 
-  // Execute in atomic Firestore transaction
   const result = await db().runTransaction(async (tx) => {
     const dutySnap = await tx.get(dutyRef);
     if (!dutySnap.exists) {
@@ -53,55 +63,70 @@ export const atomicSelectDoctor = onCall(async (request: CallableRequest) => {
     }
     const duty = dutySnap.data()!;
 
-    if (duty.status !== 'published' && duty.status !== 'filled') {
-      throw new DomainError('INVALID_STATE_TRANSITION', `Cannot select candidate for duty in status ${duty.status}`, correlationId);
-    }
+    const startAt = duty.schedule.startAt;
+    const endAt = duty.schedule.endAt;
+    const coveredDates = getDateIntervals(startAt, endAt);
+    const scheduleRefs = coveredDates.map(date => db().collection('doctorSchedules').doc(`${doctorId}_${date}`));
 
-    if (duty.remainingHeadcount <= 0) {
-      throw new DomainError('DUTY_CAPACITY_FILLED', 'No remaining duty headcount available', correlationId);
-    }
+    const [isMember, orgSnap, doctorSnap, appSnap, ...scheduleSnaps] = await Promise.all([
+      isActiveOrgMemberInTx(tx, hospitalUid, duty.organizationId),
+      tx.get(db().collection('organizations').doc(duty.organizationId)),
+      tx.get(db().collection('doctors').doc(doctorId)),
+      tx.get(appRef),
+      ...scheduleRefs.map(ref => tx.get(ref)),
+    ]);
+    await assertAccountActiveInTx(tx, doctorId, correlationId);
 
-    const appSnap = await tx.get(appRef);
+    if (!isMember) {
+      throw new DomainError('PERMISSION_DENIED', 'User is not an active member of this organization', correlationId);
+    }
+    if (!orgSnap.exists || orgSnap.data()?.verificationState !== 'approved') {
+      throw new DomainError('HOSPITAL_NOT_VERIFIED', 'Hospital must be verified to select doctors', correlationId);
+    }
     if (!appSnap.exists) {
       throw new DomainError('RESOURCE_NOT_FOUND', 'Application not found', correlationId);
     }
     const app = appSnap.data()!;
 
+    // Replay of the same selection request returns the original offer.
+    if (app.status === 'selected' && app.selectionIdempotencyKey === idempotencyKey && app.assignmentId) {
+      return { assignmentId: app.assignmentId as string, expiresAt: app.offerExpiresAt as string, replayed: true };
+    }
+
+    if (duty.status !== 'published') {
+      throw new DomainError('INVALID_STATE_TRANSITION', `Cannot select candidate for duty in status ${duty.status}`, correlationId);
+    }
+    if (new Date(startAt).getTime() <= Date.now()) {
+      throw new DomainError('INVALID_STATE_TRANSITION', 'Duty has already started', correlationId);
+    }
+    if (duty.remainingHeadcount <= 0) {
+      throw new DomainError('DUTY_CAPACITY_FILLED', 'No remaining duty headcount available', correlationId);
+    }
     if (app.status !== 'submitted' && app.status !== 'shortlisted') {
       throw new DomainError('INVALID_STATE_TRANSITION', `Cannot select application in status ${app.status}`, correlationId);
     }
+    if (!doctorSnap.exists || doctorSnap.data()?.isVerified !== true) {
+      throw new DomainError('DOCTOR_NOT_VERIFIED', 'Doctor is not currently verified', correlationId);
+    }
 
-    // Determine covered UTC dates for the duty interval
-    const startAt = duty.schedule.startAt;
-    const endAt = duty.schedule.endAt;
-    const coveredDates = getDateIntervals(startAt, endAt);
-
-    // Read all doctorSchedules date documents
-    const scheduleRefs = coveredDates.map(date => db().collection('doctorSchedules').doc(`${doctorId}_${date}`));
-    const scheduleSnaps = await Promise.all(scheduleRefs.map(ref => tx.get(ref)));
-
-    // Check for overlapping intervals in all covered dates
     for (const snap of scheduleSnaps) {
-      if (snap.exists) {
-        const intervals: ScheduleInterval[] = snap.data()?.intervals || [];
-        for (const existing of intervals) {
-          if (['selected', 'confirmed', 'in_progress'].includes(existing.status)) {
-            if (intervalsOverlap(startAt, endAt, existing.startAt, existing.endAt)) {
-              throw new DomainError(
-                'ASSIGNMENT_CONFLICT',
-                'Doctor has a conflicting duty assignment during this schedule window',
-                correlationId
-              );
-            }
-          }
+      if (!snap.exists) continue;
+      const intervals: ScheduleInterval[] = snap.data()?.intervals || [];
+      for (const existing of intervals) {
+        if (BLOCKING_INTERVAL_STATUSES.includes(existing.status) &&
+            intervalsOverlap(startAt, endAt, existing.startAt, existing.endAt)) {
+          throw new DomainError(
+            'ASSIGNMENT_CONFLICT',
+            'Doctor has a conflicting duty assignment during this schedule window',
+            correlationId
+          );
         }
       }
     }
 
-    // Configured offer expiry duration (default 12 hours)
+    const assignmentId = assignmentRef.id;
     const expiresAt = new Date(Date.now() + expiryHours * 60 * 60 * 1000).toISOString();
 
-    // 1. Decrement duty capacity
     const newRemaining = duty.remainingHeadcount - 1;
     tx.update(dutyRef, {
       remainingHeadcount: newRemaining,
@@ -110,18 +135,20 @@ export const atomicSelectDoctor = onCall(async (request: CallableRequest) => {
       updatedAt: nowTimestamp(),
     });
 
-    // 2. Update application to 'selected'
     tx.update(appRef, {
       status: 'selected',
+      assignmentId,
+      offerExpiresAt: expiresAt,
+      selectionIdempotencyKey: idempotencyKey,
       version: app.version + 1,
       updatedAt: nowTimestamp(),
     });
 
-    // 3. Create Assignment Offer
-    const assignmentPayload = {
+    tx.set(assignmentRef, {
       assignmentId,
       dutyId,
       doctorId,
+      doctorName: app.doctorName ?? doctorSnap.data()?.fullName ?? null,
       organizationId: duty.organizationId,
       facilityId: duty.facilityId,
       facilityName: duty.facilityName,
@@ -131,8 +158,9 @@ export const atomicSelectDoctor = onCall(async (request: CallableRequest) => {
         amount: duty.paymentTerms.amount,
         currency: duty.paymentTerms.currency,
         basis: duty.paymentTerms.basis,
-        startAt: duty.schedule.startAt,
-        endAt: duty.schedule.endAt,
+        expectedPaymentTiming: duty.paymentTerms.expectedPaymentTiming ?? null,
+        startAt,
+        endAt,
       },
       status: 'selected',
       expiresAt,
@@ -142,32 +170,21 @@ export const atomicSelectDoctor = onCall(async (request: CallableRequest) => {
       createdAt: nowTimestamp(),
       updatedAt: nowTimestamp(),
       version: 1,
-    };
-    tx.set(assignmentRef, assignmentPayload);
+    });
 
-    // 4. Update / Create doctorSchedules date documents
-    const newInterval: ScheduleInterval = {
-      assignmentId,
-      dutyId,
-      startAt,
-      endAt,
-      status: 'selected',
-    };
-
+    const newInterval: ScheduleInterval = { assignmentId, dutyId, startAt, endAt, status: 'selected' };
     scheduleSnaps.forEach((snap, idx) => {
-      const ref = scheduleRefs[idx];
-      const dateStr = coveredDates[idx];
       if (snap.exists) {
         const existingIntervals: ScheduleInterval[] = snap.data()?.intervals || [];
-        tx.update(ref, {
+        tx.update(scheduleRefs[idx], {
           intervals: [...existingIntervals, newInterval],
           version: (snap.data()?.version || 1) + 1,
           updatedAt: nowTimestamp(),
         });
       } else {
-        tx.set(ref, {
+        tx.set(scheduleRefs[idx], {
           doctorId,
-          date: dateStr,
+          date: coveredDates[idx],
           intervals: [newInterval],
           version: 1,
           updatedAt: nowTimestamp(),
@@ -175,63 +192,45 @@ export const atomicSelectDoctor = onCall(async (request: CallableRequest) => {
       }
     });
 
-    // 5. Emit assignment event & outbox notification
-    const eventRef = db().collection('assignmentEvents').doc();
-    tx.set(eventRef, {
-      eventId: eventRef.id,
-      assignmentId,
-      dutyId,
-      doctorId,
-      organizationId: duty.organizationId,
-      fromStatus: 'none',
-      toStatus: 'selected',
-      actorId: hospitalUid,
-      actorRole: 'hospital_staff',
-      reason: 'HOSPITAL_CANDIDATE_SELECTION',
-      timestamp: nowTimestamp(),
-    });
+    const event = assignmentEvent(
+      { dutyId, doctorId, organizationId: duty.organizationId },
+      assignmentId, 'none', 'selected', hospitalUid, 'hospital_staff', 'HOSPITAL_CANDIDATE_SELECTION'
+    );
+    tx.set(event.ref, event.data);
 
-    const outboxRef = db().collection('notificationOutbox').doc();
-    tx.set(outboxRef, {
-      eventId: outboxRef.id,
+    enqueueNotification(tx, {
       dedupeKey: `app_selected_${assignmentId}`,
       eventType: 'application.selected',
       targetUserId: doctorId,
       title: 'Duty Offer Received!',
       body: `You have been selected for ${duty.specialtyName} duty at ${duty.facilityName}`,
       payload: { assignmentId, dutyId, expiresAt },
-      status: 'pending',
-      leaseExpiresAt: null,
-      attemptCount: 0,
-      maxAttempts: 5,
-      lastError: null,
-      availableAt: nowTimestamp(),
-      createdAt: nowTimestamp(),
     });
 
-    return { assignmentId, expiresAt };
+    stageAudit(tx, {
+      actorId: hospitalUid,
+      actorRole: 'hospital_staff',
+      action: 'DOCTOR_SELECTED',
+      targetType: 'assignments',
+      targetId: assignmentId,
+      reasonCode: 'ATOMIC_SELECTION',
+      correlationId,
+      result: 'SUCCESS',
+      afterSummary: { dutyId, doctorId, assignmentId },
+    });
+
+    return { assignmentId, expiresAt, replayed: false };
   });
 
-  await logAudit({
-    actorId: hospitalUid,
-    actorRole: 'hospital_staff',
-    action: 'DOCTOR_SELECTED',
-    targetType: 'assignments',
-    targetId: result.assignmentId,
-    reasonCode: 'ATOMIC_SELECTION',
-    correlationId,
-    result: 'SUCCESS',
-    afterSummary: { dutyId, doctorId, assignmentId: result.assignmentId },
-  });
-
-  return { success: true, assignmentId: result.assignmentId, expiresAt: result.expiresAt };
-});
+  return { success: true, assignmentId: result.assignmentId, expiresAt: result.expiresAt, replayed: result.replayed };
+}, { requireConsent: true });
 
 /**
  * DOCTOR ASSIGNMENT CONFIRMATION
- * Transitions assignment to 'confirmed' and issues active contactGrants.
+ * Transitions assignment to 'confirmed' and issues the contact grant.
+ * Races safely with offer expiry: both transitions require status 'selected'.
  */
-export const confirmAssignment = onCall(async (request: CallableRequest) => {
+export const confirmAssignment = domainCall(async (request: CallableRequest) => {
   const doctorUid = requireAuth(request);
   const correlationId = sanitizeCorrelationId(request.data?.correlationId);
 
@@ -240,10 +239,10 @@ export const confirmAssignment = onCall(async (request: CallableRequest) => {
     throw new DomainError('VALIDATION_FAILED', 'Invalid confirmation payload', correlationId);
   }
 
-  const { assignmentId } = parsed.data;
+  const { assignmentId, idempotencyKey } = parsed.data;
   const assignmentRef = db().collection('assignments').doc(assignmentId);
 
-  await db().runTransaction(async (tx) => {
+  const outcome = await db().runTransaction(async (tx) => {
     const snap = await tx.get(assignmentRef);
     if (!snap.exists) {
       throw new DomainError('RESOURCE_NOT_FOUND', 'Assignment not found', correlationId);
@@ -253,26 +252,29 @@ export const confirmAssignment = onCall(async (request: CallableRequest) => {
     if (asg.doctorId !== doctorUid) {
       throw new DomainError('PERMISSION_DENIED', 'Only the selected doctor can confirm this assignment', correlationId);
     }
-
+    if (asg.status === 'confirmed') {
+      return { replayed: true };
+    }
     if (asg.status !== 'selected') {
       throw new DomainError('INVALID_STATE_TRANSITION', `Cannot confirm assignment in status ${asg.status}`, correlationId);
     }
-
-    const expiresAtTime = new Date(asg.expiresAt).getTime();
-    if (expiresAtTime <= Date.now()) {
+    if (new Date(asg.expiresAt).getTime() <= Date.now()) {
       throw new DomainError('OFFER_EXPIRED', 'Assignment offer has expired', correlationId);
     }
 
-    // 1. Update assignment to 'confirmed'
+    const scheduleSnaps = await Promise.all(scheduleRefsFor(asg).map(ref => tx.get(ref)));
+
     tx.update(assignmentRef, {
       status: 'confirmed',
       confirmedAt: nowTimestamp(),
+      confirmIdempotencyKey: idempotencyKey,
       version: asg.version + 1,
       updatedAt: nowTimestamp(),
     });
+    setScheduleIntervalStatus(tx, scheduleSnaps, assignmentId, 'confirmed');
 
-    // 2. Issue contactGrants (Metadata only — no raw phone numbers duplicated)
-    const grantRef = db().collection('contactGrants').doc();
+    // Deterministic grant ID: one grant per assignment, no duplicates on replay.
+    const grantRef = db().collection('contactGrants').doc(`asg_${assignmentId}`);
     tx.set(grantRef, {
       grantId: grantRef.id,
       assignmentId,
@@ -283,67 +285,47 @@ export const confirmAssignment = onCall(async (request: CallableRequest) => {
       revokedAt: null,
     });
 
-    // 3. Emit assignment event & outbox
-    const eventRef = db().collection('assignmentEvents').doc();
-    tx.set(eventRef, {
-      eventId: eventRef.id,
-      assignmentId,
-      dutyId: asg.dutyId,
-      doctorId: asg.doctorId,
-      organizationId: asg.organizationId,
-      fromStatus: 'selected',
-      toStatus: 'confirmed',
-      actorId: doctorUid,
-      actorRole: 'doctor',
-      reason: 'DOCTOR_ACCEPTED_OFFER',
-      timestamp: nowTimestamp(),
-    });
+    const event = assignmentEvent(asg, assignmentId, 'selected', 'confirmed', doctorUid, 'doctor', 'DOCTOR_ACCEPTED_OFFER');
+    tx.set(event.ref, event.data);
 
-    const outboxRef = db().collection('notificationOutbox').doc();
-    tx.set(outboxRef, {
-      eventId: outboxRef.id,
+    enqueueNotification(tx, {
       dedupeKey: `asg_confirmed_${assignmentId}`,
       eventType: 'assignment.confirmed',
-      targetUserId: asg.organizationId,
+      targetOrganizationId: asg.organizationId,
       title: 'Duty Confirmed!',
       body: 'The selected doctor has accepted and confirmed the duty assignment',
       payload: { assignmentId, dutyId: asg.dutyId },
-      status: 'pending',
-      leaseExpiresAt: null,
-      attemptCount: 0,
-      maxAttempts: 5,
-      lastError: null,
-      availableAt: nowTimestamp(),
-      createdAt: nowTimestamp(),
     });
+
+    stageAudit(tx, {
+      actorId: doctorUid,
+      actorRole: 'doctor',
+      action: 'ASSIGNMENT_CONFIRMED',
+      targetType: 'assignments',
+      targetId: assignmentId,
+      reasonCode: 'DOCTOR_ACCEPT',
+      correlationId,
+      result: 'SUCCESS',
+    });
+    return { replayed: false };
   });
 
-  await logAudit({
-    actorId: doctorUid,
-    actorRole: 'doctor',
-    action: 'ASSIGNMENT_CONFIRMED',
-    targetType: 'assignments',
-    targetId: assignmentId,
-    reasonCode: 'DOCTOR_ACCEPT',
-    correlationId,
-    result: 'SUCCESS',
-  });
-
-  return { success: true, assignmentId, status: 'confirmed' };
-});
+  return { success: true, assignmentId, status: 'confirmed', replayed: outcome.replayed };
+}, { requireConsent: true });
 
 /**
  * CONTACT RESOLUTION FUNCTION
  * Replaces insecure phone duplication with audited, authenticated server resolution.
  */
-export const getAssignmentContact = onCall(async (request: CallableRequest) => {
+export const getAssignmentContact = domainCall(async (request: CallableRequest) => {
   const callerUid = requireAuth(request);
   const correlationId = sanitizeCorrelationId(request.data?.correlationId);
-  const assignmentId = request.data?.assignmentId;
 
-  if (!assignmentId) {
+  const parsed = AssignmentActionSchema.safeParse(request.data);
+  if (!parsed.success) {
     throw new DomainError('VALIDATION_FAILED', 'assignmentId is required', correlationId);
   }
+  const { assignmentId } = parsed.data;
 
   const asgDoc = await db().collection('assignments').doc(assignmentId).get();
   if (!asgDoc.exists) {
@@ -351,23 +333,15 @@ export const getAssignmentContact = onCall(async (request: CallableRequest) => {
   }
   const asg = asgDoc.data()!;
 
-  // Must be in confirmed, in_progress, or completed status
   if (!['confirmed', 'in_progress', 'completed'].includes(asg.status)) {
     throw new DomainError('PERMISSION_DENIED', 'Contact access is only permitted on confirmed assignments', correlationId);
   }
 
   const isDoctor = asg.doctorId === callerUid;
-  let isHospital = false;
   if (!isDoctor) {
-    const memberDoc = await db().collection('organizations').doc(asg.organizationId).collection('members').doc(callerUid).get();
-    isHospital = memberDoc.exists;
+    await requireOrgMember(callerUid, asg.organizationId, correlationId);
   }
 
-  if (!isDoctor && !isHospital) {
-    throw new DomainError('PERMISSION_DENIED', 'You do not have access to contact details for this assignment', correlationId);
-  }
-
-  // Fetch active contact grant
   const grantQuery = await db()
     .collection('contactGrants')
     .where('assignmentId', '==', assignmentId)
@@ -379,9 +353,8 @@ export const getAssignmentContact = onCall(async (request: CallableRequest) => {
     throw new DomainError('PERMISSION_DENIED', 'No active contact grant found for this assignment', correlationId);
   }
 
-  // Fetch target contact information
   let contactPayload: Record<string, string> = {};
-  if (isHospital) {
+  if (!isDoctor) {
     const userDoc = await db().collection('users').doc(asg.doctorId).get();
     const docProfile = await db().collection('doctors').doc(asg.doctorId).get();
     contactPayload = {
@@ -394,7 +367,9 @@ export const getAssignmentContact = onCall(async (request: CallableRequest) => {
     contactPayload = {
       role: 'hospital',
       name: orgDoc.data()?.displayName || 'Hospital Coordinator',
-      phone: orgDoc.data()?.registrationNumber || '', // Org contact
+      // Only an explicitly provided coordination number is released; the
+      // registration number is an identifier, not a phone number.
+      phone: orgDoc.data()?.contactPhone || '',
       address: orgDoc.data()?.address || '',
     };
   }
@@ -413,113 +388,126 @@ export const getAssignmentContact = onCall(async (request: CallableRequest) => {
   return { success: true, contact: contactPayload };
 });
 
-export const completeAssignment = onCall(async (request: CallableRequest) => {
+export const completeAssignment = domainCall(async (request: CallableRequest) => {
   const uid = requireAuth(request);
   const correlationId = sanitizeCorrelationId(request.data?.correlationId);
-  const assignmentId = request.data?.assignmentId;
 
-  if (!assignmentId) {
-    throw new DomainError('VALIDATION_FAILED', 'assignmentId is required', correlationId);
+  const parsed = AssignmentActionSchema.safeParse(request.data);
+  if (!parsed.success) {
+    throw new DomainError('VALIDATION_FAILED', 'Invalid completion payload', correlationId);
   }
-
+  const { assignmentId, outcome } = parsed.data;
   const asgRef = db().collection('assignments').doc(assignmentId);
-  const asgDoc = await asgRef.get();
-  if (!asgDoc.exists) {
-    throw new DomainError('RESOURCE_NOT_FOUND', 'Assignment not found', correlationId);
-  }
-  const asg = asgDoc.data()!;
 
-  await requireOrgMember(uid, asg.organizationId, correlationId);
+  const result = await db().runTransaction(async (tx) => {
+    const asgSnap = await tx.get(asgRef);
+    if (!asgSnap.exists) {
+      throw new DomainError('RESOURCE_NOT_FOUND', 'Assignment not found', correlationId);
+    }
+    const asg = asgSnap.data()!;
 
-  if (asg.status !== 'confirmed' && asg.status !== 'in_progress') {
-    throw new DomainError('INVALID_STATE_TRANSITION', `Cannot complete assignment in status ${asg.status}`, correlationId);
-  }
-
-  const recordRef = db().collection('completionRecords').doc();
-  const batch = db().batch();
-
-  batch.update(asgRef, {
-    status: 'completed',
-    completedAt: nowTimestamp(),
-    version: asg.version + 1,
-    updatedAt: nowTimestamp(),
-  });
-
-  batch.set(recordRef, {
-    recordId: recordRef.id,
-    assignmentId,
-    dutyId: asg.dutyId,
-    doctorId: asg.doctorId,
-    organizationId: asg.organizationId,
-    completedAt: nowTimestamp(),
-    acknowledgedBy: uid,
-    structuredOutcome: request.data?.outcome || 'SUCCESSFUL_SHIFT_COMPLETED',
-  });
-
-  await batch.commit();
-
-  await logAudit({
-    actorId: uid,
-    actorRole: 'hospital_staff',
-    action: 'ASSIGNMENT_COMPLETED',
-    targetType: 'assignments',
-    targetId: assignmentId,
-    reasonCode: 'SHIFT_COMPLETION',
-    correlationId,
-    result: 'SUCCESS',
-  });
-
-  return { success: true, assignmentId, status: 'completed' };
-});
-
-export const cancelAssignment = onCall(async (request: CallableRequest) => {
-  const uid = requireAuth(request);
-  const correlationId = sanitizeCorrelationId(request.data?.correlationId);
-  const assignmentId = request.data?.assignmentId;
-  const reason = request.data?.reason || 'CANCELLATION_REQUESTED';
-
-  if (!assignmentId) {
-    throw new DomainError('VALIDATION_FAILED', 'assignmentId is required', correlationId);
-  }
-
-  const asgRef = db().collection('assignments').doc(assignmentId);
-  const asgDoc = await asgRef.get();
-  if (!asgDoc.exists) {
-    throw new DomainError('RESOURCE_NOT_FOUND', 'Assignment not found', correlationId);
-  }
-  const asg = asgDoc.data()!;
-
-  // Must be in selected or confirmed status
-  if (!['selected', 'confirmed'].includes(asg.status)) {
-    throw new DomainError('INVALID_STATE_TRANSITION', `Cannot cancel assignment in status ${asg.status}`, correlationId);
-  }
-
-  const isDoctor = asg.doctorId === uid;
-  let isHospital = false;
-  if (!isDoctor) {
-    const memberDoc = await db().collection('organizations').doc(asg.organizationId).collection('members').doc(uid).get();
-    isHospital = memberDoc.exists;
-  }
-
-  if (!isDoctor && !isHospital) {
-    throw new DomainError('PERMISSION_DENIED', 'You are not authorized to cancel this assignment', correlationId);
-  }
-
-  const dutyRef = db().collection('duties').doc(asg.dutyId);
-
-  await db().runTransaction(async (tx) => {
-    const dutySnap = await tx.get(dutyRef);
-    if (dutySnap.exists) {
-      const duty = dutySnap.data()!;
-      tx.update(dutyRef, {
-        remainingHeadcount: duty.remainingHeadcount + 1,
-        status: 'published',
-        version: duty.version + 1,
-        updatedAt: nowTimestamp(),
-      });
+    if (!(await isActiveOrgMemberInTx(tx, uid, asg.organizationId))) {
+      throw new DomainError('PERMISSION_DENIED', 'User is not an active member of this organization', correlationId);
+    }
+    if (asg.status === 'completed') {
+      return { replayed: true };
+    }
+    if (asg.status !== 'confirmed' && asg.status !== 'in_progress') {
+      throw new DomainError('INVALID_STATE_TRANSITION', `Cannot complete assignment in status ${asg.status}`, correlationId);
+    }
+    if (new Date(asg.termsSnapshot.startAt).getTime() > Date.now()) {
+      throw new DomainError('INVALID_STATE_TRANSITION', 'A shift cannot be completed before it starts', correlationId);
     }
 
-    // Update assignment to cancelled
+    const scheduleSnaps = await Promise.all(scheduleRefsFor(asg).map(ref => tx.get(ref)));
+
+    tx.update(asgRef, {
+      status: 'completed',
+      completedAt: nowTimestamp(),
+      version: asg.version + 1,
+      updatedAt: nowTimestamp(),
+    });
+    setScheduleIntervalStatus(tx, scheduleSnaps, assignmentId, 'completed');
+
+    // Deterministic record ID: one completion record per assignment.
+    const recordRef = db().collection('completionRecords').doc(assignmentId);
+    tx.set(recordRef, {
+      recordId: recordRef.id,
+      assignmentId,
+      dutyId: asg.dutyId,
+      doctorId: asg.doctorId,
+      organizationId: asg.organizationId,
+      completedAt: nowTimestamp(),
+      acknowledgedBy: uid,
+      structuredOutcome: outcome ?? 'SUCCESSFUL_SHIFT_COMPLETED',
+    });
+
+    const event = assignmentEvent(asg, assignmentId, asg.status, 'completed', uid, 'hospital_staff', 'SHIFT_COMPLETION');
+    tx.set(event.ref, event.data);
+
+    enqueueNotification(tx, {
+      dedupeKey: `asg_completed_${assignmentId}`,
+      eventType: 'assignment.completed',
+      targetUserId: asg.doctorId,
+      title: 'Shift Marked Completed',
+      body: `${asg.facilityName ?? 'The hospital'} recorded your shift as completed`,
+      payload: { assignmentId, dutyId: asg.dutyId },
+    });
+
+    stageAudit(tx, {
+      actorId: uid,
+      actorRole: 'hospital_staff',
+      action: 'ASSIGNMENT_COMPLETED',
+      targetType: 'assignments',
+      targetId: assignmentId,
+      reasonCode: 'SHIFT_COMPLETION',
+      correlationId,
+      result: 'SUCCESS',
+    });
+    return { replayed: false };
+  });
+
+  return { success: true, assignmentId, status: 'completed', replayed: result.replayed };
+});
+
+/**
+ * CANCELLATION
+ * Either party may cancel a selected or confirmed assignment. All reads happen
+ * before any write; the status transition guards against restoring capacity twice.
+ */
+export const cancelAssignment = domainCall(async (request: CallableRequest) => {
+  const uid = requireAuth(request);
+  const correlationId = sanitizeCorrelationId(request.data?.correlationId);
+
+  const parsed = AssignmentActionSchema.safeParse(request.data);
+  if (!parsed.success) {
+    throw new DomainError('VALIDATION_FAILED', 'Invalid cancellation payload', correlationId);
+  }
+  const { assignmentId } = parsed.data;
+  const reason = parsed.data.reason ?? 'CANCELLATION_REQUESTED';
+  const asgRef = db().collection('assignments').doc(assignmentId);
+
+  const result = await db().runTransaction(async (tx) => {
+    const asgSnap = await tx.get(asgRef);
+    if (!asgSnap.exists) {
+      throw new DomainError('RESOURCE_NOT_FOUND', 'Assignment not found', correlationId);
+    }
+    const asg = asgSnap.data()!;
+
+    const isDoctor = asg.doctorId === uid;
+    const isHospital = !isDoctor && await isActiveOrgMemberInTx(tx, uid, asg.organizationId);
+    if (!isDoctor && !isHospital) {
+      throw new DomainError('PERMISSION_DENIED', 'You are not authorized to cancel this assignment', correlationId);
+    }
+    if (asg.status === 'cancelled') {
+      return { replayed: true, isDoctor };
+    }
+    if (!RESERVING_STATUSES.includes(asg.status)) {
+      throw new DomainError('INVALID_STATE_TRANSITION', `Cannot cancel assignment in status ${asg.status}`, correlationId);
+    }
+
+    const reads = await readReservation(tx, asg, assignmentId);
+
     tx.update(asgRef, {
       status: 'cancelled',
       cancelledAt: nowTimestamp(),
@@ -528,55 +516,36 @@ export const cancelAssignment = onCall(async (request: CallableRequest) => {
       version: asg.version + 1,
       updatedAt: nowTimestamp(),
     });
+    applyRelease(tx, assignmentId, reads, isDoctor ? 'withdrawn' : 'rejected');
 
-    // Revoke active contact grants
-    const grants = await db().collection('contactGrants')
-      .where('assignmentId', '==', assignmentId)
-      .where('status', '==', 'active')
-      .get();
-    grants.forEach(g => {
-      tx.update(g.ref, { status: 'revoked', revokedAt: nowTimestamp() });
+    const actorRole = isDoctor ? 'doctor' : 'hospital_staff';
+    const event = assignmentEvent(asg, assignmentId, asg.status, 'cancelled', uid, actorRole, reason);
+    tx.set(event.ref, event.data);
+
+    enqueueNotification(tx, {
+      dedupeKey: `asg_cancelled_${assignmentId}`,
+      eventType: 'assignment.cancelled',
+      ...(isDoctor ? { targetOrganizationId: asg.organizationId } : { targetUserId: asg.doctorId }),
+      title: 'Duty Assignment Cancelled',
+      body: isDoctor
+        ? 'The selected doctor cancelled this duty assignment'
+        : `${asg.facilityName ?? 'The hospital'} cancelled your duty assignment`,
+      payload: { assignmentId, dutyId: asg.dutyId },
     });
 
-    // Remove intervals from doctorSchedules
-    const coveredDates = getDateIntervals(asg.termsSnapshot.startAt, asg.termsSnapshot.endAt);
-    for (const date of coveredDates) {
-      const scheduleRef = db().collection('doctorSchedules').doc(`${asg.doctorId}_${date}`);
-      const snap = await tx.get(scheduleRef);
-      if (snap.exists) {
-        const intervals: ScheduleInterval[] = snap.data()?.intervals || [];
-        const filtered = intervals.filter(i => i.assignmentId !== assignmentId);
-        tx.update(scheduleRef, { intervals: filtered, updatedAt: nowTimestamp() });
-      }
-    }
-
-    // Emit event
-    const eventRef = db().collection('assignmentEvents').doc();
-    tx.set(eventRef, {
-      eventId: eventRef.id,
-      assignmentId,
-      dutyId: asg.dutyId,
-      doctorId: asg.doctorId,
-      organizationId: asg.organizationId,
-      fromStatus: asg.status,
-      toStatus: 'cancelled',
+    stageAudit(tx, {
       actorId: uid,
-      actorRole: isDoctor ? 'doctor' : 'hospital_staff',
-      reason,
-      timestamp: nowTimestamp(),
+      actorRole,
+      action: 'ASSIGNMENT_CANCELLED',
+      targetType: 'assignments',
+      targetId: assignmentId,
+      reasonCode: reason,
+      correlationId,
+      result: 'SUCCESS',
+      beforeSummary: { status: asg.status },
     });
+    return { replayed: false, isDoctor };
   });
 
-  await logAudit({
-    actorId: uid,
-    actorRole: isDoctor ? 'doctor' : 'hospital_staff',
-    action: 'ASSIGNMENT_CANCELLED',
-    targetType: 'assignments',
-    targetId: assignmentId,
-    reasonCode: reason,
-    correlationId,
-    result: 'SUCCESS',
-  });
-
-  return { success: true, assignmentId, status: 'cancelled' };
+  return { success: true, assignmentId, status: 'cancelled', replayed: result.replayed };
 });

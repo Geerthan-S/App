@@ -12,6 +12,7 @@ import '../../../core/widgets/state_views.dart';
 import '../../../core/widgets/language_selector_dialog.dart';
 import '../../../core/localization/language_provider.dart';
 import '../data/hospital_repository.dart';
+import '../../../core/errors/error_envelope.dart';
 
 class HospitalDashboardScreen extends ConsumerStatefulWidget {
   const HospitalDashboardScreen({super.key});
@@ -60,6 +61,8 @@ class _HospitalDashboardScreenState extends ConsumerState<HospitalDashboardScree
     final colors = context.appColors;
     List<Map<String, dynamic>> applicants = [];
     bool loading = true;
+    bool requested = false;
+    bool loadFailed = false;
 
     showModalBottomSheet<void>(
       context: context,
@@ -70,10 +73,16 @@ class _HospitalDashboardScreenState extends ConsumerState<HospitalDashboardScree
       ),
       builder: (ctx) {
         return StatefulBuilder(builder: (context, setSheet) {
-          if (loading) {
+          if (loading && !requested) {
+            requested = true;
             HospitalRepository.getApplicationsForDuty(dutyId).then((apps) {
               setSheet(() {
                 applicants = apps;
+                loading = false;
+              });
+            }).catchError((Object _) {
+              setSheet(() {
+                loadFailed = true;
                 loading = false;
               });
             });
@@ -95,12 +104,14 @@ class _HospitalDashboardScreenState extends ConsumerState<HospitalDashboardScree
                   ],
                 ),
                 Text(
-                  'Selecting a candidate atomically locks the headcount and sends a 12-hour offer.',
+                  'Selecting a candidate atomically reserves a seat and sends a time-limited offer.',
                   style: AppTypography.bodySmall(colors.textMuted),
                 ),
                 const SizedBox(height: AppSpacing.md),
                 if (loading)
                   const Center(child: CircularProgressIndicator())
+                else if (loadFailed)
+                  Text('Could not load applicants. Close and try again.', style: AppTypography.bodyMedium(AppColors.rose))
                 else if (applicants.isEmpty)
                   Text('No applicants yet.', style: AppTypography.bodyMedium(colors.textMuted))
                 else
@@ -177,13 +188,13 @@ class _HospitalDashboardScreenState extends ConsumerState<HospitalDashboardScree
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: AppColors.emerald,
-            content: Text('$doctorName selected. 12-hour offer timer active.'),
+            content: Text('Offer sent to $doctorName. It expires if not confirmed in time.'),
           ),
         );
       }
     } on FirebaseFunctionsException catch (e) {
       if (mounted) {
-        final msg = e.code == 'DUTY_CAPACITY_FILLED'
+        final msg = e.domainCode == 'DUTY_CAPACITY_FILLED'
             ? 'Duty is already fully filled.'
             : e.message ?? 'Selection failed. Try again.';
         ScaffoldMessenger.of(context).showSnackBar(

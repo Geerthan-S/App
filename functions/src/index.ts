@@ -25,6 +25,7 @@ export { applyToDuty, shortlistApplication } from './applications/applicationFun
 
 // Assignments, Selection & Contact Privacy
 export { atomicSelectDoctor, confirmAssignment, getAssignmentContact, completeAssignment, cancelAssignment } from './assignments/assignmentFunctions';
+export { expireAssignmentOffers } from './assignments/offerExpiryWorker';
 
 // Verification Engine
 export {
@@ -36,10 +37,11 @@ export {
   recordVerificationDecision,
   verifyDoctorRegistration,
 } from './verification/verificationFunctions';
-export { indexVerificationEvidence } from './verification/evidenceIngest';
+export { indexVerificationEvidence, ingestEvidenceScanResult } from './verification/evidenceIngest';
 
-// Outbox Worker
-export { processNotificationOutbox } from './notifications/outboxWorker';
+// Notifications: outbox delivery, retry recovery and device registration
+export { processNotificationOutbox, retryNotificationOutbox } from './notifications/outboxWorker';
+export { registerDeviceToken, unregisterDeviceToken } from './notifications/deviceTokenFunctions';
 
 // Admin & Moderation
 export { getAdminQueues, submitModerationAction, updatePlatformConfig } from './admin/adminFunctions';

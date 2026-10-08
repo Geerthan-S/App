@@ -14,6 +14,7 @@ import '../../../core/widgets/status_badge.dart';
 import '../../../core/widgets/language_selector_dialog.dart';
 import '../../../core/localization/language_provider.dart';
 import '../../duty_marketplace/data/duty_repository.dart';
+import '../../../core/errors/error_envelope.dart';
 
 class CreateDutyScreen extends ConsumerStatefulWidget {
   const CreateDutyScreen({super.key});
@@ -215,16 +216,16 @@ class _CreateDutyScreenState extends ConsumerState<CreateDutyScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             backgroundColor: AppColors.emerald,
-            content: Text('Duty published! Verified doctors will be notified.'),
+            content: Text('Duty published to the marketplace.'),
           ),
         );
         context.pop();
       }
     } on FirebaseFunctionsException catch (e) {
       if (mounted) {
-        setState(() => _errorMessage = switch (e.code) {
+        setState(() => _errorMessage = switch (e.domainCode) {
           'HOSPITAL_NOT_VERIFIED' => 'Your organization must be verified before publishing duties.',
-          'INVALID_STATE_TRANSITION' => 'Duty start time must be in the future.',
+          'CONSENT_REQUIRED' => 'Accept the current terms before publishing duties.',
           _ => e.message ?? 'Could not publish duty. Try again.',
         });
       }

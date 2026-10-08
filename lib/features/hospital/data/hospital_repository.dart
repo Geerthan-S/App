@@ -21,47 +21,58 @@ class HospitalRepository {
         .snapshots()
         .map((snap) => snap.docs.map((doc) {
               final d = doc.data();
-              final sched = d['schedule'] as Map<String, dynamic>? ?? {};
-              final pay = d['paymentTerms'] as Map<String, dynamic>? ?? {};
+              // The server freezes schedule and pay into termsSnapshot at selection.
+              final terms = d['termsSnapshot'] as Map<String, dynamic>? ?? {};
               return {
                 'assignmentId': doc.id,
                 'dutyId': d['dutyId'] ?? '',
                 'doctorId': d['doctorId'] ?? '',
-                'doctorName': d['snapshotName'] ?? d['doctorName'] ?? 'Doctor',
+                'doctorName': d['doctorName'] ?? 'Doctor',
                 'facilityName': d['facilityName'] ?? '',
                 'specialtyName': d['specialtyName'] ?? '',
                 'department': d['department'] ?? '',
                 'status': d['status'] ?? '',
-                'amount': pay['amount'] ?? d['amount'] ?? 0,
-                'startAt': _formatTs(sched['startAt'] ?? d['startAt']),
+                'amount': terms['amount'],
+                'startAt': _formatTs(terms['startAt']),
+                'endAt': _formatTs(terms['endAt']),
               };
             }).toList());
   }
 
+  /// Applicants live at duties/{dutyId}/applications/{doctorId}; the credential
+  /// details shown to the hospital come from the immutable snapshot captured
+  /// when the doctor applied.
   static Future<List<Map<String, dynamic>>> getApplicationsForDuty(String dutyId) async {
-    final snap = await FirebaseFirestore.instance
-        .collection('assignments')
-        .where('dutyId', isEqualTo: dutyId)
-        .where('status', whereIn: ['applied', 'shortlisted'])
+    final db = FirebaseFirestore.instance;
+    final snap = await db
+        .collection('duties')
+        .doc(dutyId)
+        .collection('applications')
+        .where('status', whereIn: ['submitted', 'shortlisted'])
         .get();
-    return snap.docs.map((doc) {
+    return Future.wait(snap.docs.map((doc) async {
       final d = doc.data();
+      final snapshotId = d['snapshotRef'] as String?;
+      final snapshotDoc = snapshotId == null
+          ? null
+          : await db.collection('applicationSnapshots').doc(snapshotId).get();
+      final profile = snapshotDoc?.data()?['doctorProfileSnapshot'] as Map<String, dynamic>? ?? {};
       return {
-        'assignmentId': doc.id,
-        'doctorId': d['doctorId'] ?? '',
-        'name': d['snapshotName'] ?? 'Doctor',
-        'regNo': d['snapshotRegNo'] ?? '',
-        'council': d['snapshotCouncil'] ?? '',
-        'qualification': d['snapshotQualification'] ?? '',
+        'applicationId': d['applicationId'] ?? doc.id,
+        'doctorId': d['doctorId'] ?? doc.id,
+        'name': profile['fullName'] ?? d['doctorName'] ?? 'Doctor',
+        'regNo': profile['registrationNo'] ?? '',
+        'council': profile['council'] ?? '',
+        'qualification': profile['qualification'] ?? '',
         'note': d['note'] ?? '',
-        'isVerified': d['snapshotIsVerified'] ?? false,
-        'status': d['status'] ?? 'applied',
+        'isVerified': profile['isVerified'] == true,
+        'status': d['status'] ?? 'submitted',
       };
-    }).toList();
+    }));
   }
 
   static Future<void> selectDoctor(String dutyId, String doctorId) async {
-    await FirebaseFunctions.instance.httpsCallable('atomicSelectDoctor').call({
+    await FirebaseFunctions.instance.httpsCallable('atomicSelectDoctor').call<Map<String, dynamic>>({
       'dutyId': dutyId,
       'doctorId': doctorId,
       'idempotencyKey': const Uuid().v4(),
@@ -112,7 +123,13 @@ class HospitalRepository {
   static String _formatTs(dynamic ts) {
     if (ts == null) return '—';
     try {
-      final dt = (ts is String ? DateTime.parse(ts) : DateTime.now()).toLocal();
+      final DateTime? parsed = ts is String
+          ? DateTime.tryParse(ts)
+          : ts is Timestamp
+              ? ts.toDate()
+              : null;
+      if (parsed == null) return '—';
+      final dt = parsed.toLocal();
       return DateFormat('dd MMM, h:mm a').format(dt);
     } catch (_) {
       return ts.toString();

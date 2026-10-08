@@ -5,6 +5,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../../../core/config/local_test_config.dart';
+import '../../../core/services/push_registration_service.dart';
 
 /// Thrown when the user closes/cancels the Google account picker.
 class GoogleSignInCancelledException implements Exception {}
@@ -58,6 +59,8 @@ class AuthRepository {
   }
 
   Future<void> signOut() async {
+    // Detach this device from the account while the session can still prove ownership.
+    await PushRegistrationService.unregister();
     await Future.wait([_firebaseAuth.signOut(), _googleSignIn.signOut()]);
   }
 

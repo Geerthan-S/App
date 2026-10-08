@@ -10,6 +10,7 @@ import '../../../core/design_system/app_cards.dart';
 import '../../../core/design_system/app_inputs.dart';
 import '../../../core/widgets/state_views.dart';
 import '../../duty_marketplace/data/duty_repository.dart';
+import '../../../core/errors/error_envelope.dart';
 
 class AddPostScreen extends StatefulWidget {
   const AddPostScreen({super.key});
@@ -181,7 +182,7 @@ class _AddPostScreenState extends State<AddPostScreen> {
       );
     } on FirebaseFunctionsException catch (e) {
       if (!mounted) return;
-      final msg = e.code == 'HOSPITAL_NOT_VERIFIED'
+      final msg = e.domainCode == 'HOSPITAL_NOT_VERIFIED'
           ? 'Your organization must be verified before posting duties.'
           : e.message ?? 'Could not post duty. Try again.';
       ScaffoldMessenger.of(context).showSnackBar(
