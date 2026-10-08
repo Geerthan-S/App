@@ -6,7 +6,7 @@
 - Current verification: Functions TypeScript build passes; Jest has 30 passing tests, 7 skipped tests and one suite that cannot compile because it imports the deleted verification service. A separate real Firestore/Storage emulator run passes all 7 rules tests.
 - Flutter analysis exits nonzero with 162 findings. Widget tests have 2 passes, 1 skip and the obsolete counter smoke-test failure. No real-device or authenticated verifier acceptance run was performed.
 - Open release blockers include applicant collection mismatch, missing assignment confirmation idempotency key, marketplace indexes, evidence approval race/scanner setup, notification recovery, and real callable/concurrency acceptance coverage. External production setup remains unverified.
-- Prepared branch: `codex/deployment-readiness-2026-10-08`. GitHub push is blocked by HTTP 403 for the currently authenticated `aladdyn-io` account; owner authentication or write access is required.
+- Published branch: `codex/deployment-readiness-2026-10-08` in `Geerthan-S/App`. Initial office-account access was rejected; the owner subsequently authorized personal `Geerthan-S` authentication, which was verified before pushing. This checkout's Git credential username is scoped to `Geerthan-S`.
 
 **Legend:**
 - `NOT_STARTED`: Feature is defined but implementation has not begun.
