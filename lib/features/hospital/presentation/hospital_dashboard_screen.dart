@@ -1,20 +1,17 @@
-/**
- * Hospital Operations Dashboard & Applicant Review Screen
- * Manages active duties, applicant review, atomic doctor selection, 12-hour expiry timer, and contact release.
- */
-
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/constants/app_constants.dart';
 import '../../../core/design_system/app_colors.dart';
 import '../../../core/design_system/app_typography.dart';
 import '../../../core/design_system/app_spacing.dart';
 import '../../../core/design_system/app_buttons.dart';
 import '../../../core/design_system/app_cards.dart';
 import '../../../core/widgets/status_badge.dart';
+import '../../../core/widgets/state_views.dart';
 import '../../../core/widgets/language_selector_dialog.dart';
 import '../../../core/localization/language_provider.dart';
+import '../data/hospital_repository.dart';
 
 class HospitalDashboardScreen extends ConsumerStatefulWidget {
   const HospitalDashboardScreen({super.key});
@@ -24,59 +21,47 @@ class HospitalDashboardScreen extends ConsumerStatefulWidget {
 }
 
 class _HospitalDashboardScreenState extends ConsumerState<HospitalDashboardScreen> {
-  final List<Map<String, dynamic>> _hospitalDuties = [
-    {
-      'dutyId': 'duty_hosp_01',
-      'specialtyName': 'General Medicine',
-      'department': 'ICU & Emergency',
-      'timing': 'Tomorrow, 08:00 AM - 04:00 PM',
-      'headcount': 2,
-      'remainingHeadcount': 1,
-      'status': 'published',
-      'applicantsCount': 2,
-    },
-    {
-      'dutyId': 'duty_hosp_02',
-      'specialtyName': 'Anesthesiology',
-      'department': 'Main Operation Theatre',
-      'timing': '19 Sep, 09:00 AM - 05:00 PM',
-      'headcount': 1,
-      'remainingHeadcount': 1,
-      'status': 'published',
-      'applicantsCount': 1,
-    },
-  ];
+  List<Map<String, dynamic>> _organizations = [];
+  String? _selectedOrgId;
+  String _selectedOrgName = '';
+  bool _loadingOrgs = true;
 
-  Map<String, dynamic>? _selectedAssignment;
+  @override
+  void initState() {
+    super.initState();
+    _loadOrgs();
+  }
 
-  void _showApplicantsSheet(String dutyId) {
-    final List<Map<String, dynamic>> applicants = [
-      {
-        'doctorId': 'doc_aravind_01',
-        'name': 'Dr. Aravind Swaminathan',
-        'regNo': 'TNMC_98234',
-        'council': 'Tamil Nadu Medical Council',
-        'qualification': 'MBBS, MD (General Medicine)',
-        'qualificationMatch': '100% Match',
-        'experience': '5 years ICU / Casualty',
-        'note': 'Available immediately for the emergency triage desk. Familiar with Apollo protocols.',
-        'isVerified': true,
-      },
-      {
-        'doctorId': 'doc_priya_02',
-        'name': 'Dr. Priya Sharma',
-        'regNo': 'KMC_45678',
-        'council': 'Karnataka Medical Council',
-        'qualification': 'MBBS, DA',
-        'qualificationMatch': 'Eligible',
-        'experience': '3 years Emergency Medicine',
-        'note': 'Experienced with acute adult resuscitation and trauma care.',
-        'isVerified': true,
-      },
-    ];
+  Future<void> _loadOrgs() async {
+    try {
+      final result = await FirebaseFunctions.instance
+          .httpsCallable('getMyOrganizations')
+          .call<Map<String, dynamic>>();
+      final orgs = (result.data['organizations'] as List<dynamic>? ?? [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+      if (mounted) {
+        setState(() {
+          _organizations = orgs;
+          if (orgs.isNotEmpty) {
+            _selectedOrgId = orgs.first['organizationId'] as String?;
+            _selectedOrgName = orgs.first['displayName'] as String? ??
+                orgs.first['legalName'] as String? ?? 'My Organization';
+          }
+          _loadingOrgs = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loadingOrgs = false);
+    }
+  }
+
+  Future<void> _showApplicantsSheet(String dutyId) async {
     final colors = context.appColors;
+    List<Map<String, dynamic>> applicants = [];
+    bool loading = true;
 
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: colors.surface,
@@ -84,162 +69,227 @@ class _HospitalDashboardScreenState extends ConsumerState<HospitalDashboardScree
         borderRadius: BorderRadius.vertical(top: Radius.circular(AppSpacing.radiusLg)),
       ),
       builder: (ctx) {
-        return Padding(
-          padding: AppSpacing.paddingScreen,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('Review Verified Applicants', style: AppTypography.headingSmall(colors.textPrimary)),
-                  IconButton(
-                    icon: Icon(Icons.close_rounded, color: colors.textMuted),
-                    onPressed: () => Navigator.pop(ctx),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                'Atomic selection locks duty headcount and dispatches an offer with a 12-hour expiry timer.',
-                style: AppTypography.bodySmall(colors.textMuted),
-              ),
-              const SizedBox(height: AppSpacing.md),
-
-              ...applicants.map((app) {
-                return AppCard(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              color: AppColors.primary,
-                              borderRadius: BorderRadius.circular(AppSpacing.radiusPill),
-                            ),
-                            child: Center(
-                              child: Text(
-                                app['name'].toString().split(' ').last.substring(0, 1),
-                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: AppSpacing.sm),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+        return StatefulBuilder(builder: (context, setSheet) {
+          if (loading) {
+            HospitalRepository.getApplicationsForDuty(dutyId).then((apps) {
+              setSheet(() {
+                applicants = apps;
+                loading = false;
+              });
+            });
+          }
+          return Padding(
+            padding: AppSpacing.paddingScreen,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Review Applicants', style: AppTypography.headingSmall(colors.textPrimary)),
+                    IconButton(
+                      icon: Icon(Icons.close_rounded, color: colors.textMuted),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
+                ),
+                Text(
+                  'Selecting a candidate atomically locks the headcount and sends a 12-hour offer.',
+                  style: AppTypography.bodySmall(colors.textMuted),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                if (loading)
+                  const Center(child: CircularProgressIndicator())
+                else if (applicants.isEmpty)
+                  Text('No applicants yet.', style: AppTypography.bodyMedium(colors.textMuted))
+                else
+                  ...applicants.map((app) => AppCard(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
                               children: [
-                                Row(
-                                  children: [
-                                    Text(app['name'] as String, style: AppTypography.labelBold(colors.textPrimary)),
-                                    const SizedBox(width: 4),
-                                    const Icon(Icons.verified_rounded, color: AppColors.emerald, size: 14),
-                                  ],
+                                CircleAvatar(
+                                  radius: 22,
+                                  backgroundColor: AppColors.primary,
+                                  child: Text(
+                                    (app['name'] as String).split(' ').last.substring(0, 1),
+                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                  ),
                                 ),
-                                Text('${app['regNo']} • ${app['experience']}', style: AppTypography.bodySmall(colors.textMuted)),
+                                const SizedBox(width: AppSpacing.sm),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(children: [
+                                        Text(app['name'] as String, style: AppTypography.labelBold(colors.textPrimary)),
+                                        const SizedBox(width: 4),
+                                        if (app['isVerified'] == true)
+                                          const Icon(Icons.verified_rounded, color: AppColors.emerald, size: 14),
+                                      ]),
+                                      Text('${app['regNo']} • ${app['qualification']}',
+                                          style: AppTypography.bodySmall(colors.textMuted)),
+                                    ],
+                                  ),
+                                ),
                               ],
                             ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: AppColors.emerald.withOpacity(0.15),
-                              borderRadius: BorderRadius.circular(AppSpacing.radiusPill),
+                            if ((app['note'] as String).isNotEmpty) ...[
+                              const SizedBox(height: AppSpacing.sm),
+                              Text('"${app['note']}"', style: AppTypography.bodySmall(colors.textSecondary)),
+                            ],
+                            const SizedBox(height: AppSpacing.sm),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.emerald,
+                                    foregroundColor: Colors.white,
+                                  ),
+                                  onPressed: () async {
+                                    Navigator.pop(ctx);
+                                    await _selectDoctor(dutyId, app['doctorId'] as String, app['name'] as String);
+                                  },
+                                  child: const Text('Select Candidate'),
+                                ),
+                              ],
                             ),
-                            child: Text(
-                              app['qualificationMatch'] as String,
-                              style: AppTypography.bodySmall(AppColors.emerald),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: colors.surface,
-                          borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                          ],
                         ),
-                        child: Text(
-                          '"${app['note']}"',
-                          style: AppTypography.bodySmall(colors.textSecondary),
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          TextButton(
-                            onPressed: () {
-                              Navigator.pop(ctx);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Applicant shortlisted for duty.')),
-                              );
-                            },
-                            child: Text('Shortlist', style: TextStyle(color: colors.textMuted)),
-                          ),
-                          const SizedBox(width: 8),
-                          ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.emerald,
-                              foregroundColor: Colors.white,
-                            ),
-                            onPressed: () {
-                              Navigator.pop(ctx);
-                              _atomicSelectDoctor(dutyId, app);
-                            },
-                            child: const Text('Select Candidate'),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                );
-              }),
-            ],
-          ),
-        );
+                      )),
+                const SizedBox(height: AppSpacing.md),
+              ],
+            ),
+          );
+        });
       },
     );
   }
 
-  void _atomicSelectDoctor(String dutyId, Map<String, dynamic> doctor) {
-    setState(() {
-      _selectedAssignment = {
-        'dutyId': dutyId,
-        'doctorId': doctor['doctorId'],
-        'doctorName': doctor['name'],
-        'regNo': doctor['regNo'],
-        'phone': '+91 98765 43210', // Tokenized contact release
-        'status': 'selected',
-        'expiresAt': DateTime.now().add(const Duration(hours: AppConstants.defaultOfferExpiryHours)),
-        'amount': 6500,
-        'selectedAt': DateTime.now(),
-      };
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        backgroundColor: AppColors.emerald,
-        content: Text('Candidate selected atomically! 12-hour offer timer active and notification sent.'),
-      ),
-    );
+  Future<void> _selectDoctor(String dutyId, String doctorId, String doctorName) async {
+    try {
+      await HospitalRepository.selectDoctor(dutyId, doctorId);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AppColors.emerald,
+            content: Text('$doctorName selected. 12-hour offer timer active.'),
+          ),
+        );
+      }
+    } on FirebaseFunctionsException catch (e) {
+      if (mounted) {
+        final msg = e.code == 'DUTY_CAPACITY_FILLED'
+            ? 'Duty is already fully filled.'
+            : e.message ?? 'Selection failed. Try again.';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(backgroundColor: AppColors.rose, content: Text(msg)),
+        );
+      }
+    }
   }
 
-  void _cancelOffer() {
-    setState(() {
-      _selectedAssignment = null;
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        backgroundColor: AppColors.rose,
-        content: Text('Assignment offer cancelled. Duty slot capacity restored.'),
+  void _showReviewModal(Map<String, dynamic> assignment) {
+    final commentCtrl = TextEditingController();
+    int selectedRating = 0;
+    bool submitting = false;
+    final colors = context.appColors;
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: colors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppSpacing.radiusLg)),
       ),
+      builder: (ctx) => StatefulBuilder(builder: (context, setSheet) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 16, right: 16, top: 20,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Review Doctor', style: AppTypography.headingSmall(colors.textPrimary)),
+                const SizedBox(height: 4),
+                Text(
+                  'Rate ${assignment['doctorName']} for their duty at ${assignment['facilityName']}',
+                  style: AppTypography.bodySmall(colors.textMuted),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(5, (i) => IconButton(
+                    icon: Icon(
+                      i < selectedRating ? Icons.star_rounded : Icons.star_border_rounded,
+                      color: AppColors.amber,
+                      size: 36,
+                    ),
+                    onPressed: () => setSheet(() => selectedRating = i + 1),
+                  )),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                TextField(
+                  controller: commentCtrl,
+                  maxLines: 3,
+                  maxLength: 500,
+                  decoration: InputDecoration(
+                    hintText: 'Share your experience with this doctor...',
+                    hintStyle: AppTypography.bodyMedium(colors.textMuted),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppSpacing.radiusSm)),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                AppButton(
+                  label: 'Submit Review',
+                  isLoading: submitting,
+                  onPressed: selectedRating > 0
+                      ? () async {
+                          if (commentCtrl.text.trim().isEmpty) return;
+                          setSheet(() => submitting = true);
+                          try {
+                            await FirebaseFunctions.instance.httpsCallable('submitFeedback').call({
+                              'targetId': assignment['doctorId'],
+                              'targetType': 'doctor',
+                              'assignmentId': assignment['assignmentId'],
+                              'rating': selectedRating,
+                              'comment': commentCtrl.text.trim(),
+                            });
+                            if (ctx.mounted) Navigator.pop(ctx);
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  backgroundColor: AppColors.emerald,
+                                  content: Text('Review submitted successfully.'),
+                                ),
+                              );
+                            }
+                          } catch (_) {
+                            setSheet(() => submitting = false);
+                            if (ctx.mounted) {
+                              ScaffoldMessenger.of(ctx).showSnackBar(
+                                const SnackBar(
+                                  backgroundColor: AppColors.rose,
+                                  content: Text('Could not submit review. Try again.'),
+                                ),
+                              );
+                            }
+                          }
+                        }
+                      : null,
+                ),
+              ],
+            ),
+          ),
+        );
+      }),
     );
   }
 
@@ -247,6 +297,21 @@ class _HospitalDashboardScreenState extends ConsumerState<HospitalDashboardScree
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final loc = ref.watch(localizationProvider);
+
+    if (_loadingOrgs) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    if (_selectedOrgId == null) {
+      return Scaffold(
+        appBar: AppBar(title: Text(loc.translate('hospitalOperations'))),
+        body: const EmptyStateView(
+          icon: Icons.apartment_rounded,
+          title: 'No organization found',
+          description: 'Set up your hospital organization to start posting duties.',
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -273,36 +338,55 @@ class _HospitalDashboardScreenState extends ConsumerState<HospitalDashboardScree
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Organization Header
-              AppCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('Apollo Specialty Hospital', style: AppTypography.headingSmall(colors.textPrimary)),
-                        const StatusBadge(status: 'approved'),
-                      ],
-                    ),
-                    const SizedBox(height: 2),
-                    Text('Thousand Lights, Chennai • Verified Establishment', style: AppTypography.bodySmall(colors.textMuted)),
-                    const SizedBox(height: AppSpacing.sm),
-                    OutlinedButton.icon(
-                      icon: const Icon(Icons.apartment_rounded, size: 16),
-                      label: const Text('Manage Organization & Facilities'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.primaryLight,
-                        side: BorderSide(color: colors.border),
+              // Org selector if multiple
+              if (_organizations.length > 1)
+                DropdownButtonFormField<String>(
+                  value: _selectedOrgId,
+                  decoration: InputDecoration(
+                    labelText: 'Organization',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppSpacing.radiusSm)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  ),
+                  items: _organizations
+                      .map((o) => DropdownMenuItem<String>(
+                            value: o['organizationId'] as String,
+                            child: Text(o['displayName'] as String? ?? o['legalName'] as String? ?? ''),
+                          ))
+                      .toList(),
+                  onChanged: (v) => setState(() {
+                    _selectedOrgId = v;
+                    final org = _organizations.firstWhere((o) => o['organizationId'] == v, orElse: () => {});
+                    _selectedOrgName = org['displayName'] as String? ?? org['legalName'] as String? ?? '';
+                  }),
+                )
+              else
+                AppCard(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(_selectedOrgName, style: AppTypography.headingSmall(colors.textPrimary)),
+                            Text('Verified Organization', style: AppTypography.bodySmall(colors.textMuted)),
+                          ],
+                        ),
                       ),
-                      onPressed: () => context.push('/hospital-profile'),
-                    ),
-                  ],
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.apartment_rounded, size: 16),
+                        label: const Text('Manage'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.primaryLight,
+                          side: BorderSide(color: colors.border),
+                        ),
+                        onPressed: () => context.push('/hospital-profile'),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
               const SizedBox(height: AppSpacing.lg),
 
-              // Post Duty Button
               AppButton(
                 label: loc.translate('postDuty'),
                 icon: Icons.add_circle_outline_rounded,
@@ -310,105 +394,125 @@ class _HospitalDashboardScreenState extends ConsumerState<HospitalDashboardScree
               ),
               const SizedBox(height: AppSpacing.lg),
 
-              // Active Assignment / Selected Doctor Card (with 12-Hour Expiry Timer)
-              if (_selectedAssignment != null) ...[
-                Text('Active Selection & Expiry Countdown', style: AppTypography.headingSmall(colors.textPrimary)),
-                const SizedBox(height: AppSpacing.xs),
-                AppCard(
-                  borderColor: AppColors.emerald.withOpacity(0.5),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.timer_outlined, color: AppColors.amber, size: 20),
-                              const SizedBox(width: 6),
-                              Text('Offer Expiry: 11h 59m remaining', style: AppTypography.labelBold(AppColors.amber)),
-                            ],
-                          ),
-                          const StatusBadge(status: 'selected'),
-                        ],
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      Text(_selectedAssignment!['doctorName'] as String, style: AppTypography.headingSmall(colors.textPrimary)),
-                      Text('${_selectedAssignment!['regNo']} • General Medicine', style: AppTypography.bodySmall(colors.textMuted)),
-                      const Divider(),
-
-                      // Released Contact (Tokenized Access)
-                      Row(
-                        children: [
-                          const Icon(Icons.phone_in_talk_rounded, color: AppColors.emerald, size: 16),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Released Contact: ${_selectedAssignment!['phone']}',
-                            style: AppTypography.labelBold(AppColors.emerald),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text('Contact released under active selection grant. Direct duty coordination enabled.', style: AppTypography.bodySmall(colors.textMuted)),
-                      const SizedBox(height: AppSpacing.md),
-
-                      OutlinedButton(
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.rose,
-                          side: const BorderSide(color: AppColors.rose),
-                        ),
-                        onPressed: _cancelOffer,
-                        child: const Text('Cancel Offer Before Acceptance'),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.lg),
-              ],
-
-              // Active Requirements
+              // Active duties
               Text(loc.translate('activeDuties'), style: AppTypography.headingSmall(colors.textPrimary)),
               const SizedBox(height: AppSpacing.sm),
-              ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: _hospitalDuties.length,
-                separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
-                itemBuilder: (context, index) {
-                  final duty = _hospitalDuties[index];
-                  return AppCard(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              StreamBuilder<List<Map<String, dynamic>>>(
+                stream: HospitalRepository.watchOrgDuties(_selectedOrgId!),
+                builder: (context, snap) {
+                  if (snap.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  final duties = snap.data ?? [];
+                  if (duties.isEmpty) {
+                    return AppCard(
+                      child: Text('No duties posted yet.', style: AppTypography.bodyMedium(colors.textMuted)),
+                    );
+                  }
+                  return ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: duties.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
+                    itemBuilder: (context, i) {
+                      final duty = duties[i];
+                      return AppCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(duty['specialtyName'] as String, style: AppTypography.headingSmall(colors.textPrimary)),
-                            StatusBadge(status: duty['status'] as String),
-                          ],
-                        ),
-                        const SizedBox(height: 2),
-                        Text(duty['department'] as String, style: AppTypography.bodySmall(colors.textMuted)),
-                        const SizedBox(height: AppSpacing.sm),
-                        Text(duty['timing'] as String, style: AppTypography.bodyMedium(colors.textSecondary)),
-                        const SizedBox(height: AppSpacing.sm),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text('${duty['remainingHeadcount']} slot open', style: AppTypography.bodySmall(AppColors.amber)),
-                            OutlinedButton.icon(
-                              icon: const Icon(Icons.people_outline_rounded, size: 16),
-                              label: Text('${loc.translate('reviewApplicants')} (${duty['applicantsCount']})'),
-                              style: OutlinedButton.styleFrom(
-                                side: BorderSide(color: colors.border),
-                                foregroundColor: AppColors.primaryLight,
-                              ),
-                              onPressed: () => _showApplicantsSheet(duty['dutyId'] as String),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Text(duty['specialtyName'] as String,
+                                      style: AppTypography.headingSmall(colors.textPrimary)),
+                                ),
+                                StatusBadge(status: duty['status'] as String),
+                              ],
+                            ),
+                            const SizedBox(height: 2),
+                            Text(duty['department'] as String, style: AppTypography.bodySmall(colors.textMuted)),
+                            const SizedBox(height: AppSpacing.xs),
+                            Text(duty['timing'] as String, style: AppTypography.bodyMedium(colors.textSecondary)),
+                            const SizedBox(height: AppSpacing.sm),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text('${duty['remainingHeadcount']} slot open',
+                                    style: AppTypography.bodySmall(AppColors.amber)),
+                                OutlinedButton.icon(
+                                  icon: const Icon(Icons.people_outline_rounded, size: 16),
+                                  label: Text(loc.translate('reviewApplicants')),
+                                  style: OutlinedButton.styleFrom(
+                                    side: BorderSide(color: colors.border),
+                                    foregroundColor: AppColors.primaryLight,
+                                  ),
+                                  onPressed: () => _showApplicantsSheet(duty['dutyId'] as String),
+                                ),
+                              ],
                             ),
                           ],
                         ),
-                      ],
-                    ),
+                      );
+                    },
+                  );
+                },
+              ),
+              const SizedBox(height: AppSpacing.lg),
+
+              // Completed assignments — review doctors
+              Text('Completed Assignments', style: AppTypography.headingSmall(colors.textPrimary)),
+              const SizedBox(height: AppSpacing.xs),
+              Text('Leave a review for doctors after their shift ends.',
+                  style: AppTypography.bodySmall(colors.textMuted)),
+              const SizedBox(height: AppSpacing.sm),
+              StreamBuilder<List<Map<String, dynamic>>>(
+                stream: HospitalRepository.watchOrgAssignments(_selectedOrgId!),
+                builder: (context, snap) {
+                  final all = snap.data ?? [];
+                  final completed = all.where((a) => a['status'] == 'completed').toList();
+                  if (completed.isEmpty) {
+                    return AppCard(
+                      child: Text('No completed assignments yet.', style: AppTypography.bodyMedium(colors.textMuted)),
+                    );
+                  }
+                  return ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: completed.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
+                    itemBuilder: (context, i) {
+                      final asg = completed[i];
+                      return AppCard(
+                        child: Row(
+                          children: [
+                            CircleAvatar(
+                              backgroundColor: AppColors.emerald.withValues(alpha: 0.15),
+                              child: const Icon(Icons.check_circle_rounded, color: AppColors.emerald),
+                            ),
+                            const SizedBox(width: AppSpacing.sm),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(asg['doctorName'] as String, style: AppTypography.labelBold(colors.textPrimary)),
+                                  Text('${asg['specialtyName']} • ${asg['startAt']}',
+                                      style: AppTypography.bodySmall(colors.textMuted)),
+                                ],
+                              ),
+                            ),
+                            OutlinedButton(
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppColors.primaryLight,
+                                side: BorderSide(color: colors.border),
+                              ),
+                              onPressed: () => _showReviewModal(asg),
+                              child: const Text('Review'),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
                   );
                 },
               ),

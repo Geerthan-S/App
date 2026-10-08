@@ -1,65 +1,27 @@
-/**
- * In-App Notifications Inbox Screen
- * Reuses MockData.notifications, MockData.conversations and MockData.duties
- * — no separate notifications model. Tapping a notification marks it read
- * and opens the relevant Chat or Duty Details screen.
- */
-
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/constants/mock_data.dart';
 import '../../../core/design_system/app_colors.dart';
 import '../../../core/design_system/app_typography.dart';
 import '../../../core/design_system/app_spacing.dart';
 import '../../../core/design_system/app_cards.dart';
 import '../../../core/widgets/state_views.dart';
+import '../data/notification_repository.dart';
 
-class NotificationsScreen extends StatefulWidget {
+class NotificationsScreen extends StatelessWidget {
   const NotificationsScreen({super.key});
 
-  @override
-  State<NotificationsScreen> createState() => _NotificationsScreenState();
-}
-
-class _NotificationsScreenState extends State<NotificationsScreen> {
-  static const Map<String, IconData> _iconByType = {
+  static const Map<String, IconData> _icons = {
     'message': Icons.chat_bubble_outline_rounded,
     'confirmed': Icons.check_circle_outline_rounded,
     'new_duty': Icons.local_hospital_outlined,
     'verification': Icons.shield_outlined,
+    'info': Icons.info_outline_rounded,
   };
-
-  void _openNotification(Map<String, dynamic> notification) {
-    setState(() => notification['isRead'] = true);
-
-    final conversationId = notification['conversationId'] as String?;
-    if (conversationId != null) {
-      final conversation = MockData.conversations.firstWhere(
-        (c) => c['conversationId'] == conversationId,
-        orElse: () => <String, dynamic>{},
-      );
-      if (conversation.isNotEmpty) {
-        context.push('/chat', extra: conversation);
-        return;
-      }
-    }
-
-    final dutyId = notification['dutyId'] as String?;
-    if (dutyId != null) {
-      final duty = MockData.duties.firstWhere(
-        (d) => d['dutyId'] == dutyId,
-        orElse: () => <String, dynamic>{},
-      );
-      if (duty.isNotEmpty) {
-        context.push('/post-details', extra: duty);
-      }
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    final notifications = MockData.notifications;
 
     return Scaffold(
       backgroundColor: colors.bg,
@@ -67,37 +29,74 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         title: Text('Notifications', style: AppTypography.headingMedium(colors.textPrimary)),
       ),
       body: SafeArea(
-        child: notifications.isEmpty
-            ? const EmptyStateView(
+        child: StreamBuilder<List<Map<String, dynamic>>>(
+          stream: NotificationRepository.watchAll(),
+          builder: (context, snap) {
+            if (snap.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            final notifications = snap.data ?? [];
+            if (notifications.isEmpty) {
+              return const EmptyStateView(
                 icon: Icons.notifications_none_rounded,
                 title: 'No notifications yet',
-                description: 'Updates about your duties and chats will appear here.',
-              )
-            : ListView.separated(
-                padding: AppSpacing.paddingScreen,
-                itemCount: notifications.length,
-                separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
-                itemBuilder: (context, index) => _buildNotificationCard(notifications[index]),
-              ),
+                description: 'Updates about your duties and verifications will appear here.',
+              );
+            }
+            return ListView.separated(
+              padding: AppSpacing.paddingScreen,
+              itemCount: notifications.length,
+              separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
+              itemBuilder: (context, index) =>
+                  _NotificationCard(notification: notifications[index]),
+            );
+          },
+        ),
       ),
     );
   }
+}
 
-  Widget _buildNotificationCard(Map<String, dynamic> notification) {
+class _NotificationCard extends StatelessWidget {
+  final Map<String, dynamic> notification;
+  const _NotificationCard({required this.notification});
+
+  Future<void> _open(BuildContext context) async {
+    final id = notification['notificationId'] as String;
+    NotificationRepository.markRead(id).ignore();
+
+    final dutyId = notification['dutyId'] as String?;
+    if (dutyId != null && dutyId.isNotEmpty) {
+      try {
+        final doc = await FirebaseFirestore.instance.collection('duties').doc(dutyId).get();
+        if (doc.exists && context.mounted) {
+          context.push('/duty-details', extra: Map<String, dynamic>.from(doc.data()!));
+          return;
+        }
+      } catch (_) {}
+    }
+    // No navigation target — just marking read is enough
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final colors = context.appColors;
     final isUnread = notification['isRead'] == false;
-    final icon = _iconByType[notification['type']] ?? Icons.notifications_active_rounded;
+    final icon = NotificationsScreen._icons[notification['type']] ??
+        Icons.notifications_active_rounded;
 
     return AppCard(
-      onTap: () => _openNotification(notification),
-      borderColor: isUnread ? AppColors.primary.withOpacity(0.5) : null,
+      onTap: () => _open(context),
+      borderColor: isUnread ? AppColors.primary.withValues(alpha: 0.5) : null,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: isUnread ? AppColors.primary.withOpacity(0.15) : colors.surfaceElevated,
+              color: isUnread
+                  ? AppColors.primary.withValues(alpha: 0.15)
+                  : colors.surfaceElevated,
               borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
             ),
             child: Icon(
@@ -111,20 +110,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  notification['title'] as String,
-                  style: AppTypography.labelBold(colors.textPrimary),
-                ),
+                Text(notification['title'] as String,
+                    style: AppTypography.labelBold(colors.textPrimary)),
                 const SizedBox(height: 2),
-                Text(
-                  notification['body'] as String,
-                  style: AppTypography.bodyMedium(colors.textSecondary),
-                ),
+                Text(notification['body'] as String,
+                    style: AppTypography.bodyMedium(colors.textSecondary)),
                 const SizedBox(height: 4),
-                Text(
-                  notification['time'] as String,
-                  style: AppTypography.bodySmall(colors.textMuted),
-                ),
+                Text(notification['time'] as String,
+                    style: AppTypography.bodySmall(colors.textMuted)),
               ],
             ),
           ),

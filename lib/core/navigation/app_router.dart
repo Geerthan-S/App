@@ -174,7 +174,11 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/hospital-info',
-      builder: (context, state) => const HospitalInfoScreen(),
+      builder: (context, state) {
+        final extra = state.extra;
+        final orgId = extra is Map<String, dynamic> ? extra['organizationId'] as String? : null;
+        return HospitalInfoScreen(organizationId: orgId);
+      },
     ),
     GoRoute(
       path: '/reviews',

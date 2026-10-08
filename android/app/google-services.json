@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "415742364224-ccp8rkmgg7cgldkngi0ibtv4sbvbrijh.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.geerthan.healthcareworkforce",
+            "certificate_hash": "aa02d76da78291c25a52975b1a4e082b5dad2e7e"
+          }
+        },
+        {
           "client_id": "415742364224-rkd72nn0e7va4socav5jqg8nfkbusp4v.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {

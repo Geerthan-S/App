@@ -35,11 +35,6 @@ service cloud.firestore {
         exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid));
     }
 
-    function isOrgAdmin(orgId) {
-      return isAuthenticated() &&
-        get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.role in ['owner', 'admin'];
-    }
-
     // Default Deny
     match /{document=**} {
       allow read, write: if false;
@@ -50,8 +45,7 @@ service cloud.firestore {
     // =========================================================================
     match /users/{uid} {
       allow read: if isOwner(uid) || isSupportAdmin() || isSuperAdmin();
-      allow create, update: if isOwner(uid) && request.resource.data.uid == uid;
-      allow delete: if isSuperAdmin();
+      allow write: if false; // Server functions own identity, consent and suspension fields.
     }
 
     match /deviceTokens/{tokenId} {
@@ -62,22 +56,17 @@ service cloud.firestore {
     // DOCTORS & PROFILES
     // =========================================================================
     match /doctors/{doctorId} {
-      // Authenticated users can view doctor profile summary; doctor can update non-privileged fields
-      allow read: if isAuthenticated();
-      allow create: if isOwner(doctorId) && request.resource.data.userId == request.auth.uid && request.resource.data.isVerified == false;
-      allow update: if isOwner(doctorId) && 
-        request.resource.data.userId == request.auth.uid &&
-        request.resource.data.isVerified == resource.data.isVerified; // Prevent self-verification
-      allow delete: if isSuperAdmin();
+      allow read: if isOwner(doctorId) || isVerifier() || isSupportAdmin();
+      allow write: if false; // Prevent credential edits after verification.
 
       match /qualifications/{qualId} {
-        allow read: if isAuthenticated();
-        allow write: if isOwner(doctorId);
+        allow read: if isOwner(doctorId) || isVerifier();
+        allow write: if false;
       }
 
       match /specialties/{specId} {
-        allow read: if isAuthenticated();
-        allow write: if isOwner(doctorId);
+        allow read: if isOwner(doctorId) || isVerifier();
+        allow write: if false;
       }
     }
 
@@ -90,19 +79,17 @@ service cloud.firestore {
     // ORGANIZATIONS & FACILITIES
     // =========================================================================
     match /organizations/{orgId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update: if isOrgAdmin(orgId) && request.resource.data.verificationState == resource.data.verificationState;
-      allow delete: if isSuperAdmin();
+      allow read: if isOrgMember(orgId) || isVerifier() || isSupportAdmin();
+      allow write: if false; // Server-owned verification and tenant fields.
 
       match /members/{memberUid} {
         allow read: if isOrgMember(orgId) || isSupportAdmin();
-        allow write: if isOrgAdmin(orgId) || isSuperAdmin();
+        allow write: if false; // Membership grants require audited server flow.
       }
 
       match /facilities/{facilityId} {
-        allow read: if isAuthenticated();
-        allow write: if isOrgAdmin(orgId);
+        allow read: if isOrgMember(orgId) || isVerifier();
+        allow write: if false;
       }
     }
 
@@ -218,6 +205,10 @@ service cloud.firestore {
     // =========================================================================
     match /notificationOutbox/{eventId} {
       allow read, write: if false; // Server-only background trigger & worker
+    }
+
+    match /deliveryAttempts/{attemptId} {
+      allow read, write: if false; // Server-only outbox delivery records
     }
 
     match /inboxNotifications/{notifId} {

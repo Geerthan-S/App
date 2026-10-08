@@ -3,6 +3,7 @@
  */
 
 import { onCall, CallableRequest } from 'firebase-functions/v2/https';
+import { FieldValue } from 'firebase-admin/firestore';
 import { db, nowTimestamp, sanitizeCorrelationId } from '../shared/firestoreHelpers';
 import { requireAuth, requireOrgAdmin } from '../security/guards';
 import { CreateOrganizationSchema, CreateFacilitySchema } from '../shared/schemas';
@@ -50,6 +51,7 @@ export const createOrganizationDraft = onCall(async (request: CallableRequest) =
   // Update user active role
   await db().collection('users').doc(uid).set({
     activeRole: 'hospital_staff',
+    organizationIds: FieldValue.arrayUnion(orgId),
     updatedAt: nowTimestamp(),
   }, { merge: true });
 
@@ -66,6 +68,39 @@ export const createOrganizationDraft = onCall(async (request: CallableRequest) =
   });
 
   return { success: true, organizationId: orgId };
+});
+
+export const getMyOrganizations = onCall(async (request: CallableRequest) => {
+  const uid = requireAuth(request);
+  const user = await db().collection('users').doc(uid).get();
+  const savedIds = user.data()?.organizationIds;
+  const legacyOwned = await db().collection('organizations').where('createdBy', '==', uid).limit(20).get();
+  const ids = [...new Set([
+    ...(Array.isArray(savedIds) ? savedIds : []),
+    ...legacyOwned.docs.map(doc => doc.id),
+  ])];
+  const organizations = await Promise.all(ids.slice(0, 20).map(async id => {
+    if (typeof id !== 'string' || !id || id.includes('/')) return null;
+    const orgRef = db().collection('organizations').doc(id);
+    const [member, org] = await Promise.all([
+      orgRef.collection('members').doc(uid).get(), orgRef.get(),
+    ]);
+    if (!member.exists || !org.exists) return null;
+    const data = org.data()!;
+    return {
+      organizationId: id,
+      legalName: data.legalName,
+      displayName: data.displayName,
+      organizationType: data.organizationType,
+      registrationNumber: data.registrationNumber,
+      address: data.address,
+      city: data.city,
+      verificationState: data.verificationState,
+      verificationCaseId: data.verificationCaseId,
+      memberRole: member.data()?.role,
+    };
+  }));
+  return { organizations: organizations.filter(Boolean) };
 });
 
 export const addFacility = onCall(async (request: CallableRequest) => {

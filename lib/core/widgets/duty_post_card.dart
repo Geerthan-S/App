@@ -21,7 +21,7 @@ class DutyPostCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     return AppCard(
-      onTap: () => context.push('/post-details', extra: duty),
+      onTap: () => context.push('/duty-details', extra: duty),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -99,7 +99,7 @@ class DutyPostCard extends StatelessWidget {
               Icon(Icons.location_on_outlined, size: 14, color: colors.textMuted),
               const SizedBox(width: 4),
               Text(
-                '${duty['distanceKm']} km away',
+                duty['distanceKm'] != null ? '${duty['distanceKm']} km away' : duty['city'] as String? ?? '',
                 style: AppTypography.bodySmall(colors.textMuted),
               ),
               const Spacer(),

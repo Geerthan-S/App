@@ -31,9 +31,16 @@ build/
 # Android
 android/**/gradle-wrapper.jar
 android/.gradle
+android/.kotlin/
 android/captures/
 android/local.properties
+android/key.properties
+*.jks
+*.keystore
 android/**/GeneratedPluginRegistrant.java
+
+# Admin portal config (contains production API keys — never commit)
+admin/firebase-config.json
 
 # Node / Functions
 node_modules/
@@ -47,4 +54,8 @@ ui-debug.log*
 
 # Functions build output
 functions/lib/
+
+# Local Firebase/browser artifacts (may contain session or test data)
+.firebase/
+.playwright-mcp/
 

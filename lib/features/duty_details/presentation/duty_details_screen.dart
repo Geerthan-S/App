@@ -3,6 +3,7 @@
  * Doctor view: Facility details, GPS navigation, eligibility check, profile snapshot, terms acknowledgement, and duplicate prevention.
  */
 
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -15,6 +16,8 @@ import '../../../core/design_system/app_inputs.dart';
 import '../../../core/services/location_service.dart';
 import '../../../core/widgets/language_selector_dialog.dart';
 import '../../../core/localization/language_provider.dart';
+import '../../duty_marketplace/data/duty_repository.dart';
+import '../../doctor_profile/data/doctor_repository.dart';
 
 class DutyDetailsScreen extends ConsumerStatefulWidget {
   final Map<String, dynamic> duty;
@@ -28,6 +31,15 @@ class DutyDetailsScreen extends ConsumerStatefulWidget {
 class _DutyDetailsScreenState extends ConsumerState<DutyDetailsScreen> {
   bool _hasApplied = false;
   bool _isSubmitting = false;
+  Map<String, dynamic>? _doctorProfile;
+
+  @override
+  void initState() {
+    super.initState();
+    DoctorRepository.getProfile().then((p) {
+      if (mounted) setState(() => _doctorProfile = p);
+    });
+  }
 
   void _showApplicationModal() {
     final noteCtrl = TextEditingController();
@@ -73,21 +85,33 @@ class _DutyDetailsScreenState extends ConsumerState<DutyDetailsScreen> {
                     Text('IMMUTABLE CREDENTIAL SNAPSHOT', style: AppTypography.labelBold(colors.textSecondary)),
                     const SizedBox(height: 6),
                     AppCard(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Text('Dr. Aravind Swaminathan', style: AppTypography.labelBold(colors.textPrimary)),
-                              const SizedBox(width: 4),
-                              const Icon(Icons.verified_rounded, color: AppColors.emerald, size: 14),
-                            ],
-                          ),
-                          const SizedBox(height: 2),
-                          Text('TNMC_98234 • Tamil Nadu Medical Council', style: AppTypography.bodySmall(colors.textMuted)),
-                          Text('MBBS, MD (General Medicine) • 5 yrs clinical experience', style: AppTypography.bodySmall(colors.textSecondary)),
-                        ],
-                      ),
+                      child: _doctorProfile == null
+                          ? Text('Loading profile...', style: AppTypography.bodySmall(colors.textMuted))
+                          : Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(
+                                      _doctorProfile!['fullName'] as String? ?? '—',
+                                      style: AppTypography.labelBold(colors.textPrimary),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    if (_doctorProfile!['isVerified'] == true)
+                                      const Icon(Icons.verified_rounded, color: AppColors.emerald, size: 14),
+                                  ],
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '${_doctorProfile!['registrationNo'] ?? '—'} • ${_doctorProfile!['council'] ?? '—'}',
+                                  style: AppTypography.bodySmall(colors.textMuted),
+                                ),
+                                Text(
+                                  '${_doctorProfile!['qualification'] ?? '—'} • ${_doctorProfile!['yearsOfExperience'] ?? 0} yrs experience',
+                                  style: AppTypography.bodySmall(colors.textSecondary),
+                                ),
+                              ],
+                            ),
                     ),
                     const SizedBox(height: AppSpacing.md),
 
@@ -131,8 +155,9 @@ class _DutyDetailsScreenState extends ConsumerState<DutyDetailsScreen> {
                       icon: Icons.send_rounded,
                       onPressed: (confirmAvailability && acknowledgeTerms)
                           ? () {
+                              final note = noteCtrl.text.trim();
                               Navigator.pop(ctx);
-                              _submitApplication();
+                              _submitApplication(note: note.isNotEmpty ? note : null);
                             }
                           : null,
                     ),
@@ -153,14 +178,13 @@ class _DutyDetailsScreenState extends ConsumerState<DutyDetailsScreen> {
     );
   }
 
-  void _submitApplication() {
+  Future<void> _submitApplication({String? note}) async {
     setState(() => _isSubmitting = true);
-    Future.delayed(const Duration(milliseconds: 800), () {
+    try {
+      final dutyId = widget.duty['dutyId'] as String? ?? '';
+      await DutyRepository.applyToDuty(dutyId, note: note);
       if (mounted) {
-        setState(() {
-          _isSubmitting = false;
-          _hasApplied = true;
-        });
+        setState(() => _hasApplied = true);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             backgroundColor: AppColors.emerald,
@@ -168,7 +192,30 @@ class _DutyDetailsScreenState extends ConsumerState<DutyDetailsScreen> {
           ),
         );
       }
-    });
+    } on FirebaseFunctionsException catch (e) {
+      if (mounted) {
+        final msg = switch (e.code) {
+          'DOCTOR_NOT_VERIFIED' => 'Your profile must be verified before applying.',
+          'APPLICATION_ALREADY_EXISTS' => 'You have already applied for this duty.',
+          'DUTY_CAPACITY_FILLED' => 'This duty has been fully filled.',
+          _ => e.message ?? 'Could not submit application. Try again.',
+        };
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(backgroundColor: AppColors.rose, content: Text(msg)),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            backgroundColor: AppColors.rose,
+            content: Text('Application failed. Check your connection and try again.'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
   }
 
   void _reportDuty() {

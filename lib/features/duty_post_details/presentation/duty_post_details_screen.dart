@@ -1,13 +1,5 @@
-/**
- * Duty Post Details Screen
- * Shown between a Home/Search recommendation and Chat: Home/Search →
- * Duty Details → Chat. Reuses the same duty map (MockData.duties schema)
- * already used by DutyPostCard — no new data model.
- */
-
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/constants/mock_data.dart';
 import '../../../core/design_system/app_colors.dart';
 import '../../../core/design_system/app_typography.dart';
 import '../../../core/design_system/app_spacing.dart';
@@ -34,7 +26,6 @@ class DutyPostDetailsScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Hospital / Clinic + duty type header
               AppCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -46,7 +37,7 @@ class DutyPostDetailsScreen extends StatelessWidget {
                           width: 48,
                           height: 48,
                           decoration: BoxDecoration(
-                            color: AppColors.primary.withOpacity(0.12),
+                            color: AppColors.primary.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                           ),
                           child: const Icon(Icons.local_hospital_rounded, color: AppColors.primary, size: 26),
@@ -60,7 +51,7 @@ class DutyPostDetailsScreen extends StatelessWidget {
                                 children: [
                                   Expanded(
                                     child: Text(
-                                      duty['facilityName'] as String,
+                                      duty['facilityName'] as String? ?? '—',
                                       style: AppTypography.headingSmall(colors.textPrimary),
                                     ),
                                   ),
@@ -72,7 +63,7 @@ class DutyPostDetailsScreen extends StatelessWidget {
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                duty['specialtyName'] as String,
+                                duty['specialtyName'] as String? ?? '—',
                                 style: AppTypography.bodyMedium(colors.textSecondary),
                               ),
                             ],
@@ -83,12 +74,12 @@ class DutyPostDetailsScreen extends StatelessWidget {
                     const SizedBox(height: AppSpacing.sm),
                     Row(
                       children: [
-                        StatusBadge(status: duty['status'] as String),
+                        StatusBadge(status: duty['status'] as String? ?? 'published'),
                         const SizedBox(width: AppSpacing.sm),
                         Icon(Icons.location_on_outlined, size: 14, color: colors.textMuted),
                         const SizedBox(width: 2),
                         Text(
-                          '${duty['city']} • ${duty['distanceKm']} km away',
+                          duty['city'] as String? ?? '',
                           style: AppTypography.bodySmall(colors.textMuted),
                         ),
                       ],
@@ -103,33 +94,21 @@ class DutyPostDetailsScreen extends StatelessWidget {
               AppCard(
                 child: Column(
                   children: [
-                    _buildRow(colors, 'Duty Type', duty['shiftType'] as String),
+                    _buildRow(colors, 'Department', duty['department'] as String? ?? '—'),
                     const Divider(),
-                    _buildRow(colors, 'Department', duty['department'] as String),
+                    _buildRow(colors, 'Starts', duty['startAt'] as String? ?? '—'),
                     const Divider(),
-                    _buildRow(colors, 'Starts', duty['startAt'] as String),
+                    _buildRow(colors, 'Ends', duty['endAt'] as String? ?? '—'),
                     const Divider(),
-                    _buildRow(colors, 'Ends', duty['endAt'] as String),
+                    _buildRow(colors, 'Compensation', '₹${duty['amount']} / ${duty['basis'] ?? 'shift'}', valueColor: AppColors.emerald),
                     const Divider(),
-                    _buildRow(colors, 'Compensation', '₹${duty['amount']} (${duty['basis']})', valueColor: AppColors.emerald),
-                    const Divider(),
-                    _buildRow(colors, 'Open Positions', '${duty['remainingHeadcount']} of ${duty['headcount']}'),
+                    _buildRow(colors, 'Open Positions', '${duty['remainingHeadcount'] ?? 1} of ${duty['headcount'] ?? 1}'),
                   ],
                 ),
               ),
               const SizedBox(height: AppSpacing.md),
 
-              Text('Description', style: AppTypography.headingSmall(colors.textPrimary)),
-              const SizedBox(height: AppSpacing.xs),
-              AppCard(
-                child: Text(
-                  '${duty['shiftType']} covering ${duty['department']} at ${duty['facilityName']}, ${duty['city']}.',
-                  style: AppTypography.bodyMedium(colors.textSecondary),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-
-              Text('Requirements / Qualifications', style: AppTypography.headingSmall(colors.textPrimary)),
+              Text('Requirements', style: AppTypography.headingSmall(colors.textPrimary)),
               const SizedBox(height: AppSpacing.xs),
               AppCard(
                 child: Row(
@@ -138,7 +117,7 @@ class DutyPostDetailsScreen extends StatelessWidget {
                     const SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: Text(
-                        duty['qualificationRequired'] as String,
+                        duty['qualificationRequired'] as String? ?? '—',
                         style: AppTypography.bodyMedium(colors.textPrimary),
                       ),
                     ),
@@ -148,9 +127,9 @@ class DutyPostDetailsScreen extends StatelessWidget {
               const SizedBox(height: AppSpacing.xl),
 
               AppButton(
-                label: 'Interested / Chat',
-                icon: Icons.chat_bubble_outline_rounded,
-                onPressed: () => context.push('/chat', extra: MockData.conversationForDuty(duty)),
+                label: 'Apply for this Duty',
+                icon: Icons.send_rounded,
+                onPressed: () => context.push('/duty-details', extra: duty),
               ),
               const SizedBox(height: AppSpacing.lg),
             ],

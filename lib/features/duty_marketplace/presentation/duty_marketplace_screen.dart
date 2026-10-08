@@ -1,19 +1,16 @@
-/**
- * Duty Marketplace Screen — Doctor Browse, Search & Filter
- */
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_constants.dart';
-import '../../../core/constants/mock_data.dart';
 import '../../../core/design_system/app_colors.dart';
 import '../../../core/design_system/app_typography.dart';
 import '../../../core/design_system/app_spacing.dart';
 import '../../../core/design_system/app_cards.dart';
+import '../../../core/widgets/state_views.dart';
 import '../../../core/widgets/status_badge.dart';
 import '../../../core/widgets/language_selector_dialog.dart';
 import '../../../core/localization/language_provider.dart';
+import '../data/duty_repository.dart';
 
 class DutyMarketplaceScreen extends ConsumerStatefulWidget {
   const DutyMarketplaceScreen({super.key});
@@ -24,16 +21,19 @@ class DutyMarketplaceScreen extends ConsumerStatefulWidget {
 
 class _DutyMarketplaceScreenState extends ConsumerState<DutyMarketplaceScreen> {
   String _selectedSpecialty = 'All';
-  String _selectedSort = 'Nearest';
+  String _searchQuery = '';
   final _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final loc = ref.watch(localizationProvider);
-    final filteredDuties = _selectedSpecialty == 'All'
-        ? MockData.duties
-        : MockData.duties.where((d) => d['specialtyName'] == _selectedSpecialty).toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -53,12 +53,12 @@ class _DutyMarketplaceScreenState extends ConsumerState<DutyMarketplaceScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Search & Filter Header
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
               child: TextField(
                 controller: _searchController,
                 style: AppTypography.bodyMedium(colors.textPrimary),
+                onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
                 decoration: InputDecoration(
                   hintText: 'Search by specialty, hospital or area...',
                   hintStyle: AppTypography.bodyMedium(colors.textMuted),
@@ -73,30 +73,58 @@ class _DutyMarketplaceScreenState extends ConsumerState<DutyMarketplaceScreen> {
                 ),
               ),
             ),
-
-            // Specialty Filter Chips
             SizedBox(
               height: 44,
               child: ListView(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 children: [
-                  _buildFilterChip('All'),
-                  ...AppConstants.specialties.map((s) => _buildFilterChip(s)),
+                  _chip('All'),
+                  ...AppConstants.specialties.map(_chip),
                 ],
               ),
             ),
             const SizedBox(height: AppSpacing.xs),
-
-            // Duty Feed List
             Expanded(
-              child: ListView.separated(
-                padding: AppSpacing.paddingScreen,
-                itemCount: filteredDuties.length,
-                separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.md),
-                itemBuilder: (context, index) {
-                  final duty = filteredDuties[index];
-                  return _buildDutyCard(context, duty);
+              child: StreamBuilder<List<Map<String, dynamic>>>(
+                stream: DutyRepository.watchPublished(
+                  specialty: _selectedSpecialty == 'All' ? null : _selectedSpecialty,
+                ),
+                builder: (context, snap) {
+                  if (snap.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (snap.hasError) {
+                    return const EmptyStateView(
+                      icon: Icons.cloud_off_rounded,
+                      title: 'Could not load duties',
+                      description: 'Check your connection and try again.',
+                    );
+                  }
+                  var duties = snap.data ?? [];
+                  if (_searchQuery.isNotEmpty) {
+                    duties = duties.where((d) {
+                      final facility = (d['facilityName'] as String).toLowerCase();
+                      final spec = (d['specialtyName'] as String).toLowerCase();
+                      final city = (d['city'] as String).toLowerCase();
+                      return facility.contains(_searchQuery) ||
+                          spec.contains(_searchQuery) ||
+                          city.contains(_searchQuery);
+                    }).toList();
+                  }
+                  if (duties.isEmpty) {
+                    return const EmptyStateView(
+                      icon: Icons.search_off_rounded,
+                      title: 'No duties found',
+                      description: 'Try a different specialty or check back later.',
+                    );
+                  }
+                  return ListView.separated(
+                    padding: AppSpacing.paddingScreen,
+                    itemCount: duties.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.md),
+                    itemBuilder: (context, index) => _buildDutyCard(duties[index]),
+                  );
                 },
               ),
             ),
@@ -106,7 +134,7 @@ class _DutyMarketplaceScreenState extends ConsumerState<DutyMarketplaceScreen> {
     );
   }
 
-  Widget _buildFilterChip(String label) {
+  Widget _chip(String label) {
     final colors = context.appColors;
     final isSelected = _selectedSpecialty == label;
     return Padding(
@@ -127,7 +155,7 @@ class _DutyMarketplaceScreenState extends ConsumerState<DutyMarketplaceScreen> {
     );
   }
 
-  Widget _buildDutyCard(BuildContext context, Map<String, dynamic> duty) {
+  Widget _buildDutyCard(Map<String, dynamic> duty) {
     final colors = context.appColors;
     return AppCard(
       onTap: () => context.push('/duty-details', extra: duty),
@@ -139,9 +167,12 @@ class _DutyMarketplaceScreenState extends ConsumerState<DutyMarketplaceScreen> {
             children: [
               Row(
                 children: [
-                  Text(
-                    duty['facilityName'] as String,
-                    style: AppTypography.headingSmall(colors.textPrimary),
+                  Flexible(
+                    child: Text(
+                      duty['facilityName'] as String,
+                      style: AppTypography.headingSmall(colors.textPrimary),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                   const SizedBox(width: 6),
                   if (duty['isVerifiedOrg'] == true)
@@ -153,7 +184,9 @@ class _DutyMarketplaceScreenState extends ConsumerState<DutyMarketplaceScreen> {
           ),
           const SizedBox(height: 2),
           Text(
-            '${duty['city']} • ${duty['distanceKm']} km away',
+            duty['distanceKm'] != null
+                ? '${duty['city']} • ${duty['distanceKm']} km away'
+                : duty['city'] as String,
             style: AppTypography.bodySmall(colors.textMuted),
           ),
           const SizedBox(height: AppSpacing.sm),
@@ -170,16 +203,10 @@ class _DutyMarketplaceScreenState extends ConsumerState<DutyMarketplaceScreen> {
                   children: [
                     const Icon(Icons.medical_services_outlined, size: 16, color: AppColors.primaryLight),
                     const SizedBox(width: 6),
-                    Text(
-                      duty['specialtyName'] as String,
-                      style: AppTypography.labelBold(colors.textPrimary),
-                    ),
+                    Text(duty['specialtyName'] as String, style: AppTypography.labelBold(colors.textPrimary)),
                   ],
                 ),
-                Text(
-                  '₹${duty['amount']} / shift',
-                  style: AppTypography.labelBold(AppColors.emerald),
-                ),
+                Text('₹${duty['amount']} / shift', style: AppTypography.labelBold(AppColors.emerald)),
               ],
             ),
           ),
@@ -188,13 +215,15 @@ class _DutyMarketplaceScreenState extends ConsumerState<DutyMarketplaceScreen> {
             children: [
               Icon(Icons.access_time_rounded, size: 14, color: colors.textMuted),
               const SizedBox(width: 4),
-              Text(
-                '${duty['startAt']} - ${duty['endAt']}',
-                style: AppTypography.bodySmall(colors.textSecondary),
+              Expanded(
+                child: Text(
+                  '${duty['startAt']} - ${duty['endAt']}',
+                  style: AppTypography.bodySmall(colors.textSecondary),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-              const Spacer(),
               Text(
-                '${duty['remainingHeadcount']} slot open',
+                '${duty['remainingHeadcount']} slot${(duty['remainingHeadcount'] as int) == 1 ? '' : 's'} open',
                 style: AppTypography.bodySmall(AppColors.amber),
               ),
             ],

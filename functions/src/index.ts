@@ -15,7 +15,7 @@ export { recordConsent, setCustomClaims } from './auth/authFunctions';
 export { submitDoctorProfile } from './doctors/doctorFunctions';
 
 // Hospitals & Facilities
-export { createOrganizationDraft, addFacility } from './hospitals/hospitalFunctions';
+export { createOrganizationDraft, addFacility, getMyOrganizations } from './hospitals/hospitalFunctions';
 
 // Duties
 export { createDuty, publishDuty } from './duties/dutyFunctions';
@@ -29,17 +29,23 @@ export { atomicSelectDoctor, confirmAssignment, getAssignmentContact, completeAs
 // Verification Engine
 export {
   createVerificationCase,
+  getVerificationQueue,
+  getVerificationCaseDetails,
   submitVerificationCase,
   getEvidenceReadUrl,
   recordVerificationDecision,
   verifyDoctorRegistration,
 } from './verification/verificationFunctions';
+export { indexVerificationEvidence } from './verification/evidenceIngest';
 
 // Outbox Worker
 export { processNotificationOutbox } from './notifications/outboxWorker';
 
 // Admin & Moderation
 export { getAdminQueues, submitModerationAction, updatePlatformConfig } from './admin/adminFunctions';
+
+// Feedback & Reviews
+export { submitFeedback } from './feedback/feedbackFunctions';
 
 // Phase 2 Modules (Gated behind feature flags)
 export { createAvailabilityRule, requestDutyReplacement, openDispute } from './phase2/phase2Functions';

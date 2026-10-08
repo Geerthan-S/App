@@ -10,17 +10,31 @@ service firebase.storage {
       return isAuthenticated() && request.auth.uid == uid;
     }
 
-    function hasCustomClaim(claim) {
-      return isAuthenticated() && request.auth.token[claim] == true;
-    }
-
-    function isVerifier() {
-      return hasCustomClaim('isVerifier') || hasCustomClaim('isSuperAdmin');
-    }
-
     function isValidEvidenceFile() {
-      return request.resource.size < 10 * 1024 * 1024 // 10MB
+      return request.resource.size > 0
+        && request.resource.size < 10 * 1024 * 1024
         && request.resource.contentType.matches('image/(jpeg|png)|application/pdf');
+    }
+
+    function ownsDoctorCase(doctorUid, caseId) {
+      return isOwner(doctorUid)
+        && firestore.get(/databases/(default)/documents/verificationCases/$(caseId)).data.subjectType == 'doctor'
+        && firestore.get(/databases/(default)/documents/verificationCases/$(caseId)).data.subjectId == doctorUid
+        && firestore.get(/databases/(default)/documents/verificationCases/$(caseId)).data.status in
+          ['draft', 'submitted', 'under_review', 'needs_information'];
+    }
+
+    function isOrgAdmin(orgId) {
+      return isAuthenticated()
+        && firestore.get(/databases/(default)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.role in ['owner', 'admin'];
+    }
+
+    function ownsOrganizationCase(orgId, caseId) {
+      return isOrgAdmin(orgId)
+        && firestore.get(/databases/(default)/documents/verificationCases/$(caseId)).data.subjectType == 'organization'
+        && firestore.get(/databases/(default)/documents/verificationCases/$(caseId)).data.subjectId == orgId
+        && firestore.get(/databases/(default)/documents/verificationCases/$(caseId)).data.status in
+          ['draft', 'submitted', 'under_review', 'needs_information'];
     }
 
     // Default Deny
@@ -30,27 +44,36 @@ service firebase.storage {
 
     // Doctor Verification Evidence
     match /verification/doctor/{doctorUid}/{caseId}/{fileName} {
-      allow write: if isOwner(doctorUid) && isValidEvidenceFile();
-      // Direct reads blocked: authorized verifiers read through Cloud Function short-lived signed URLs
-      allow read: if isOwner(doctorUid) || isVerifier();
+      allow create: if ownsDoctorCase(doctorUid, caseId)
+        && fileName.matches('[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\.(pdf|png|jpg|jpeg)')
+        && isValidEvidenceFile();
+      // Evidence can only be read through the audited, short-lived server URL.
+      allow get, list, update, delete: if false;
     }
 
     // Hospital / Organization Verification Evidence
     match /verification/organization/{orgId}/{caseId}/{fileName} {
-      allow write: if isAuthenticated() && isValidEvidenceFile();
-      allow read: if isAuthenticated() || isVerifier();
+      allow create: if ownsOrganizationCase(orgId, caseId)
+        && fileName.matches('[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\.(pdf|png|jpg|jpeg)')
+        && request.resource.metadata.uploadedBy == request.auth.uid
+        && isValidEvidenceFile();
+      allow get, list, update, delete: if false;
     }
 
     // Dispute Evidence (Phase 2)
     match /disputes/{disputeId}/{fileName} {
-      allow write: if isAuthenticated() && isValidEvidenceFile();
-      allow read: if isAuthenticated();
+      // Phase 2 remains disabled until party-scoped evidence handling exists.
+      allow read, write: if false;
     }
 
     // Public Organization Assets (Logos)
     match /public/branding/{orgId}/{fileName} {
       allow read: if true;
-      allow write: if isAuthenticated() && request.resource.size < 2 * 1024 * 1024 && request.resource.contentType.matches('image/(jpeg|png|webp)');
+      allow create: if isOrgAdmin(orgId)
+        && request.resource.size > 0
+        && request.resource.size < 2 * 1024 * 1024
+        && request.resource.contentType.matches('image/(jpeg|png|webp)');
+      allow update, delete: if false;
     }
   }
 }

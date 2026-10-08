@@ -84,6 +84,16 @@ export const VerificationDecisionSchema = z.object({
   notes: z.string().max(1000).optional(),
 });
 
+export const OfficialSourceReviewSchema = z.object({
+  sourceUrl: z.string().url().max(2048).refine(value => value.startsWith('https://')),
+  checkedAt: z.string().datetime(),
+  registrationNumberMatched: z.literal(true),
+  nameMatched: z.literal(true),
+  councilMatched: z.literal(true),
+  qualificationMatched: z.literal(true),
+  officialStatus: z.literal('ACTIVE'),
+}).strict();
+
 export const ModerationActionSchema = z.object({
   reportId: z.string().min(1),
   action: z.enum(['hide_duty', 'warn_user', 'suspend_user', 'dismiss']),

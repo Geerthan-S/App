@@ -3,11 +3,11 @@
  * Manages identity, qualifications, specialties, locations, bio, and re-verification triggers.
  */
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_constants.dart';
-import '../../../core/constants/mock_data.dart';
 import '../../../core/design_system/app_colors.dart';
 import '../../../core/design_system/app_typography.dart';
 import '../../../core/design_system/app_spacing.dart';
@@ -17,6 +17,8 @@ import '../../../core/design_system/app_inputs.dart';
 import '../../../core/widgets/status_badge.dart';
 import '../../../core/widgets/language_selector_dialog.dart';
 import '../../../core/localization/language_provider.dart';
+import '../../auth/data/auth_repository.dart';
+import '../data/doctor_repository.dart';
 
 class DoctorProfileScreen extends ConsumerStatefulWidget {
   const DoctorProfileScreen({super.key});
@@ -26,21 +28,64 @@ class DoctorProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
-  String _fullName = MockData.currentDoctorName;
-  String _qualifications = 'MBBS, MD (General Medicine)';
-  String _primarySpecialty = 'General Medicine';
-  int _experienceYears = 5;
-  String _preferredHubs = 'Chennai, Coimbatore';
-  String _bio = 'Consultant Physician with 5+ years experience in ICU management, inpatient care, and acute medical emergencies.';
-  bool _isVerified = true;
+  String _fullName = '';
+  String _qualifications = '';
+  String _council = '';
+  String _registrationNo = '';
+  String _primarySpecialty = AppConstants.specialties.first;
+  int _experienceYears = 0;
+  String _preferredHubs = '';
+  String _bio = '';
+  bool _isVerified = false;
+  String? _uid;
+  List<String> _specialtyChips = [];
+  double _doctorRating = 0.0;
+  int _reviewCount = 0;
 
-  static const List<String> _specialtyChips = ['Emergency Triage', 'Critical Care Coverage'];
+  @override
+  void initState() {
+    super.initState();
+    _uid = FirebaseAuth.instance.currentUser?.uid;
+    _loadProfile();
+    _loadReviews();
+  }
 
-  double get _doctorRating {
-    const reviews = MockData.doctorReviews;
-    if (reviews.isEmpty) return 0;
-    final total = reviews.fold<num>(0, (sum, r) => sum + (r['rating'] as num));
-    return total / reviews.length;
+  Future<void> _loadProfile() async {
+    final profile = await DoctorRepository.getProfile();
+    if (!mounted || profile == null) return;
+    setState(() {
+      _fullName = profile['fullName'] as String? ?? '';
+      _qualifications = profile['qualification'] as String? ?? '';
+      _council = profile['council'] as String? ?? '';
+      _registrationNo = profile['registrationNo'] as String? ?? '';
+      _primarySpecialty = profile['primarySpecialty'] as String? ?? AppConstants.specialties.first;
+      _experienceYears = (profile['yearsOfExperience'] as num?)?.toInt() ?? 0;
+      final cities = profile['preferredCities'];
+      _preferredHubs = cities is List ? (cities as List).join(', ') : (cities as String? ?? '');
+      _bio = profile['bio'] as String? ?? '';
+      _isVerified = profile['isVerified'] == true;
+      final specialties = profile['specialties'];
+      if (specialties is List) {
+        _specialtyChips = specialties.cast<String>().where((s) => s != _primarySpecialty).toList();
+      }
+    });
+  }
+
+  Future<void> _loadReviews() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    DoctorRepository.watchReviews(uid).listen((reviews) {
+      if (!mounted) return;
+      setState(() {
+        _reviewCount = reviews.length;
+        if (reviews.isNotEmpty) {
+          final total = reviews.fold<num>(0, (s, r) => s + (r['rating'] as num));
+          _doctorRating = total / reviews.length;
+        } else {
+          _doctorRating = 0.0;
+        }
+      });
+    });
   }
 
   double get _profileCompletion {
@@ -105,50 +150,6 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
     );
   }
 
-  Widget _buildMyDutyTile({
-    required Map<String, dynamic> duty,
-    required Map<String, dynamic> conversation,
-  }) {
-    final colors = context.appColors;
-    return AppCard(
-      onTap: () => context.push('/chat', extra: conversation),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-            ),
-            child: const Icon(Icons.local_hospital_rounded, color: AppColors.primary, size: 20),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  duty['facilityName'] as String,
-                  style: AppTypography.labelBold(colors.textPrimary),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '${duty['specialtyName']} • ${duty['startAt']}',
-                  style: AppTypography.bodySmall(colors.textMuted),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: AppSpacing.xs),
-          StatusBadge(status: conversation['dutyStatus'] as String),
-        ],
-      ),
-    );
-  }
-
   Widget _buildAccountTile({
     required IconData icon,
     required String label,
@@ -175,8 +176,18 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
     );
   }
 
+  Future<void> _openDoctorReviews(BuildContext context) async {
+    final uid = _uid;
+    if (uid == null) return;
+    final reviews = await DoctorRepository.watchReviews(uid).first;
+    if (!mounted) return;
+    context.push('/reviews', extra: {'title': 'Doctor Reviews', 'reviews': reviews});
+  }
+
   void _showEditProfileSheet() {
     final nameCtrl = TextEditingController(text: _fullName);
+    final councilCtrl = TextEditingController(text: _council);
+    final regNoCtrl = TextEditingController(text: _registrationNo);
     final qualCtrl = TextEditingController(text: _qualifications);
     final expCtrl = TextEditingController(text: _experienceYears.toString());
     final hubsCtrl = TextEditingController(text: _preferredHubs);
@@ -244,6 +255,10 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
 
                     AppTextField(label: 'FULL NAME', controller: nameCtrl),
                     const SizedBox(height: AppSpacing.md),
+                    AppTextField(label: 'MEDICAL COUNCIL', controller: councilCtrl, hintText: 'e.g. Tamil Nadu Medical Council'),
+                    const SizedBox(height: AppSpacing.md),
+                    AppTextField(label: 'COUNCIL REGISTRATION NUMBER', controller: regNoCtrl, hintText: 'e.g. TNMC/98234'),
+                    const SizedBox(height: AppSpacing.md),
                     AppTextField(label: 'QUALIFICATIONS', controller: qualCtrl),
                     const SizedBox(height: AppSpacing.md),
                     Text('PRIMARY SPECIALTY', style: AppTypography.labelBold(colors.textSecondary)),
@@ -284,39 +299,49 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
                     const SizedBox(height: AppSpacing.lg),
                     AppButton(
                       label: 'Save Profile Changes',
-                      onPressed: () {
+                      onPressed: () async {
                         final qualChanged = qualCtrl.text.trim() != _qualifications;
                         final nameChanged = nameCtrl.text.trim() != _fullName;
-
-                        setState(() {
-                          _fullName = nameCtrl.text.trim();
-                          _qualifications = qualCtrl.text.trim();
-                          _primarySpecialty = selectedSpec;
-                          _experienceYears = int.tryParse(expCtrl.text.trim()) ?? _experienceYears;
-                          _preferredHubs = hubsCtrl.text.trim();
-                          _bio = bioCtrl.text.trim();
-
-                          if (qualChanged || nameChanged) {
-                            _isVerified = false; // Re-verification triggered
-                          }
-                        });
-
+                        final cities = hubsCtrl.text.trim().split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
                         Navigator.pop(ctx);
-
-                        if (qualChanged || nameChanged) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              backgroundColor: AppColors.amber,
-                              content: Text('Material credential change detected. Re-verification review initiated.'),
-                            ),
+                        try {
+                          await DoctorRepository.saveProfile(
+                            fullName: nameCtrl.text.trim(),
+                            council: councilCtrl.text.trim(),
+                            registrationNo: regNoCtrl.text.trim(),
+                            qualification: qualCtrl.text.trim(),
+                            primarySpecialty: selectedSpec,
+                            preferredCities: cities.isNotEmpty ? cities : [''],
+                            yearsOfExperience: int.tryParse(expCtrl.text.trim()) ?? _experienceYears,
+                            bio: bioCtrl.text.trim(),
                           );
-                        } else {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              backgroundColor: AppColors.emerald,
-                              content: Text('Doctor profile updated successfully.'),
-                            ),
-                          );
+                          if (mounted) {
+                            setState(() {
+                              _fullName = nameCtrl.text.trim();
+                              _council = councilCtrl.text.trim();
+                              _registrationNo = regNoCtrl.text.trim();
+                              _qualifications = qualCtrl.text.trim();
+                              _primarySpecialty = selectedSpec;
+                              _experienceYears = int.tryParse(expCtrl.text.trim()) ?? _experienceYears;
+                              _preferredHubs = hubsCtrl.text.trim();
+                              _bio = bioCtrl.text.trim();
+                              if (qualChanged || nameChanged) _isVerified = false;
+                            });
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                backgroundColor: qualChanged || nameChanged ? AppColors.amber : AppColors.emerald,
+                                content: Text(qualChanged || nameChanged
+                                    ? 'Credential change detected. Re-verification required.'
+                                    : 'Doctor profile updated successfully.'),
+                              ),
+                            );
+                          }
+                        } catch (_) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(backgroundColor: AppColors.rose, content: Text('Could not save profile. Try again.')),
+                            );
+                          }
                         }
                       },
                     ),
@@ -540,20 +565,51 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
               ),
               const SizedBox(height: AppSpacing.md),
 
-              // My Duties — duties the doctor is actively engaged with,
-              // derived from MockData.conversations (no separate model).
-              if (MockData.myDuties.isNotEmpty) ...[
-                Text('My Duties', style: AppTypography.headingSmall(colors.textPrimary)),
-                const SizedBox(height: AppSpacing.xs),
-                ...MockData.myDuties.map((entry) => Padding(
-                      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                      child: _buildMyDutyTile(
-                        duty: entry['duty'] as Map<String, dynamic>,
-                        conversation: entry['conversation'] as Map<String, dynamic>,
-                      ),
-                    )),
-                const SizedBox(height: AppSpacing.xs),
-              ],
+              // My Duties — real assignments from Firestore
+              StreamBuilder<List<Map<String, dynamic>>>(
+                stream: DoctorRepository.watchAssignments(),
+                builder: (context, snap) {
+                  final assignments = snap.data ?? [];
+                  if (assignments.isEmpty) return const SizedBox.shrink();
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('My Assignments', style: AppTypography.headingSmall(colors.textPrimary)),
+                      const SizedBox(height: AppSpacing.xs),
+                      ...assignments.take(3).map((asg) => Padding(
+                        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                        child: AppCard(
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 40, height: 40,
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                                ),
+                                child: const Icon(Icons.local_hospital_rounded, color: AppColors.primary, size: 20),
+                              ),
+                              const SizedBox(width: AppSpacing.sm),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(asg['facilityName'] as String, style: AppTypography.labelBold(colors.textPrimary), overflow: TextOverflow.ellipsis),
+                                    const SizedBox(height: 2),
+                                    Text('${asg['specialtyName']} • ${asg['startAt']}', style: AppTypography.bodySmall(colors.textMuted), overflow: TextOverflow.ellipsis),
+                                  ],
+                                ),
+                              ),
+                              StatusBadge(status: asg['status'] as String),
+                            ],
+                          ),
+                        ),
+                      )),
+                      const SizedBox(height: AppSpacing.xs),
+                    ],
+                  );
+                },
+              ),
 
               // Hospital / Clinic
               Text('Hospital / Clinic', style: AppTypography.headingSmall(colors.textPrimary)),
@@ -580,19 +636,19 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
                             children: [
                               Expanded(
                                 child: Text(
-                                  MockData.hospitalProfile['name'] as String,
+                                  'My Hospital / Clinic',
                                   style: AppTypography.labelBold(colors.textPrimary),
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                              if (MockData.hospitalProfile['isVerified'] == true) ...[
+                              if (false) ...[
                                 const SizedBox(width: 4),
                                 const Icon(Icons.verified_rounded, color: AppColors.emerald, size: 16),
                               ],
                             ],
                           ),
                           Text(
-                            MockData.hospitalProfile['city'] as String,
+                            '',
                             style: AppTypography.bodySmall(colors.textMuted),
                           ),
                         ],
@@ -613,22 +669,19 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
                     child: _buildReviewLinkCard(
                       title: 'Doctor Reviews',
                       rating: _doctorRating,
-                      count: MockData.doctorReviews.length,
-                      onTap: () => context.push('/reviews', extra: {
-                        'title': 'Doctor Reviews',
-                        'reviews': MockData.doctorReviews,
-                      }),
+                      count: _reviewCount,
+                      onTap: () => _openDoctorReviews(context),
                     ),
                   ),
                   const SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: _buildReviewLinkCard(
                       title: 'Hospital Reviews',
-                      rating: MockData.hospitalProfile['rating'] as double,
-                      count: MockData.hospitalReviews.length,
+                      rating: 0.0,
+                      count: 0,
                       onTap: () => context.push('/reviews', extra: {
                         'title': 'Hospital Reviews',
-                        'reviews': MockData.hospitalReviews,
+                        'reviews': <Map<String, dynamic>>[],
                       }),
                     ),
                   ),
@@ -652,7 +705,10 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
                       icon: Icons.logout_rounded,
                       label: 'Logout',
                       color: AppColors.rose,
-                      onTap: () => context.go('/login'),
+                      onTap: () async {
+                        await AuthRepository().signOut();
+                        if (context.mounted) context.go('/login');
+                      },
                     ),
                   ],
                 ),

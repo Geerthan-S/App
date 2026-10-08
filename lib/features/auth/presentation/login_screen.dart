@@ -12,16 +12,18 @@ import '../../../core/design_system/app_spacing.dart';
 import '../../../core/design_system/app_buttons.dart';
 import '../../../core/design_system/app_inputs.dart';
 import '../data/auth_repository.dart';
+import '../../../core/config/local_test_config.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
-  const LoginScreen({super.key});
+  final AuthRepository? authRepository;
+  const LoginScreen({super.key, this.authRepository});
 
   @override
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  final _authRepository = AuthRepository();
+  late final _authRepository = widget.authRepository ?? AuthRepository();
   final _phoneController = TextEditingController();
   bool _isGoogleLoading = false;
   bool _isPhoneLoading = false;
@@ -44,13 +46,36 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     } on FirebaseAuthException catch (e) {
       setState(() => _error = e.message ?? 'Sign-in failed. Please try again.');
     } catch (_) {
-      setState(() => _error = 'Something went wrong. Please check your connection and try again.');
+      setState(
+        () => _error =
+            'Something went wrong. Please check your connection and try again.',
+      );
     } finally {
       if (mounted) setState(() => _isGoogleLoading = false);
     }
   }
 
   Future<void> _sendOtp() async {
+    if (LocalTestConfig.enabled) {
+      setState(() {
+        _isPhoneLoading = true;
+        _error = null;
+      });
+      try {
+        await _authRepository.signInToLocalTestAccount();
+        if (mounted) context.go('/home');
+      } catch (_) {
+        if (mounted) {
+          setState(
+            () => _error =
+                'Start the local Firebase test services and try again.',
+          );
+        }
+      } finally {
+        if (mounted) setState(() => _isPhoneLoading = false);
+      }
+      return;
+    }
     final rawNumber = _phoneController.text.trim();
     if (rawNumber.length != 10) {
       setState(() => _error = 'Enter a valid 10-digit mobile number');
@@ -71,7 +96,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           await _authRepository.signInWithPhoneCredential(credential);
           if (mounted) context.go('/consent');
         } on FirebaseAuthException catch (e) {
-          if (mounted) setState(() => _error = e.message ?? 'Sign-in failed. Please try again.');
+          if (mounted)
+            setState(
+              () => _error = e.message ?? 'Sign-in failed. Please try again.',
+            );
         } finally {
           if (mounted) setState(() => _isPhoneLoading = false);
         }
@@ -80,13 +108,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         if (!mounted) return;
         setState(() {
           _isPhoneLoading = false;
-          _error = e.message ?? 'Could not verify this number. Please try again.';
+          _error =
+              e.message ?? 'Could not verify this number. Please try again.';
         });
       },
       codeSent: (verificationId, forceResendingToken) {
         if (!mounted) return;
         setState(() => _isPhoneLoading = false);
-        context.push('/otp', extra: {'phoneNumber': phoneNumber, 'verificationId': verificationId});
+        context.push(
+          '/otp',
+          extra: {'phoneNumber': phoneNumber, 'verificationId': verificationId},
+        );
       },
       codeAutoRetrievalTimeout: (verificationId) {},
     );
@@ -116,7 +148,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                   border: Border.all(color: AppColors.primary.withOpacity(0.3)),
                 ),
-                child: const Icon(Icons.local_hospital_rounded, color: AppColors.primary, size: 36),
+                child: const Icon(
+                  Icons.local_hospital_rounded,
+                  color: AppColors.primary,
+                  size: 36,
+                ),
               ),
               const SizedBox(height: AppSpacing.lg),
               Text(
@@ -142,8 +178,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 children: [
                   Expanded(child: Divider(color: colors.border)),
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
-                    child: Text('OR', style: AppTypography.bodySmall(colors.textMuted)),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.sm,
+                    ),
+                    child: Text(
+                      'OR',
+                      style: AppTypography.bodySmall(colors.textMuted),
+                    ),
                   ),
                   Expanded(child: Divider(color: colors.border)),
                 ],
@@ -155,8 +196,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 controller: _phoneController,
                 keyboardType: TextInputType.phone,
                 prefixIcon: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                  child: Text('+91', style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.bold)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 14,
+                  ),
+                  child: Text(
+                    '+91',
+                    style: TextStyle(
+                      color: colors.textPrimary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(height: AppSpacing.sm),
@@ -207,7 +257,10 @@ class _GoogleSignInButton extends StatelessWidget {
             ? const SizedBox(
                 width: 20,
                 height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppColors.primary,
+                ),
               )
             : Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -268,7 +321,12 @@ class _GoogleLogoPainter extends CustomPainter {
 
     final barPaint = Paint()..color = const Color(0xFF4285F4);
     canvas.drawRect(
-      Rect.fromLTWH(center.dx, center.dy - strokeWidth / 2, radius + strokeWidth / 2, strokeWidth),
+      Rect.fromLTWH(
+        center.dx,
+        center.dy - strokeWidth / 2,
+        radius + strokeWidth / 2,
+        strokeWidth,
+      ),
       barPaint,
     );
   }

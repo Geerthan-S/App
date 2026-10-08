@@ -75,7 +75,7 @@ class AppTheme {
         systemOverlayStyle: overlayStyle,
       ),
       iconTheme: IconThemeData(color: colors.textSecondary),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: colors.surface,
         elevation: 0,
         shape: RoundedRectangleBorder(
@@ -141,7 +141,7 @@ class AppTheme {
           borderSide: const BorderSide(color: AppColors.rose),
         ),
       ),
-      dialogTheme: DialogTheme(
+      dialogTheme: DialogThemeData(
         backgroundColor: colors.surface,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(

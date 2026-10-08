@@ -1,16 +1,10 @@
-/**
- * Search Screen
- * Lets the doctor search duty/job posts from the existing mock data by
- * facility, specialty, city, or department. Tapping a result opens chat.
- */
-
 import 'package:flutter/material.dart';
-import '../../../core/constants/mock_data.dart';
 import '../../../core/design_system/app_colors.dart';
 import '../../../core/design_system/app_typography.dart';
 import '../../../core/design_system/app_spacing.dart';
 import '../../../core/widgets/duty_post_card.dart';
 import '../../../core/widgets/state_views.dart';
+import '../../duty_marketplace/data/duty_repository.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -21,7 +15,16 @@ class SearchScreen extends StatefulWidget {
 
 class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController _searchController = TextEditingController();
+  List<Map<String, dynamic>> _allDuties = [];
   String _query = '';
+
+  @override
+  void initState() {
+    super.initState();
+    DutyRepository.watchPublished().listen((duties) {
+      if (mounted) setState(() => _allDuties = duties);
+    });
+  }
 
   @override
   void dispose() {
@@ -31,9 +34,8 @@ class _SearchScreenState extends State<SearchScreen> {
 
   List<Map<String, dynamic>> get _matchingDuties {
     final query = _query.trim().toLowerCase();
-    if (query.isEmpty) return MockData.duties;
-
-    return MockData.duties.where((duty) {
+    if (query.isEmpty) return _allDuties;
+    return _allDuties.where((duty) {
       final haystack = [
         duty['facilityName'],
         duty['specialtyName'],
@@ -103,10 +105,12 @@ class _SearchScreenState extends State<SearchScreen> {
             ),
             Expanded(
               child: results.isEmpty
-                  ? const EmptyStateView(
-                      icon: Icons.search_off_rounded,
-                      title: 'No results found',
-                      description: 'Try a different facility, specialty, or city.',
+                  ? EmptyStateView(
+                      icon: isSearching ? Icons.search_off_rounded : Icons.inbox_outlined,
+                      title: isSearching ? 'No results found' : 'No duties available',
+                      description: isSearching
+                          ? 'Try a different facility, specialty, or city.'
+                          : 'New duties matching your specialty will appear here.',
                     )
                   : ListView.separated(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),

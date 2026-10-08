@@ -23,7 +23,19 @@
     "rules": "storage.rules"
   },
   "hosting": {
+    "site": "doctor-c7c29",
     "public": "admin",
+    "headers": [
+      {
+        "source": "**",
+        "headers": [
+          { "key": "X-Content-Type-Options", "value": "nosniff" },
+          { "key": "X-Frame-Options", "value": "DENY" },
+          { "key": "Referrer-Policy", "value": "no-referrer" },
+          { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=()" }
+        ]
+      }
+    ],
     "ignore": [
       "firebase.json",
       "**/.*",

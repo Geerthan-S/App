@@ -4,63 +4,125 @@
 
 import { onCall, CallableRequest } from 'firebase-functions/v2/https';
 import { getStorage } from 'firebase-admin/storage';
+import type { QuerySnapshot } from 'firebase-admin/firestore';
 import { db, nowTimestamp, sanitizeCorrelationId } from '../shared/firestoreHelpers';
-import { requireAuth, requireVerifier, requireStepUpAuth } from '../security/guards';
-import { VerificationDecisionSchema } from '../shared/schemas';
+import { requireAuth, requireOrgAdmin, requireVerifier, requireStepUpAuth } from '../security/guards';
+import { OfficialSourceReviewSchema, VerificationDecisionSchema } from '../shared/schemas';
 import { DomainError } from '../shared/errors';
 import { logAudit } from '../audit/auditLogger';
-import { ManualVerificationAdapter } from './verificationSourceAdapter';
-import { VerificationService } from './verificationService';
+
+export const getVerificationQueue = onCall(async (request: CallableRequest) => {
+  const correlationId = sanitizeCorrelationId(request.data?.correlationId);
+  requireVerifier(request, correlationId);
+  const pending = await db().collection('verificationCases')
+    .where('status', 'in', ['submitted', 'under_review', 'needs_information'])
+    .limit(50).get();
+  return { cases: pending.docs.map(doc => doc.data()) };
+});
+
+export const getVerificationCaseDetails = onCall(async (request: CallableRequest) => {
+  const correlationId = sanitizeCorrelationId(request.data?.correlationId);
+  const verifierUid = requireVerifier(request, correlationId);
+  requireStepUpAuth(request, correlationId, 600);
+  const caseId = request.data?.caseId;
+  if (typeof caseId !== 'string' || !caseId || caseId.includes('/')) {
+    throw new DomainError('VALIDATION_FAILED', 'Valid caseId is required', correlationId);
+  }
+  const caseSnap = await db().collection('verificationCases').doc(caseId).get();
+  if (!caseSnap.exists) throw new DomainError('RESOURCE_NOT_FOUND', 'Case not found', correlationId);
+  const caseData = caseSnap.data()!;
+  const subjectCollection = caseData.subjectType === 'doctor' ? 'doctors' : 'organizations';
+  const subjectSnap = await db().collection(subjectCollection).doc(caseData.subjectId).get();
+  const documentsSnap = await db().collection('verificationDocuments').where('caseId', '==', caseId).limit(20).get();
+  const subject = subjectSnap.data() || {};
+  await logAudit({
+    actorId: verifierUid,
+    actorRole: 'verifier',
+    action: 'VERIFICATION_CASE_VIEWED',
+    targetType: 'verificationCases',
+    targetId: caseId,
+    reasonCode: 'VERIFIER_REVIEW',
+    correlationId,
+    result: 'SUCCESS',
+  });
+  return {
+    case: caseData,
+    subject: caseData.subjectType === 'doctor' ? {
+      fullName: subject.fullName,
+      council: subject.council,
+      registrationNo: subject.registrationNo || subject.registrationNumber,
+      qualification: subject.qualification || subject.primaryQualification,
+    } : {
+      legalName: subject.legalName,
+      registrationNumber: subject.registrationNumber,
+      organizationType: subject.organizationType,
+    },
+    documents: documentsSnap.docs.map(doc => ({
+      documentId: doc.id,
+      contentType: doc.data().contentType,
+      sizeBytes: doc.data().sizeBytes,
+      scanStatus: doc.data().scanStatus,
+      sha256: doc.data().sha256,
+    })),
+  };
+});
+
 
 export const createVerificationCase = onCall(async (request: CallableRequest) => {
   const uid = requireAuth(request);
   const correlationId = sanitizeCorrelationId(request.data?.correlationId);
   const subjectType = request.data?.subjectType || 'doctor';
   const subjectId = request.data?.subjectId || uid;
-
-  const caseRef = db().collection('verificationCases').doc();
-  const caseId = caseRef.id;
-
-  const caseData = {
-    caseId,
-    subjectType,
-    subjectId,
-    status: 'draft',
-    policyVersion: 'v1.0_2026',
-    reviewerId: null,
-    decisionReason: null,
-    submittedAt: nowTimestamp(),
-    decidedAt: null,
-    updatedAt: nowTimestamp(),
-  };
-
-  await caseRef.set(caseData);
-
-  // Link case ID to doctor / org profile
-  if (subjectType === 'doctor') {
-    await db().collection('doctors').doc(subjectId).set({
-      verificationCaseId: caseId,
-      updatedAt: nowTimestamp(),
-    }, { merge: true });
-  } else {
-    await db().collection('organizations').doc(subjectId).set({
-      verificationCaseId: caseId,
-      updatedAt: nowTimestamp(),
-    }, { merge: true });
+  if (!['doctor', 'organization'].includes(subjectType) ||
+      typeof subjectId !== 'string' || !subjectId || subjectId.includes('/')) {
+    throw new DomainError('VALIDATION_FAILED', 'Invalid verification subject', correlationId);
   }
+  if (subjectType === 'doctor' && subjectId !== uid) {
+    throw new DomainError('PERMISSION_DENIED', 'Doctor cases must belong to the caller', correlationId);
+  }
+  if (subjectType === 'organization') {
+    await requireOrgAdmin(uid, subjectId, correlationId);
+  }
+
+  const subjectRef = db().collection(subjectType === 'doctor' ? 'doctors' : 'organizations').doc(subjectId);
+  const caseRef = db().collection('verificationCases').doc();
+  const result = await db().runTransaction(async tx => {
+    const subject = await tx.get(subjectRef);
+    if (!subject.exists) {
+      throw new DomainError('RESOURCE_NOT_FOUND', 'Profile not found', correlationId);
+    }
+    const existingId = subject.data()?.verificationCaseId;
+    if (existingId) return { caseId: existingId, created: false };
+    tx.create(caseRef, {
+      caseId: caseRef.id,
+      subjectType,
+      subjectId,
+      status: 'draft',
+      policyVersion: 'v1.1_2026',
+      reviewerId: null,
+      decisionReason: null,
+      submittedAt: null,
+      decidedAt: null,
+      createdAt: nowTimestamp(),
+      updatedAt: nowTimestamp(),
+    });
+    tx.update(subjectRef, { verificationCaseId: caseRef.id, updatedAt: nowTimestamp() });
+    return { caseId: caseRef.id, created: true };
+  });
+  if (!result.created) return { success: true, caseId: result.caseId };
 
   await logAudit({
     actorId: uid,
     actorRole: 'user',
     action: 'VERIFICATION_CASE_CREATED',
     targetType: 'verificationCases',
-    targetId: caseId,
+    targetId: result.caseId,
     reasonCode: 'CASE_INITIATION',
     correlationId,
     result: 'SUCCESS',
   });
 
-  return { success: true, caseId };
+  return { success: true, caseId: result.caseId };
 });
 
 export const submitVerificationCase = onCall(async (request: CallableRequest) => {
@@ -77,11 +139,30 @@ export const submitVerificationCase = onCall(async (request: CallableRequest) =>
   if (!caseDoc.exists) {
     throw new DomainError('RESOURCE_NOT_FOUND', 'Verification case not found', correlationId);
   }
+  const caseData = caseDoc.data()!;
+  if (caseData.subjectType === 'doctor') {
+    if (caseData.subjectId !== uid) {
+      throw new DomainError('PERMISSION_DENIED', 'Case does not belong to caller', correlationId);
+    }
+  } else if (caseData.subjectType === 'organization') {
+    await requireOrgAdmin(uid, caseData.subjectId, correlationId);
+  } else {
+    throw new DomainError('INVALID_STATE_TRANSITION', 'Invalid case subject', correlationId);
+  }
+  if (!['draft', 'needs_information'].includes(caseData.status)) {
+    throw new DomainError('INVALID_STATE_TRANSITION', 'Case cannot be submitted in this state', correlationId);
+  }
 
-  await caseRef.update({
-    status: 'submitted',
-    submittedAt: nowTimestamp(),
-    updatedAt: nowTimestamp(),
+  await db().runTransaction(async tx => {
+    const latest = await tx.get(caseRef);
+    if (!latest.exists || !['draft', 'needs_information'].includes(latest.data()?.status)) {
+      throw new DomainError('INVALID_STATE_TRANSITION', 'Case cannot be submitted in this state', correlationId);
+    }
+    tx.update(caseRef, {
+      status: 'submitted',
+      submittedAt: nowTimestamp(),
+      updatedAt: nowTimestamp(),
+    });
   });
 
   await logAudit({
@@ -118,8 +199,12 @@ export const getEvidenceReadUrl = onCall(async (request: CallableRequest) => {
     throw new DomainError('RESOURCE_NOT_FOUND', 'Evidence document record not found', correlationId);
   }
 
+  if (docRecord.data()?.scanStatus !== 'clean') {
+    throw new DomainError('INVALID_STATE_TRANSITION', 'Evidence has not passed scanning', correlationId);
+  }
+
   const objectKey = docRecord.data()!.objectKey;
-  const bucket = getStorage().bucket();
+  const bucket = getStorage().bucket(docRecord.data()!.bucket);
   const file = bucket.file(objectKey);
 
   // Generate 5-minute short-lived signed URL
@@ -166,31 +251,65 @@ export const recordVerificationDecision = onCall(async (request: CallableRequest
     throw new DomainError('RESOURCE_NOT_FOUND', 'Verification case not found', correlationId);
   }
   const caseData = caseDoc.data()!;
+  if (caseData.subjectId === verifierUid) {
+    throw new DomainError('PERMISSION_DENIED', 'A verifier cannot decide their own case', correlationId);
+  }
+  if (!['submitted', 'under_review', 'needs_information'].includes(caseData.status)) {
+    throw new DomainError('INVALID_STATE_TRANSITION', 'Case is not reviewable', correlationId);
+  }
 
   const checkRef = db().collection('verificationChecks').doc();
-  const adapter = new ManualVerificationAdapter();
+  const auditRef = db().collection('auditLogs').doc();
+  const parsedReview = decision === 'approved'
+    ? OfficialSourceReviewSchema.safeParse(request.data?.review) : null;
+  if (decision === 'approved' && (!parsedReview?.success ||
+      Date.parse(parsedReview.data.checkedAt) > Date.now() ||
+      Date.now() - Date.parse(parsedReview.data.checkedAt) > 24 * 60 * 60 * 1000)) {
+    throw new DomainError('VALIDATION_FAILED', 'Recorded official-source review is required before approval', correlationId);
+  }
+  const review = parsedReview?.success ? parsedReview.data : null;
+  let sourceHostname = '';
+  if (decision === 'approved') {
+    try { sourceHostname = new URL(review!.sourceUrl).hostname.toLowerCase(); } catch (_) {
+      throw new DomainError('VALIDATION_FAILED', 'Invalid official source URL', correlationId);
+    }
+  }
+  // Query evidence outside the transaction — tx.get() does not support collection queries
+  let evidenceSnap: QuerySnapshot | null = null;
+  if (decision === 'approved') {
+    evidenceSnap = await db().collection('verificationDocuments').where('caseId', '==', caseId).get();
+    if (evidenceSnap.empty || evidenceSnap.docs.some(doc => doc.data().scanStatus !== 'clean')) {
+      throw new DomainError('INVALID_STATE_TRANSITION', 'Approval requires scanned, clean evidence', correlationId);
+    }
+  }
 
-  const checkResult = await adapter.lookup({
-    council: 'Official Council Registry',
-    registrationNumber: caseData.subjectId,
-  });
-
-  const batch = db().batch();
+  await db().runTransaction(async tx => {
+  const latest = await tx.get(caseRef);
+  if (!latest.exists || !['submitted', 'under_review', 'needs_information'].includes(latest.data()?.status)) {
+    throw new DomainError('INVALID_STATE_TRANSITION', 'Case is no longer reviewable', correlationId);
+  }
+  if (decision === 'approved') {
+    const registryConfig = await tx.get(db().collection('configuration').doc('approved_registry_domains'));
+    const domains = registryConfig.data()?.value;
+    if (!Array.isArray(domains) || !domains.some(domain =>
+      typeof domain === 'string' && domain.toLowerCase() === sourceHostname)) {
+      throw new DomainError('INVALID_STATE_TRANSITION', 'Official source domain is not approved', correlationId);
+    }
+  }
 
   // 1. Record Field Check
-  batch.set(checkRef, {
+  tx.create(checkRef, {
     checkId: checkRef.id,
     caseId,
-    checkType: 'OFFICIAL_REGISTRY_MATCH',
-    source: adapter.sourceId,
-    queryParams: { subjectId: caseData.subjectId },
-    result: checkResult,
+    checkType: decision === 'approved' ? 'OFFICIAL_REGISTRY_MATCH' : 'HUMAN_REVIEW_DECISION',
+    source: 'HUMAN_REVIEW',
+    result: review || null,
     checkedAt: nowTimestamp(),
     reviewerId: verifierUid,
   });
 
   // 2. Update Case State
-  batch.update(caseRef, {
+  tx.update(caseRef, {
     status: decision,
     reviewerId: verifierUid,
     decisionReason: `${reasonCode}: ${notes || ''}`,
@@ -201,13 +320,13 @@ export const recordVerificationDecision = onCall(async (request: CallableRequest
   // 3. Update Subject (Doctor / Org)
   if (caseData.subjectType === 'doctor') {
     const docRef = db().collection('doctors').doc(caseData.subjectId);
-    batch.update(docRef, {
+    tx.update(docRef, {
       isVerified: decision === 'approved',
       updatedAt: nowTimestamp(),
     });
   } else {
     const orgRef = db().collection('organizations').doc(caseData.subjectId);
-    batch.update(orgRef, {
+    tx.update(orgRef, {
       verificationState: decision,
       updatedAt: nowTimestamp(),
     });
@@ -215,7 +334,7 @@ export const recordVerificationDecision = onCall(async (request: CallableRequest
 
   // 4. Outbox notification to user
   const outboxRef = db().collection('notificationOutbox').doc();
-  batch.set(outboxRef, {
+  tx.create(outboxRef, {
     eventId: outboxRef.id,
     dedupeKey: `verif_decision_${caseId}`,
     eventType: 'verification.updated',
@@ -232,9 +351,8 @@ export const recordVerificationDecision = onCall(async (request: CallableRequest
     createdAt: nowTimestamp(),
   });
 
-  await batch.commit();
-
-  await logAudit({
+  tx.create(auditRef, {
+    auditId: auditRef.id,
     actorId: verifierUid,
     actorRole: 'verifier',
     action: 'VERIFICATION_DECISION_RECORDED',
@@ -243,19 +361,21 @@ export const recordVerificationDecision = onCall(async (request: CallableRequest
     reasonCode,
     correlationId,
     result: 'SUCCESS',
+    beforeSummary: null,
     afterSummary: { decision, subjectType: caseData.subjectType, subjectId: caseData.subjectId },
+    securityMetadata: null,
+    createdAt: nowTimestamp(),
+  });
+
   });
 
   return { success: true, caseId, decision };
 });
 
 /**
- * AUTOMATED / HYBRID DOCTOR REGISTRATION VERIFICATION
- * Runs authoritative source check + Comparison Engine.
- * - MATCH: Auto-approved, updates doctor profile and dispatches FCM notification.
- * - MISMATCH: Places case into Admin Verifier Queue with detailed comparison discrepancies.
- * - NOT_FOUND: Requests evidence from doctor, queued for reviewer.
- * - SOURCE_UNAVAILABLE: Kept pending/reviewable (no automatic rejection).
+ * Records a request for a human official-source registration review.
+ * No live authoritative registry integration is configured, so no automatic
+ * match, approval, or verified badge can result from this callable.
  */
 export const verifyDoctorRegistration = onCall(async (request: CallableRequest) => {
   const uid = requireAuth(request);
@@ -274,8 +394,14 @@ export const verifyDoctorRegistration = onCall(async (request: CallableRequest) 
   const caseData = caseDoc.data()!;
 
   // Must belong to caller or caller must be verifier/admin
+  if (caseData.subjectType !== 'doctor') {
+    throw new DomainError('VALIDATION_FAILED', 'Doctor verification requires a doctor case', correlationId);
+  }
   if (caseData.subjectId !== uid) {
     requireVerifier(request, correlationId);
+  }
+  if (!['submitted', 'under_review', 'needs_information'].includes(caseData.status)) {
+    throw new DomainError('INVALID_STATE_TRANSITION', 'Case is not awaiting a source check', correlationId);
   }
 
   // Fetch doctor profile
@@ -293,21 +419,31 @@ export const verifyDoctorRegistration = onCall(async (request: CallableRequest) 
     qualification: request.data?.qualification || docData.primaryQualification || docData.qualifications?.[0]?.degree || 'MBBS',
   };
 
-  const verifService = new VerificationService();
-  const providerPreference = request.data?.providerId;
-  const verificationResult = await verifService.verifyDoctor(submittedDetails, providerPreference);
+  // Phase 1 has no approved machine-readable NMC/SMC integration.
+  // Client-supplied claims must never turn into an official match or badge.
+  const providerId = 'MANUAL_REVIEW_REQUIRED';
+  const officialRecord = null;
+  const comparison = {
+    outcome: 'SOURCE_UNAVAILABLE',
+    isAutoApprovable: false,
+    confidenceScore: 0,
+    fieldComparisons: [],
+    discrepancySummary: 'Official-source review is pending an authorized verifier',
+  };
 
-  const { providerId, officialRecord, comparison } = verificationResult;
   const checkRef = db().collection('verificationChecks').doc();
   const now = nowTimestamp();
+  const finalCaseStatus = 'under_review';
 
-  const batch = db().batch();
-
-  // 1. Record Detailed Verification Check
-  batch.set(checkRef, {
+  await db().runTransaction(async tx => {
+  const latest = await tx.get(caseRef);
+  if (!latest.exists || !['submitted', 'under_review', 'needs_information'].includes(latest.data()?.status)) {
+    throw new DomainError('INVALID_STATE_TRANSITION', 'Case is no longer awaiting review', correlationId);
+  }
+  tx.create(checkRef, {
     checkId: checkRef.id,
     caseId,
-    checkType: 'AUTOMATED_COUNCIL_MATCH',
+    checkType: 'MANUAL_SOURCE_REVIEW_REQUESTED',
     providerId,
     registrationNumber: submittedDetails.registrationNumber,
     council: submittedDetails.council,
@@ -321,93 +457,22 @@ export const verifyDoctorRegistration = onCall(async (request: CallableRequest) 
     actorId: uid,
   });
 
-  let finalCaseStatus = caseData.status;
+  tx.update(caseRef, {
+    status: finalCaseStatus,
+    automatedOutcome: 'SOURCE_UNAVAILABLE',
+    requiresReviewReason: comparison.discrepancySummary,
+    updatedAt: now,
+  });
 
-  if (comparison.outcome === 'MATCH') {
-    // Fast-track Auto Approval
-    finalCaseStatus = 'approved';
-
-    batch.update(caseRef, {
-      status: 'approved',
-      automatedOutcome: 'MATCH',
-      confidenceScore: comparison.confidenceScore,
-      reviewerId: 'SYSTEM_VERIFICATION_ENGINE',
-      decisionReason: 'AUTOMATED_MATCH_FAST_TRACK: Authoritative Medical Council registry confirmed credentials',
-      decidedAt: now,
-      updatedAt: now,
-    });
-
-    batch.update(docRef, {
-      isVerified: true,
-      verificationStatus: 'verified',
-      council: submittedDetails.council,
-      registrationNumber: submittedDetails.registrationNumber,
-      updatedAt: now,
-    });
-
-    // Outbox notification
-    const outboxRef = db().collection('notificationOutbox').doc();
-    batch.set(outboxRef, {
-      eventId: outboxRef.id,
-      dedupeKey: `auto_verif_${caseId}`,
-      eventType: 'verification.approved',
-      targetUserId: caseData.subjectId,
-      title: 'Medical Registration Verified!',
-      body: 'Your medical council registration has been verified. You now have unrestricted access to platform duties.',
-      payload: { caseId, outcome: 'MATCH' },
-      status: 'pending',
-      leaseExpiresAt: null,
-      attemptCount: 0,
-      maxAttempts: 5,
-      lastError: null,
-      availableAt: now,
-      createdAt: now,
-    });
-  } else if (comparison.outcome === 'MISMATCH') {
-    finalCaseStatus = 'under_review';
-    batch.update(caseRef, {
-      status: 'under_review',
-      automatedOutcome: 'MISMATCH',
-      requiresReviewReason: comparison.discrepancySummary,
-      confidenceScore: comparison.confidenceScore,
-      updatedAt: now,
-    });
-  } else if (comparison.outcome === 'NOT_FOUND') {
-    finalCaseStatus = 'needs_information';
-    batch.update(caseRef, {
-      status: 'needs_information',
-      automatedOutcome: 'NOT_FOUND',
-      requiresReviewReason: 'Registration record not found in official register; upload supporting certificates',
-      confidenceScore: 0,
-      updatedAt: now,
-    });
-  } else if (comparison.outcome === 'SOURCE_UNAVAILABLE') {
-    finalCaseStatus = 'pending_source';
-    batch.update(caseRef, {
-      status: 'under_review',
-      automatedOutcome: 'SOURCE_UNAVAILABLE',
-      requiresReviewReason: 'Medical Council registry is temporarily unreachable; manual verifier inspection queued',
-      updatedAt: now,
-    });
-  } else {
-    finalCaseStatus = 'under_review';
-    batch.update(caseRef, {
-      status: 'under_review',
-      automatedOutcome: comparison.outcome,
-      requiresReviewReason: comparison.discrepancySummary || 'Manual inspection required',
-      updatedAt: now,
-    });
-  }
-
-  await batch.commit();
+  });
 
   await logAudit({
     actorId: uid,
     actorRole: 'user',
-    action: comparison.outcome === 'MATCH' ? 'VERIFICATION_AUTO_APPROVED' : 'VERIFICATION_CHECK_EXECUTED',
+    action: 'VERIFICATION_CHECK_EXECUTED',
     targetType: 'verificationCases',
     targetId: caseId,
-    reasonCode: comparison.outcome === 'MATCH' ? 'AUTOMATED_MATCH_FAST_TRACK' : `OUTCOME_${comparison.outcome}`,
+    reasonCode: 'MANUAL_SOURCE_REVIEW_REQUIRED',
     correlationId,
     result: 'SUCCESS',
     afterSummary: {

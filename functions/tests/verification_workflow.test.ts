@@ -14,7 +14,7 @@ describe('Doctor Verification & Adapter Test Suite', () => {
     expect(normalized).toBe('TAMIL_NADU_MEDICAL_COUNCIL_982342020');
   });
 
-  test('VerificationSourceAdapter: Successfully verifies doctor against official source abstraction', async () => {
+  test('Manual adapter does not fabricate an official registry match', async () => {
     const adapter = new ManualVerificationAdapter();
     const result = await adapter.lookup({
       council: 'Tamil Nadu Medical Council',
@@ -22,9 +22,9 @@ describe('Doctor Verification & Adapter Test Suite', () => {
       doctorName: 'Dr. Aravind Swaminathan',
     });
 
-    expect(result.matched).toBe(true);
-    expect(result.officialStatus).toBe('ACTIVE');
-    expect(result.sourceName).toContain('Medical Council');
+    expect(result.matched).toBe(false);
+    expect(result.officialStatus).toBe('SOURCE_UNAVAILABLE');
+    expect(result.sourceName).toContain('pending');
     expect(result.checkedAt).toBeDefined();
   });
 });
