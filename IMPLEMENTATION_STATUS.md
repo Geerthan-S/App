@@ -8,6 +8,12 @@
 - Client: retired the local-only Applications/Assignments demo routes (redirect to My Duties); applicants are read from `duties/{id}/applications` with snapshots; confirmation sends a retry-stable idempotency key; marketplace indexes added. Flutter analyzer reports no errors (156 warnings/infos baseline); tests 4 passed / 2 skipped (emulator-only local-login tests). Local test login now passes through the consent screen, which needs the Functions emulator.
 - `BLOCKED_EXTERNAL`: malware scanner provisioning (contract in `docs/evidence-scanning.md`; approval stays fail-closed), App Check server enforcement, live cloud configuration, signed release build and real-device acceptance. Not yet done: removing the admin portal's hardcoded login gate and adding MFA, specialty/qualification eligibility rules, matching-doctor broadcast alerts.
 
+## Load testing (2026-10-10, `perf/`)
+
+- `IN_PROGRESS`: JMeter (API/backend) and Locust (user simulation) load testing. Full log in `perf/PROGRESS.md`, how-to in `perf/README.md`. Built and checked on the local emulator (`demo-healthforce`); the 1000-user run on `doctor-c7c29` is planned before launch.
+- `TESTED` (emulator, JMeter): seed/cleanup tooling (1,075 `loadtest_` accounts, 75 hospitals, 600 duties; cleanup leaves Firestore and Auth empty); functional plan 44/44 over the HTTP callable transport (lifecycle, idempotency replays, tenant/role checks, Firestore rules, validation); double-booking races (30 selections for one seat; 20 hospitals selecting one doctor) produced exactly one assignment in 4/4 runs, verified in the database; baseline load at 1/10/50 users with 0 errors in about 120k requests.
+- Open finding: under seat contention, Firestore `ABORTED` (transaction lock timeout) reaches clients as generic `INTERNAL_ERROR` (1 of 4 runs) because `toCallableError` does not map it. Data stays correct; fix proposed, not applied.
+
 ## Deployment review (2026-10-08)
 
 - `IN_PROGRESS`: deployment readiness review of the current local changes is recorded in `docs/deployment-review-2026-10-08.md`. This snapshot is not production ready; earlier `TESTED` labels do not certify live workflows.

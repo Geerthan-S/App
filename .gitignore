@@ -59,3 +59,11 @@ functions/lib/
 .firebase/
 .playwright-mcp/
 
+
+# Load-testing tools (JMeter install, local only)
+tools/
+
+# Load-test generated data (contains test credentials) and dependencies
+perf/data/
+perf/node_modules/
+perf/results/

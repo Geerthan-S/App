@@ -1,0 +1,17 @@
+{
+  "name": "healthforce-perf",
+  "private": true,
+  "type": "module",
+  "description": "Load-test data tooling for JMeter and Locust runs. See perf/README.md.",
+  "scripts": {
+    "emulators": "start-emulators.bat",
+    "seed": "node seed/seed.mjs",
+    "cleanup": "node seed/cleanup.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.7.0"
+  }
+}
