@@ -62,8 +62,15 @@ Run from `perf/locust/` in PowerShell with the emulators running and data seeded
 ```
 .un.ps1 -Users 50                                  # 5 minutes, 5 new users per second
 .un.ps1 -Users 100 -SpawnRate 10 -Duration 10m
+.\run.ps1 -Profile load                              # load pattern from shapes/ (see below)
 python -m locust -f locustfile.py                    # interactive web UI on http://localhost:8089
 ```
+
+| Profile | Pattern | Length |
+|---|---|---|
+| `load` | 100 users (5 min) → 500 (10 min) → 1000 (15 min) | 30 min |
+| `spike` | 100 users (3 min) → 1000 within ~20 s, held 5 min → back to 100 (3 min) | 11 min |
+| `soak` | 1000 users held, past the 50-minute token refresh | 70 min |
 
 Each simulated person signs in with their own seeded account and does what
 the app's screens do, pausing between actions like a real user:

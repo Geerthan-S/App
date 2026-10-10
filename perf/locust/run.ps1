@@ -1,19 +1,25 @@
 <#
 .SYNOPSIS
   Runs the Locust user simulation headless and writes stats, outcomes and an
-  HTML report to perf/results/locust-<users>u-<target>-<timestamp>/.
+  HTML report to perf/results/locust-<users>u-<target>-<timestamp>/ (or
+  locust-<profile>-<target>-<timestamp>/ with -Profile).
+
+  -Profile load|spike|soak uses a load pattern from shapes/, which sets the
+  user count over time; -Users, -SpawnRate and -Duration are then ignored.
 
 .EXAMPLE
   .\run.ps1 -Users 50
   .\run.ps1 -Users 100 -SpawnRate 10 -Duration 10m
-  .\run.ps1 -Users 1000 -SpawnRate 20 -Duration 30m -Target cloud -Confirm doctor-c7c29
+  .\run.ps1 -Profile spike
+  .\run.ps1 -Profile load -Target cloud -Confirm doctor-c7c29
 #>
 param(
   [int]$Users = 50,
   [int]$SpawnRate = 5,
   [string]$Duration = '5m',
   [ValidateSet('emulator', 'cloud')][string]$Target = 'emulator',
-  [string]$Confirm = ''
+  [string]$Confirm = '',
+  [ValidateSet('', 'load', 'spike', 'soak')][string]$Profile = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -21,14 +27,18 @@ $here = $PSScriptRoot
 $repo = Resolve-Path (Join-Path $here '..\..')
 
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-$out = Join-Path $repo "perf\results\locust-$($Users)u-$Target-$stamp"
+$label = if ($Profile) { $Profile } else { "$($Users)u" }
+$out = Join-Path $repo "perf\results\locust-$label-$Target-$stamp"
 New-Item -ItemType Directory -Force $out | Out-Null
 
-$locustArgs = @('-m', 'locust', '-f', (Join-Path $here 'locustfile.py'), '--headless',
-  '-u', $Users, '-r', $SpawnRate, '-t', $Duration, '--stop-timeout', '30',
+$files = Join-Path $here 'locustfile.py'
+if ($Profile) { $files += ',' + (Join-Path $here "shapes\$Profile.py") }
+
+$locustArgs = @('-m', 'locust', '-f', $files, '--headless', '--stop-timeout', '30',
   '--target', $Target, '--results-dir', $out,
   '--csv', (Join-Path $out 'stats'), '--html', (Join-Path $out 'report.html'),
   '--logfile', (Join-Path $out 'locust.log'), '--only-summary')
+if (-not $Profile) { $locustArgs += @('-u', $Users, '-r', $SpawnRate, '-t', $Duration) }
 if ($Confirm) { $locustArgs += @('--confirm', $Confirm) }
 
 Push-Location $here

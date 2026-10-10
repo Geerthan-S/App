@@ -36,7 +36,7 @@ Test the Healthcare Workforce backend before launch:
 | 2 | Seed and clean-up scripts for test data | Emulator | ✅ Done |
 | 3 | JMeter plans: functional, security, idempotency, double-booking concurrency, per-endpoint baseline | Emulator | ✅ Done (finding 1 fixed) |
 | 4 | Locust user scenarios (doctor, hospital, admin), checked at 50–100 users | Emulator | ✅ Done |
-| 5 | Smoke pass, concurrency test and the 1000-user Locust runs (load, spike, soak) | `doctor-c7c29` | ⏳ Next |
+| 5 | Smoke pass, concurrency test and the 1000-user Locust runs (load, spike, soak) | `doctor-c7c29` | 🔄 In progress (smoke passed; region fix pending deploy) |
 | 6 | Clean-up of cloud test data, results report, fixes for any bottlenecks | `doctor-c7c29` + repo | ⏳ Not started |
 
 ---
@@ -235,6 +235,57 @@ from one IP (`TOO_MANY_ATTEMPTS_TRY_LATER`). Spawning 1000 users from one
 laptop means 1000 sign-ins in under a minute at a spawn rate of 20/s. This
 has not been tested against the real project. Watch the `Auth: sign in` row on the first cloud run, and lower
 `-SpawnRate` if it shows failures.
+
+### Step 5: Cloud runs on `doctor-c7c29` (in progress, 2026-10-10)
+
+**Preparation done:**
+
+- The cloud backend was behind the code: 5 functions from the 2026-10-08
+  fixes and 4 of 20 Firestore indexes were missing. Deployed functions,
+  Firestore rules and indexes, and Storage rules (Storage was granted the
+  role it needs for rules that read Firestore). Verified afterwards: all
+  functions present, 20 / 20 indexes.
+- Seeded the cloud project (1,075 accounts, 75 organizations, 600 duties) in
+  120 s. Email/Password sign-in enabled for the test accounts.
+- Load patterns added for Locust (`perf/locust/shapes/`): `load`, `spike`
+  and `soak` (see README).
+
+#### Result: cloud smoke test, 44 / 44 passed ✅ (but slow)
+
+Every check passed against the real backend, but with one user the calls
+that touch the database took 1.6–6.6 s:
+
+| Kind of request | Time |
+|---|---|
+| Direct Firestore reads (marketplace) | 0.1–0.3 s |
+| Calls rejected before any database work (validation) | ~0.6 s |
+| Calls that read or write data (apply, select, confirm, publish, contact) | 1.6–6.6 s |
+
+**Finding 2 (fixed in code, deploy pending): functions ran in a different
+region from the database**
+
+- **Cause:** Firestore is in `asia-south1` (Mumbai), but no region was set
+  for the functions, so all callables ran in the default `us-central1`
+  (Iowa). Every database read or write inside a function crossed the Pacific
+  (about 0.25 s each way), and transactions make several. Users in India
+  also had to reach Iowa first. Even warm repeat calls were slow
+  (`confirmAssignment` replay: 2.9 s).
+- **Fix:** `setGlobalOptions({ region: 'asia-south1' })` in
+  `functions/src/index.ts`. The Flutter app now calls functions through one
+  shared client, `BackendConfig.functions` in
+  `lib/core/config/backend_config.dart` (all 11 files that used
+  `FirebaseFunctions.instance` changed). The admin portal uses
+  `getFunctions(app, 'asia-south1')`. JMeter and Locust endpoints updated.
+- **Verified on the emulator (now serving `asia-south1`):** Functions
+  suite 13 suites / 75 tests passed; JMeter functional 44 / 44; both
+  double-booking races passed; Locust 30 users for 2 min, 502 requests,
+  0 failures, integrity check passed. `flutter analyze --no-pub` shows the
+  same 136 issues as before the change, none from it (the local Flutter
+  3.24.5 is older than the project's `>=3.35.0` requirement, so most of
+  those are newer-API errors unrelated to this work).
+- **Still to do:** deploy functions and hosting (the admin portal), delete
+  the old `us-central1` functions, rebuild any installed test app, then
+  re-run the smoke test to measure the improvement.
 
 **Note (not an app issue): laptop sleep stalls a test**
 
