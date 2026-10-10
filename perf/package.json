@@ -7,7 +7,8 @@
     "emulators": "start-emulators.bat",
     "seed": "node seed/seed.mjs",
     "cleanup": "node seed/cleanup.mjs",
-    "verify": "node seed/verify.mjs"
+    "verify": "node seed/verify.mjs",
+    "leftovers": "node seed/leftovers.mjs"
   },
   "engines": {
     "node": ">=20"

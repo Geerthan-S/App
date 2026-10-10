@@ -18,6 +18,7 @@ npm run emulators   # terminal 1: Auth, Functions, Firestore on demo-healthforce
 npm run seed        # terminal 2: clears old load-test data, then seeds
 npm run cleanup     # removes every load-test user and document
 npm run verify      # after a run: seats add up and no doctor is double-booked
+npm run leftovers   # after cleanup: scans every collection for remaining load-test data
 ```
 
 The seed creates 900 verified doctors, 75 approved hospitals with 2 staff
@@ -60,8 +61,10 @@ setup and verification helpers in `lib/*.groovy`.
 Run from `perf/locust/` in PowerShell with the emulators running and data seeded:
 
 ```
-.un.ps1 -Users 50                                  # 5 minutes, 5 new users per second
-.un.ps1 -Users 100 -SpawnRate 10 -Duration 10m
+.
+un.ps1 -Users 50                                  # 5 minutes, 5 new users per second
+.
+un.ps1 -Users 100 -SpawnRate 10 -Duration 10m
 .\run.ps1 -Profile load                              # load pattern from shapes/ (see below)
 python -m locust -f locustfile.py                    # interactive web UI on http://localhost:8089
 ```
