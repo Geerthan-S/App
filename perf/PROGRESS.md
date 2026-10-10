@@ -363,6 +363,48 @@ Median 49 ms, p95 190 ms, p99 370 ms, max 2.1 s.
   19 confirmed, 9 open offers, 2 cancelled (from the smoke test);
   27 doctors with live assignments, none double-booked.
 
+#### Result: Locust 1000 users × 10 min (cloud), 4 transport failures in 74,097 ✅
+
+All 1000 users (850 doctors, 130 hospital staff, 20 admins) active within
+50 s; about 115 req/s; no CPU warning on the load generator; 1,000 / 1,000
+sign-ins succeeded (no Auth throttling).
+
+| | 100 users | 1000 users |
+|---|---|---|
+| Requests | 3,859 | 74,097 |
+| p50 / p95 / p99 | 49 / 190 / 370 ms | 88 / 200 / 410 ms |
+| Failures | 0 | 4 (0.005%) |
+
+| Request | p50 | p95 | Calls |
+|---|---|---|---|
+| Auth: sign in | 410 ms | 470 ms | 1,000 |
+| Doctor: marketplace (both queries) | 99 ms | 180 ms | 22,561 |
+| Doctor: open duty / my duties / notifications | 77–82 ms | 130–150 ms | 27,357 |
+| Doctor: applyToDuty | 120 ms | 210 ms | 3,111 |
+| Doctor: confirmAssignment | 110 ms | 200 ms | 336 |
+| Doctor: hospital contact | 120 ms | 190 ms | 296 |
+| Hospital: dashboard queries | 84–93 ms | 130–200 ms | 7,756 |
+| Hospital: applicants / credentials | 82–85 ms | 110–140 ms | 4,747 |
+| Hospital: atomicSelectDoctor | 150 ms | 210 ms | 423 |
+| Hospital: createDuty / publishDuty | 110 / 130 ms | 160 / 180 ms | 410 / 410 |
+| Admin: queues | 68–87 ms | 150 ms | 583 |
+
+- Ten times the users raised p95 by only 10 ms. A few requests (<0.01%)
+  took 2–4.7 s, consistent with cold starts while instances scaled out.
+- Flow: about 3,070 applications, 394 selections, 334 confirmations,
+  296 contact reads, 410 duties posted. Expected losing outcomes: 31 + 15
+  `INVALID_STATE_TRANSITION` (duty filled first), 14 `ASSIGNMENT_CONFLICT`,
+  4 `APPLICATION_ALREADY_EXISTS`. No permission errors, no 5xx, no
+  `CONCURRENT_UPDATE`.
+- **Failures:** 2 × applyToDuty and 2 × confirmAssignment with
+  `HTTPConnectionClosed`: the client reused a keep-alive connection as
+  Google's front end closed it, so no response arrived. Not a function
+  error. Follow-up: confirm the Flutter app retries these calls with the
+  same idempotency key on a dropped connection.
+- **Integrity check (cloud): PASS.** 1,077 duties checked; assignments
+  353 confirmed, 69 open offers, 2 cancelled; 311 doctors with live
+  assignments, none double-booked and no seat oversold.
+
 **Note (not an app issue): laptop sleep stalls a test**
 
 - During the 1-user baseline the laptop went into Windows Modern Standby
