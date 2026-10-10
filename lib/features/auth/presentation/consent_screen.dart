@@ -14,6 +14,7 @@ import '../../../core/design_system/app_buttons.dart';
 import '../../../core/design_system/app_cards.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/navigation/onboarding_gate.dart';
+import '../../../core/config/backend_config.dart';
 
 class ConsentScreen extends ConsumerStatefulWidget {
   const ConsentScreen({super.key});
@@ -35,7 +36,7 @@ class _ConsentScreenState extends ConsumerState<ConsentScreen> {
       _error = null;
     });
     try {
-      await FirebaseFunctions.instance.httpsCallable('recordConsent').call<Map<String, dynamic>>({
+      await BackendConfig.functions.httpsCallable('recordConsent').call<Map<String, dynamic>>({
         'consentVersion': AppConstants.currentConsentVersion,
       });
       OnboardingGate.markConsented(uid);

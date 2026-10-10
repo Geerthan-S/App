@@ -10,6 +10,7 @@ import 'package:uuid/uuid.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:file_picker/file_picker.dart';
 import '../domain/verification_models.dart';
+import '../../../core/config/backend_config.dart';
 
 class VerificationRepository {
   final FirebaseFunctions _functions;
@@ -18,7 +19,7 @@ class VerificationRepository {
   VerificationRepository({
     FirebaseFunctions? functions,
     FirebaseStorage? storage,
-  }) : _functions = functions ?? FirebaseFunctions.instance,
+  }) : _functions = functions ?? BackendConfig.functions,
        _storage = storage ?? FirebaseStorage.instance;
 
   /**

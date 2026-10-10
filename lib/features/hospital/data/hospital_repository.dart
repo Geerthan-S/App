@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
+import '../../../core/config/backend_config.dart';
 
 class HospitalRepository {
   static Stream<List<Map<String, dynamic>>> watchOrgDuties(String orgId) {
@@ -72,7 +72,7 @@ class HospitalRepository {
   }
 
   static Future<void> selectDoctor(String dutyId, String doctorId) async {
-    await FirebaseFunctions.instance.httpsCallable('atomicSelectDoctor').call<Map<String, dynamic>>({
+    await BackendConfig.functions.httpsCallable('atomicSelectDoctor').call<Map<String, dynamic>>({
       'dutyId': dutyId,
       'doctorId': doctorId,
       'idempotencyKey': const Uuid().v4(),

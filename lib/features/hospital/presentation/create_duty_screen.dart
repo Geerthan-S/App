@@ -15,6 +15,7 @@ import '../../../core/widgets/language_selector_dialog.dart';
 import '../../../core/localization/language_provider.dart';
 import '../../duty_marketplace/data/duty_repository.dart';
 import '../../../core/errors/error_envelope.dart';
+import '../../../core/config/backend_config.dart';
 
 class CreateDutyScreen extends ConsumerStatefulWidget {
   const CreateDutyScreen({super.key});
@@ -24,7 +25,7 @@ class CreateDutyScreen extends ConsumerStatefulWidget {
 }
 
 class _CreateDutyScreenState extends ConsumerState<CreateDutyScreen> {
-  final _functions = FirebaseFunctions.instance;
+  final _functions = BackendConfig.functions;
   final _formKey = GlobalKey<FormState>();
 
   List<Map<String, dynamic>> _organizations = [];

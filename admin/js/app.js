@@ -293,7 +293,7 @@ async function boot() {
   if (!res.ok) throw new Error('Firebase config unavailable for this portal.');
   const app = initializeApp(await res.json());
   auth      = getAuth(app);
-  functions = getFunctions(app);
+  functions = getFunctions(app, 'asia-south1');  // must match setGlobalOptions in functions/src/index.ts
   _booted   = true;
 
   // If a verified Firebase session is already persisted in the browser, skip login

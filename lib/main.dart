@@ -10,7 +10,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'core/config/local_test_config.dart';
@@ -22,6 +21,7 @@ import 'core/logging/app_logger.dart';
 import 'core/errors/error_screens.dart';
 import 'core/widgets/connectivity_gate.dart';
 import 'core/services/push_registration_service.dart';
+import 'core/config/backend_config.dart';
 
 Future<void> initializeFirebaseServices() async {
   await Firebase.initializeApp(
@@ -38,7 +38,7 @@ Future<void> initializeFirebaseServices() async {
   if (LocalTestConfig.enabled) {
     await FirebaseAuth.instance.useAuthEmulator(LocalTestConfig.host, 9099);
     FirebaseFirestore.instance.useFirestoreEmulator(LocalTestConfig.host, 8080);
-    FirebaseFunctions.instance.useFunctionsEmulator(LocalTestConfig.host, 5001);
+    BackendConfig.functions.useFunctionsEmulator(LocalTestConfig.host, 5001);
     await FirebaseStorage.instance.useStorageEmulator(
       LocalTestConfig.host,
       9199,

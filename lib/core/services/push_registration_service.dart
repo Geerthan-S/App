@@ -7,11 +7,11 @@
 
 import 'dart:async';
 
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import '../logging/app_logger.dart';
+import '../config/backend_config.dart';
 
 enum PushRegistrationStatus { unknown, registered, permissionDenied, failed }
 
@@ -44,7 +44,7 @@ class PushRegistrationService {
       }
       final fcmToken = token ?? await FirebaseMessaging.instance.getToken();
       if (fcmToken == null) throw StateError('FCM returned no device token');
-      await FirebaseFunctions.instance
+      await BackendConfig.functions
           .httpsCallable('registerDeviceToken')
           .call<Map<String, dynamic>>({'token': fcmToken, 'platform': 'android'});
       _registeredToken = fcmToken;
@@ -64,7 +64,7 @@ class PushRegistrationService {
     try {
       final token = _registeredToken ?? await FirebaseMessaging.instance.getToken();
       if (token == null) return;
-      await FirebaseFunctions.instance
+      await BackendConfig.functions
           .httpsCallable('unregisterDeviceToken')
           .call<Map<String, dynamic>>({'token': token, 'platform': 'android'});
     } catch (e, st) {

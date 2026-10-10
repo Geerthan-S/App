@@ -11,6 +11,7 @@ import '../../../core/design_system/app_inputs.dart';
 import '../../../core/widgets/state_views.dart';
 import '../../duty_marketplace/data/duty_repository.dart';
 import '../../../core/errors/error_envelope.dart';
+import '../../../core/config/backend_config.dart';
 
 class AddPostScreen extends StatefulWidget {
   const AddPostScreen({super.key});
@@ -61,7 +62,7 @@ class _AddPostScreenState extends State<AddPostScreen> {
 
   Future<void> _loadOrgs() async {
     try {
-      final result = await FirebaseFunctions.instance
+      final result = await BackendConfig.functions
           .httpsCallable('getMyOrganizations')
           .call<Map<String, dynamic>>();
       final orgs = (result.data['organizations'] as List<dynamic>? ?? [])
@@ -81,7 +82,7 @@ class _AddPostScreenState extends State<AddPostScreen> {
   Future<void> _selectOrg(String orgId) async {
     setState(() => _selectedOrgId = orgId);
     try {
-      final snap = await FirebaseFunctions.instance
+      final snap = await BackendConfig.functions
           .httpsCallable('getMyOrganizations')
           .call<Map<String, dynamic>>();
       // Load facilities from Firestore subcollection via org ID
@@ -105,7 +106,7 @@ class _AddPostScreenState extends State<AddPostScreen> {
 
   Future<List<Map<String, dynamic>>> _loadFacilities(String orgId) async {
     try {
-      final snap = await FirebaseFunctions.instance
+      final snap = await BackendConfig.functions
           .httpsCallable('getMyOrganizations')
           .call<Map<String, dynamic>>();
       // Extract facilities from org data

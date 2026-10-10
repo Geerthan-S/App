@@ -167,7 +167,7 @@ def think_time():
 def test_plan(name, comment, children):
     config = arguments("Endpoints (override with -J or -q cloud.properties)", [
         ("project", "${__P(project,demo-healthforce)}"),
-        ("functions_url", "${__P(functions_url,http://127.0.0.1:5001/demo-healthforce/us-central1)}"),
+        ("functions_url", "${__P(functions_url,http://127.0.0.1:5001/demo-healthforce/asia-south1)}"),
         ("auth_url", "${__P(auth_url,http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1)}"),
         ("firestore_host", "${__P(firestore_host,http://127.0.0.1:8080)}"),
         ("api_key", "${__P(api_key,fake-api-key)}"),

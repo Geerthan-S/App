@@ -1,11 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
+import '../../../core/config/backend_config.dart';
 
 class HospitalProfileScreen extends ConsumerStatefulWidget {
   const HospitalProfileScreen({super.key});
@@ -15,7 +15,7 @@ class HospitalProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _HospitalProfileScreenState extends ConsumerState<HospitalProfileScreen> {
-  final _functions = FirebaseFunctions.instance;
+  final _functions = BackendConfig.functions;
   List<Map<String, dynamic>> _organizations = [];
   String? _selectedId;
   bool _busy = false;

@@ -1,11 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import '../../../core/config/backend_config.dart';
 
 class DoctorRepository {
   static final _db = FirebaseFirestore.instance;
-  static final _functions = FirebaseFunctions.instance;
+  static final _functions = BackendConfig.functions;
   static final _dateFmt = DateFormat('d MMM');
 
   static String? get _uid => FirebaseAuth.instance.currentUser?.uid;

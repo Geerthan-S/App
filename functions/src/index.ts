@@ -4,6 +4,11 @@
  */
 
 import { initializeApp } from 'firebase-admin/app';
+import { setGlobalOptions } from 'firebase-functions/v2';
+
+// Run every function in Mumbai, next to the Firestore database and the app's users.
+// Clients must call the same region (lib/core/config/backend_config.dart, admin/js/app.js).
+setGlobalOptions({ region: 'asia-south1' });
 
 // Initialize Firebase Admin SDK
 initializeApp();

@@ -13,6 +13,7 @@ import '../../../core/widgets/language_selector_dialog.dart';
 import '../../../core/localization/language_provider.dart';
 import '../data/hospital_repository.dart';
 import '../../../core/errors/error_envelope.dart';
+import '../../../core/config/backend_config.dart';
 
 class HospitalDashboardScreen extends ConsumerStatefulWidget {
   const HospitalDashboardScreen({super.key});
@@ -35,7 +36,7 @@ class _HospitalDashboardScreenState extends ConsumerState<HospitalDashboardScree
 
   Future<void> _loadOrgs() async {
     try {
-      final result = await FirebaseFunctions.instance
+      final result = await BackendConfig.functions
           .httpsCallable('getMyOrganizations')
           .call<Map<String, dynamic>>();
       final orgs = (result.data['organizations'] as List<dynamic>? ?? [])
@@ -266,7 +267,7 @@ class _HospitalDashboardScreenState extends ConsumerState<HospitalDashboardScree
                           if (commentCtrl.text.trim().isEmpty) return;
                           setSheet(() => submitting = true);
                           try {
-                            await FirebaseFunctions.instance.httpsCallable('submitFeedback').call({
+                            await BackendConfig.functions.httpsCallable('submitFeedback').call({
                               'targetId': assignment['doctorId'],
                               'targetType': 'doctor',
                               'assignmentId': assignment['assignmentId'],

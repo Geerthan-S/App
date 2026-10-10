@@ -23,6 +23,7 @@ DATA = PERF / "data"
 
 EMULATOR_PROJECT = "demo-healthforce"
 CLOUD_PROJECT = "doctor-c7c29"
+FUNCTIONS_REGION = "asia-south1"  # setGlobalOptions in functions/src/index.ts
 
 # ID tokens live for an hour; refresh well before that so a soak run never sends an expired one.
 TOKEN_REFRESH_AFTER_S = 50 * 60
@@ -36,7 +37,7 @@ def endpoints(target, confirm):
         project, key = EMULATOR_PROJECT, "fake-api-key"
         return {
             "project": project,
-            "functions": f"http://127.0.0.1:5001/{project}/us-central1",
+            "functions": f"http://127.0.0.1:5001/{project}/{FUNCTIONS_REGION}",
             "sign_in": f"http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={key}",
             "refresh": f"http://127.0.0.1:9099/securetoken.googleapis.com/v1/token?key={key}",
             "documents": f"http://127.0.0.1:8080/v1/projects/{project}/databases/(default)/documents",
@@ -49,7 +50,7 @@ def endpoints(target, confirm):
         project = CLOUD_PROJECT
         return {
             "project": project,
-            "functions": f"https://us-central1-{project}.cloudfunctions.net",
+            "functions": f"https://{FUNCTIONS_REGION}-{project}.cloudfunctions.net",
             "sign_in": f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={key}",
             "refresh": f"https://securetoken.googleapis.com/v1/token?key={key}",
             "documents": f"https://firestore.googleapis.com/v1/projects/{project}/databases/(default)/documents",
