@@ -4,7 +4,7 @@ Running log of the load-testing work: what has been decided, what is done,
 and what is next. Newest updates are at the bottom of each section.
 How-to instructions live in [README.md](README.md).
 
-**Last updated:** 2026-10-10
+**Last updated:** 2026-10-11
 **Branch:** `perf/load-testing-2026-10-10`
 
 ---
@@ -36,8 +36,8 @@ Test the Healthcare Workforce backend before launch:
 | 2 | Seed and clean-up scripts for test data | Emulator | ✅ Done |
 | 3 | JMeter plans: functional, security, idempotency, double-booking concurrency, per-endpoint baseline | Emulator | ✅ Done (finding 1 fixed) |
 | 4 | Locust user scenarios (doctor, hospital, admin), checked at 50–100 users | Emulator | ✅ Done |
-| 5 | Smoke pass, concurrency test and the 1000-user Locust runs (load, spike, soak) | `doctor-c7c29` | 🔄 In progress (smoke passed after region fix) |
-| 6 | Clean-up of cloud test data, results report, fixes for any bottlenecks | `doctor-c7c29` + repo | ⏳ Not started |
+| 5 | Smoke pass, concurrency test and the 1000-user Locust runs (load, spike, soak) | `doctor-c7c29` | ✅ Done (smoke, races, 100 and 1000 users; spike and soak skipped by decision) |
+| 6 | Clean-up of cloud test data, results report, fixes for any bottlenecks | `doctor-c7c29` + repo | ✅ Done (report: [REPORT.md](REPORT.md); housekeeping listed there) |
 
 ---
 
@@ -404,6 +404,31 @@ sign-ins succeeded (no Auth throttling).
 - **Integrity check (cloud): PASS.** 1,077 duties checked; assignments
   353 confirmed, 69 open offers, 2 cancelled; 311 doctors with live
   assignments, none double-booked and no seat oversold.
+
+**Decision:** spike and soak runs skipped. The 1000-user run ramped 0 → 1000
+users in 60 s with 0 failures (max 1.4 s), which covers scale-up; the soak's
+token-refresh check tests the Locust script rather than the app (the Firebase
+SDK refreshes tokens itself). Both remain available before launch.
+
+### Step 6: Clean-up and report (2026-10-11)
+
+- **Cloud clean-up:** deleted 1,075 test accounts and about 32,000 documents
+  (1,077 duties, 3,410 application snapshots, 424 assignments, 7,956
+  notifications, 5,460 audit logs, 4,191 outbox events and delivery
+  attempts, and the rest).
+- **Leftover scan** (`npm run leftovers`, new): reads every document in every
+  collection and flags any `loadtest_` ID or field, plus orphaned delivery
+  attempts. Tested on the emulator (found seeded data, passed after
+  clean-up, caught a planted orphan). **Cloud: PASS**, 6 documents in the
+  project, none from the tests.
+- **Retry check in the app:** no automatic retries; users retry by tapping
+  again. Confirmation keeps one idempotency key per screen (safe). Apply and
+  select create a new key per tap, so after a dropped connection the user
+  can see an error for an action that succeeded (no duplicates; the server
+  refuses them). Recommended fix in the report.
+- **Final report:** [REPORT.md](REPORT.md), with results, fixes,
+  recommendations and the housekeeping checklist (turn off Email/Password
+  sign-in, revoke gcloud credentials, rebuild test app, check billing).
 
 **Note (not an app issue): laptop sleep stalls a test**
 
