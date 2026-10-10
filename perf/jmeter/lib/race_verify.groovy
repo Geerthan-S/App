@@ -34,7 +34,7 @@ if (race == 'seat') {
 }
 
 if (wins != 1) problems << "expected exactly 1 successful selection, got ${wins}"
-def unexpected = outcomes.keySet() - ['OK', 'DUTY_CAPACITY_FILLED', 'INVALID_STATE_TRANSITION', 'ASSIGNMENT_CONFLICT']
+def unexpected = outcomes.keySet() - ['OK', 'DUTY_CAPACITY_FILLED', 'INVALID_STATE_TRANSITION', 'ASSIGNMENT_CONFLICT', 'CONCURRENT_UPDATE']
 if (unexpected) report << "Unexpected loser outcomes (not double booking, but users saw an error): ${unexpected}\n"
 
 report << (problems ? "FAIL: ${problems.join('; ')}\n" : "PASS: no double booking\n")

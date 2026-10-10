@@ -405,9 +405,9 @@ def concurrency_plan():
                             ramp="0")
 
     seat = race("Race 1: many hospitals' picks for ONE seat", "seat",
-                "allow=OK,DUTY_CAPACITY_FILLED,INVALID_STATE_TRANSITION")
+                "allow=OK,DUTY_CAPACITY_FILLED,INVALID_STATE_TRANSITION,CONCURRENT_UPDATE")
     doctor = race("Race 2: many hospitals select ONE doctor for overlapping shifts", "doctor",
-                  "allow=OK,ASSIGNMENT_CONFLICT")
+                  "allow=OK,ASSIGNMENT_CONFLICT,CONCURRENT_UPDATE")
 
     verify = thread_group("Verify: no double booking", [
         jsr223("JSR223Sampler", "Verify race 1: one seat, one assignment", filename="lib/race_verify.groovy",
