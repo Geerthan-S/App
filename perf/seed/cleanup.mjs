@@ -23,6 +23,7 @@ const ID_PREFIXED = [
 
 /** Backend-generated documents, matched on the field that references a load-test entity. */
 const FIELD_PREFIXED = [
+  ['duties', 'organizationId'],  // duties load-test hospitals created during a run (auto IDs)
   ['applicationSnapshots', 'doctorId'],
   ['assignments', 'doctorId'],
   ['assignmentEvents', 'doctorId'],

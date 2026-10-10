@@ -6,7 +6,8 @@
   "scripts": {
     "emulators": "start-emulators.bat",
     "seed": "node seed/seed.mjs",
-    "cleanup": "node seed/cleanup.mjs"
+    "cleanup": "node seed/cleanup.mjs",
+    "verify": "node seed/verify.mjs"
   },
   "engines": {
     "node": ">=20"

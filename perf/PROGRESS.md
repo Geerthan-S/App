@@ -5,7 +5,7 @@ and what is next. Newest updates are at the bottom of each section.
 How-to instructions live in [README.md](README.md).
 
 **Last updated:** 2026-10-10
-**Branch:** `fix/production-blockers-2026-10-08`
+**Branch:** `perf/load-testing-2026-10-10`
 
 ---
 
@@ -34,9 +34,9 @@ Test the Healthcare Workforce backend before launch:
 |---|---|---|---|
 | 1 | Install JMeter and Locust | Laptop | ✅ Done |
 | 2 | Seed and clean-up scripts for test data | Emulator | ✅ Done |
-| 3 | JMeter plans: functional, security, idempotency, double-booking concurrency, per-endpoint baseline | Emulator | ✅ Done (1 finding open) |
-| 4 | Locust user scenarios (doctor, hospital, admin), checked at 50–100 users | Emulator | ⏳ Next |
-| 5 | Smoke pass, concurrency test and the 1000-user Locust runs (load, spike, soak) | `doctor-c7c29` | ⏳ Not started |
+| 3 | JMeter plans: functional, security, idempotency, double-booking concurrency, per-endpoint baseline | Emulator | ✅ Done (finding 1 fixed) |
+| 4 | Locust user scenarios (doctor, hospital, admin), checked at 50–100 users | Emulator | ✅ Done |
+| 5 | Smoke pass, concurrency test and the 1000-user Locust runs (load, spike, soak) | `doctor-c7c29` | ⏳ Next |
 | 6 | Clean-up of cloud test data, results report, fixes for any bottlenecks | `doctor-c7c29` + repo | ⏳ Not started |
 
 ---
@@ -148,7 +148,7 @@ Relative costs worth watching on the cloud run: `getAdminQueues` and
 
 #### Findings
 
-**Finding 1 (open): losers of a seat race sometimes get "internal error" instead of "duty filled"**
+**Finding 1 (fixed 2026-10-10): losers of a seat race sometimes got "internal error" instead of "duty filled"**
 
 - **What happened:** in 1 of 4 seat-race runs, the 29 losing selections got
   HTTP 500 `INTERNAL_ERROR`. In the other 3 runs they got the correct
@@ -162,11 +162,79 @@ Relative costs worth watching on the cloud run: `getAdminQueues` and
   please refresh".
 - **Impact:** data stays correct, but the error message is misleading, and
   it would show up in error monitoring as a server bug.
-- **Proposed fix (not applied yet):** map Firestore `ABORTED` errors to a
-  retryable callable error (for example `aborted` with domain code
-  `CONCURRENT_UPDATE`) so the app can show "someone else just updated this,
-  please try again". The emulator's locking is not identical to
-  production's, so the frequency must be confirmed in step 5.
+- **Fix:** `toCallableError` now maps Firestore `ABORTED` (gRPC code 10) to
+  the new domain code `CONCURRENT_UPDATE`, sent as callable status `aborted`
+  (HTTP 409) with the message "Someone else just updated this. Please refresh
+  and try again." It is logged as a warning, not an error. The JMeter races
+  accept `CONCURRENT_UPDATE` as a valid losing outcome.
+- **Verified:** new unit test `functions/tests/callable_errors.test.ts`
+  (fails when the fix is disabled); full emulator suite 13 suites / 75 tests
+  passed. Re-ran the races 4 times on the emulator: the lock timeout happened
+  again in 1 run, and all 29 losers got HTTP 409 `CONCURRENT_UPDATE` instead
+  of 500. No double booking in any run.
+- **Still to check in step 5:** the emulator's locking is not identical to
+  production's, so how often this happens must be confirmed on the cloud run.
+
+### Step 4: Locust user scenarios (2026-10-10)
+
+Built in `perf/locust/` (how to run them is in [README.md](README.md#locust-user-simulation)):
+
+| File | Purpose |
+|---|---|
+| `locustfile.py` | The three user types and what they do |
+| `firebase_client.py` | Sign-in with token refresh, callable requests, Firestore REST reads, outcome tally |
+| `run.ps1` | One-command headless runner; writes results to `perf/results/locust-*` |
+| `../seed/verify.mjs` (`npm run verify`) | After a run: every duty's seats add up and no doctor holds overlapping live assignments |
+
+Each simulated person signs in with their own seeded account and makes the
+same reads and calls as the app's screens, with human pauses (5–30 s):
+
+- **Doctors (85%):** marketplace (all and by specialty), open duty, apply,
+  My Duties (accept any offer), hospital contact after confirming,
+  notifications, profile.
+- **Hospital staff (13%):** dashboard (organizations, own duties, own
+  assignments), applicants and their credential snapshots, select a doctor,
+  post and publish new duties, notifications.
+- **Admins (2%):** verification queue and admin queues.
+
+Hospitals select doctors who applied during the run, and those doctors then
+confirm, so the full flow happens between simulated people. Normal losing
+outcomes (already applied, seat filled, stale state, offer expired,
+`CONCURRENT_UPDATE`) count as successes and are tallied in `outcomes.csv`;
+anything else fails the run.
+
+#### Result: emulator check, 0 failures ✅
+
+| Run | Requests | Failures | Flow completed | Integrity check |
+|---|---|---|---|---|
+| 10 users, 90 s (smoke) | 127 | 0 | — | — |
+| 50 users, 5 min | 1,994 | 0 | 85 applications, 16 selections, 11 confirmations, 6 contact reads | PASS (607 duties) |
+| 100 users, 5 min | 3,964 | 0 | 167 applications, 36 selections, 31 confirmations, 20 contact reads, 30 duties posted | PASS (637 duties, 42 confirmed, 9 open offers) |
+
+- At 100 users the median request took 9 ms. The slowest median calls were
+  the hospital's `atomicSelectDoctor` (89 ms) and `getMyOrganizations`
+  (65 ms). As with JMeter, emulator timings only show the scripts work; real
+  numbers come from step 5.
+- The only non-OK outcomes were expected ones: 2 × `APPLICATION_ALREADY_EXISTS`
+  (doctors who had applied in the 50-user run), 3 × `INVALID_STATE_TRANSITION`
+  on apply and 1 on select (duty filled since the doctor or hospital last
+  looked).
+- **Integrity check works:** after setting one duty's `remainingHeadcount`
+  to a wrong value, `npm run verify` reported the problem and exited 1.
+
+**Issue found and fixed: clean-up missed duties posted during a run.**
+`cleanup.mjs` only removed duties whose IDs start with `loadtest_`. Duties
+that hospitals create through `createDuty` get auto IDs, so on the cloud run
+they would have stayed in the real marketplace. Clean-up now also removes
+duties whose `organizationId` belongs to a load-test hospital (with their
+applications). Verified: after the runs, clean-up removed 637 duties
+(600 seeded + 37 posted) and the emulator had 0 collections and 0 accounts left.
+
+**For step 5:** Firebase Auth's abuse protection may throttle many sign-ins
+from one IP (`TOO_MANY_ATTEMPTS_TRY_LATER`). Spawning 1000 users from one
+laptop means 1000 sign-ins in under a minute at a spawn rate of 20/s. This
+has not been tested against the real project. Watch the `Auth: sign in` row on the first cloud run, and lower
+`-SpawnRate` if it shows failures.
 
 **Note (not an app issue): laptop sleep stalls a test**
 

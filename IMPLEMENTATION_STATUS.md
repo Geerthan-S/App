@@ -12,7 +12,8 @@
 
 - `IN_PROGRESS`: JMeter (API/backend) and Locust (user simulation) load testing. Full log in `perf/PROGRESS.md`, how-to in `perf/README.md`. Built and checked on the local emulator (`demo-healthforce`); the 1000-user run on `doctor-c7c29` is planned before launch.
 - `TESTED` (emulator, JMeter): seed/cleanup tooling (1,075 `loadtest_` accounts, 75 hospitals, 600 duties; cleanup leaves Firestore and Auth empty); functional plan 44/44 over the HTTP callable transport (lifecycle, idempotency replays, tenant/role checks, Firestore rules, validation); double-booking races (30 selections for one seat; 20 hospitals selecting one doctor) produced exactly one assignment in 4/4 runs, verified in the database; baseline load at 1/10/50 users with 0 errors in about 120k requests.
-- Open finding: under seat contention, Firestore `ABORTED` (transaction lock timeout) reaches clients as generic `INTERNAL_ERROR` (1 of 4 runs) because `toCallableError` does not map it. Data stays correct; fix proposed, not applied.
+- `TESTED` (emulator, Locust): user simulation in `perf/locust/` with doctors (85%), hospital staff (13%) and admins (2%) doing what the app's screens do, with human pauses. 50 and 100 users for 5 minutes each: 0 failures in 5,958 requests; the apply → select → confirm → contact flow completed between simulated users; `npm run verify` (new) confirmed seats add up and no doctor is double-booked. Clean-up now also removes duties posted during a run (they have auto IDs).
+- Fixed finding: under seat contention, Firestore `ABORTED` (transaction lock timeout) reached clients as generic `INTERNAL_ERROR`. `toCallableError` now maps it to `CONCURRENT_UPDATE` (callable `aborted`, HTTP 409). `TESTED`: unit test `callable_errors.test.ts`; emulator suite 13 suites / 75 tests; 4 re-run races (the timeout recurred once and all losers got 409 `CONCURRENT_UPDATE`). Production frequency to be confirmed on the cloud run.
 
 ## Deployment review (2026-10-08)
 
