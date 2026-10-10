@@ -336,6 +336,33 @@ against a site with an expired certificate. Failures with no HTTP response
 now show the real connection error instead of "HTTP 0". The 100-user run
 must be repeated.
 
+#### Result: Locust 100 users × 5 min (cloud, re-run), 0 failures ✅
+
+3,859 requests, 0 failures, about 13 req/s. All 100 users (85 doctors,
+13 hospital staff, 2 admins) active within 10 s; no CPU warning.
+Median 49 ms, p95 190 ms, p99 370 ms, max 2.1 s.
+
+| Request | p50 | p95 |
+|---|---|---|
+| Auth: sign in | 370 ms | 410 ms |
+| Doctor: marketplace / by specialty | 58 / 59 ms | 80 / 82 ms |
+| Doctor: open duty / my duties | 40 / 40 ms | 49 / 61 ms |
+| Doctor: applyToDuty | 120 ms | 200 ms |
+| Doctor: confirmAssignment | 140 ms | 300 ms |
+| Doctor: hospital contact | 150 ms | 2.1 s (one cold start of 13) |
+| Hospital: getMyOrganizations | 100 ms | 180 ms |
+| Hospital: applicants / credentials | 47 / 44 ms | 55 / 110 ms |
+| Hospital: atomicSelectDoctor | 160 ms | 200 ms (max 742 ms) |
+| Hospital: createDuty / publishDuty | 130 / 160 ms | 180 / 200 ms |
+| Admin: queues | 83–120 ms | 110–210 ms |
+
+- Flow between simulated users: 170 applications, 21 selections,
+  15 confirmations, 13 contact reads, 18 duties posted. Only non-OK
+  outcomes: 2 × `APPLICATION_ALREADY_EXISTS` (doctors from the earlier run).
+- **Integrity check (cloud): PASS.** 667 duties checked; assignments
+  19 confirmed, 9 open offers, 2 cancelled (from the smoke test);
+  27 doctors with live assignments, none double-booked.
+
 **Note (not an app issue): laptop sleep stalls a test**
 
 - During the 1-user baseline the laptop went into Windows Modern Standby
