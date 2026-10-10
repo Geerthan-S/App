@@ -21,6 +21,8 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import certifi
+import gevent.ssl
 from locust import FastHttpUser, between, events, task
 
 from firebase_client import (AccountPool, FirebaseSession, and_, endpoints, eq, in_, outcomes, read_csv,
@@ -35,6 +37,16 @@ SPECIALTIES = sorted({d["specialtyName"] for d in read_csv("duties.csv")})
 APPLY_EXPECTED = {"APPLICATION_ALREADY_EXISTS", "DUTY_CAPACITY_FILLED", "INVALID_STATE_TRANSITION", "CONCURRENT_UPDATE"}
 SELECT_EXPECTED = {"DUTY_CAPACITY_FILLED", "ASSIGNMENT_CONFLICT", "INVALID_STATE_TRANSITION", "CONCURRENT_UPDATE"}
 CONFIRM_EXPECTED = {"OFFER_EXPIRED", "INVALID_STATE_TRANSITION", "CONCURRENT_UPDATE"}
+
+# One TLS context for every simulated user. Building a context loads the CA
+# bundle (about 0.3 s of CPU each); per user and host that starved the load
+# generator at startup and stalled sign-ins for 20-35 s on the first cloud run.
+_SSL_CONTEXT = gevent.ssl.create_default_context(cafile=certifi.where())
+
+
+def shared_ssl_context(*_args, **_kwargs):
+    return _SSL_CONTEXT
+
 
 # Same shifts as the seed (perf/seed/seed.mjs).
 SHIFTS = [("morning", 8, 6), ("evening", 14, 6), ("night", 20, 10), ("full_day", 9, 12)]
@@ -73,6 +85,8 @@ def future(dt):
 class AppUser(FastHttpUser):
     abstract = True
     accounts = None  # AccountPool, set per subclass
+    insecure = False  # verify Google's certificates
+    ssl_context_factory = staticmethod(shared_ssl_context)
     network_timeout = 60.0
     connection_timeout = 30.0
 

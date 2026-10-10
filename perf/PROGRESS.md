@@ -36,7 +36,7 @@ Test the Healthcare Workforce backend before launch:
 | 2 | Seed and clean-up scripts for test data | Emulator | ✅ Done |
 | 3 | JMeter plans: functional, security, idempotency, double-booking concurrency, per-endpoint baseline | Emulator | ✅ Done (finding 1 fixed) |
 | 4 | Locust user scenarios (doctor, hospital, admin), checked at 50–100 users | Emulator | ✅ Done |
-| 5 | Smoke pass, concurrency test and the 1000-user Locust runs (load, spike, soak) | `doctor-c7c29` | 🔄 In progress (smoke passed; region fix pending deploy) |
+| 5 | Smoke pass, concurrency test and the 1000-user Locust runs (load, spike, soak) | `doctor-c7c29` | 🔄 In progress (smoke passed after region fix) |
 | 6 | Clean-up of cloud test data, results report, fixes for any bottlenecks | `doctor-c7c29` + repo | ⏳ Not started |
 
 ---
@@ -261,8 +261,8 @@ that touch the database took 1.6–6.6 s:
 | Calls rejected before any database work (validation) | ~0.6 s |
 | Calls that read or write data (apply, select, confirm, publish, contact) | 1.6–6.6 s |
 
-**Finding 2 (fixed in code, deploy pending): functions ran in a different
-region from the database**
+**Finding 2 (fixed and deployed): functions ran in a different region from
+the database**
 
 - **Cause:** Firestore is in `asia-south1` (Mumbai), but no region was set
   for the functions, so all callables ran in the default `us-central1`
@@ -283,9 +283,58 @@ region from the database**
   same 136 issues as before the change, none from it (the local Flutter
   3.24.5 is older than the project's `>=3.35.0` requirement, so most of
   those are newer-API errors unrelated to this work).
-- **Still to do:** deploy functions and hosting (the admin portal), delete
-  the old `us-central1` functions, rebuild any installed test app, then
-  re-run the smoke test to measure the improvement.
+- **Deployed (2026-10-10):** all 36 functions now in `asia-south1`; the old
+  `us-central1` / `us-east1` copies deleted; admin portal republished. Any
+  installed test build of the app must be rebuilt to reach the new region.
+- **Re-run smoke test: 44 / 44 passed, whole run 20 s instead of 91 s.**
+
+  | Request | Before | After |
+  |---|---|---|
+  | `confirmAssignment` replay (warm) | 2,877 ms | 152 ms |
+  | `getAssignmentContact` | 3,917 ms | 249 ms |
+  | Permission-denied checks | 2,000–3,700 ms | 108–157 ms |
+  | First call to each function (cold start) | 3,500–6,650 ms | 950–1,400 ms |
+
+  Warm calls now take 0.1–0.25 s. The ~1 s first calls are cold starts of
+  the newly created functions; the load runs show how often users meet them.
+
+#### Result: cloud double-booking races, no double booking ✅
+
+| Race | Outcome | Selection time (min / median / max) |
+|---|---|---|
+| 1: 30 selections for one seat at once | 1 assignment; 29 × `INVALID_STATE_TRANSITION` (duty already filled); duty `filled`, 0 seats left | 0.94 / 1.6 / 2.3 s |
+| 2: 20 hospitals select one doctor for overlapping shifts at once | 1 assignment; 19 × `ASSIGNMENT_CONFLICT` | 0.42 / 0.87 / 1.3 s |
+
+- Verified in the production database after the race. No `ABORTED` lock
+  timeouts (`CONCURRENT_UPDATE`) in production: real Firestore queued the
+  30 contending transactions without giving up, unlike the emulator in
+  1 of 4 runs. The Finding 1 mapping stays as a safety net.
+- The 30.7 s sample in the run summary is the race setup step (creating
+  21 duties and 50 applications in sequence), not a user request.
+
+#### Run: Locust 100 users × 5 min (cloud), result not valid: the load generator was the bottleneck
+
+2,968 requests, 24 failures (all `Auth: sign in`, no HTTP response). After
+start-up the median was 78 ms, but the first 1–2 minutes were very slow:
+sign-ins took 23 s (median) and up to 35 s, the first Firestore read per
+user 15–41 s. Locust warned that the laptop's CPU was above 90% during
+start-up. No business errors: 116 applications, 5 selections, 4
+confirmations, all OK.
+
+**Cause (Locust setup, not the app):** Locust's fast HTTP client builds a new
+TLS context per user per host, and each one loads the CA certificate bundle,
+which measured **338–440 ms of CPU** on this laptop. 100 users × 3 Google
+hosts = 300 contexts ≈ 130 s of single-core CPU right at start-up, so the
+event loop stalled and connections timed out (the 24 failures). At 1000 users
+it would have been about 20 minutes.
+
+**Fix:** all simulated users share one TLS context
+(`shared_ssl_context` in `locustfile.py`); setting up 100 users × 3 hosts
+now takes 0.00 s instead of about 130 s. Certificates are now verified
+(`insecure = False`; Locust's default skipped verification), checked
+against a site with an expired certificate. Failures with no HTTP response
+now show the real connection error instead of "HTTP 0". The 100-user run
+must be repeated.
 
 **Note (not an app issue): laptop sleep stalls a test**
 

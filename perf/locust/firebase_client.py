@@ -154,6 +154,12 @@ def decode_document(doc):
     return data
 
 
+def _status(response):
+    """HTTP status, or the connection error when no response arrived (status 0)."""
+    error = getattr(response, "error", None)
+    return f"HTTP {response.status_code} {type(error).__name__}: {error}"[:200] if not response.status_code and error         else f"HTTP {response.status_code}"
+
+
 def _json(response):
     try:
         return response.json()
@@ -180,7 +186,7 @@ class FirebaseSession:
         with self.client.post(self.urls["sign_in"], json=body, name="Auth: sign in", catch_response=True) as r:
             data = _json(r)
             if r.status_code != 200 or not data or "idToken" not in data:
-                r.failure(f"HTTP {r.status_code}")
+                r.failure(_status(r))
                 return False
             self.token, self.refresh_token, self.token_at = data["idToken"], data["refreshToken"], time.monotonic()
             return True
@@ -192,7 +198,7 @@ class FirebaseSession:
                               catch_response=True) as r:
             data = _json(r)
             if r.status_code != 200 or not data or "id_token" not in data:
-                r.failure(f"HTTP {r.status_code}")
+                r.failure(_status(r))
                 return False
             self.token, self.refresh_token, self.token_at = data["id_token"], data["refresh_token"], time.monotonic()
             return True
@@ -225,7 +231,7 @@ class FirebaseSession:
             if code in expected:
                 r.success()
             else:
-                r.failure(f"HTTP {r.status_code} {code}: {error.get('message', '')}"[:200])
+                r.failure(f"HTTP {r.status_code} {code}: {error.get('message', '')}"[:200] if r.status_code else _status(r))
             return None
 
     # ---- Firestore REST reads ----------------------------------------------
@@ -238,7 +244,7 @@ class FirebaseSession:
             body = _json(r)
             if r.status_code != 200 or not isinstance(body, list):
                 message = body[0].get("error", {}).get("message", "") if isinstance(body, list) and body else ""
-                r.failure(f"HTTP {r.status_code} {message}"[:200])
+                r.failure(f"HTTP {r.status_code} {message}"[:200] if r.status_code else _status(r))
                 return []
             return [decode_document(row["document"]) for row in body if "document" in row]
 
@@ -248,6 +254,6 @@ class FirebaseSession:
                              catch_response=True) as r:
             body = _json(r)
             if r.status_code != 200 or not body:
-                r.failure(f"HTTP {r.status_code}")
+                r.failure(_status(r))
                 return None
             return decode_document(body)
