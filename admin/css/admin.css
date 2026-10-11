@@ -29,6 +29,9 @@
 
 *,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* The `hidden` attribute must win over component `display` rules (e.g. #login-screen's flex). */
+[hidden] { display: none !important; }
+
 body {
   background: var(--bg-primary);
   color: var(--text-primary);
@@ -171,56 +174,6 @@ body {
 .btn-signin:hover  { opacity: .92; box-shadow: 0 6px 20px rgba(37,99,235,.5); }
 .btn-signin:active { transform: scale(.99); }
 .btn-signin:disabled { opacity: .55; cursor: not-allowed; box-shadow: none; }
-
-/* Divider */
-.login-divider {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  gap: 14px;
-  margin: 22px 0;
-}
-.login-divider::before,
-.login-divider::after {
-  content: '';
-  display: block;
-  height: 1px;
-  background: var(--border-color);
-}
-.login-divider span {
-  color: var(--text-muted);
-  font-size: 12px;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-/* Google button */
-.btn-google {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  width: 100%;
-  box-sizing: border-box;
-  padding: 13px 16px;
-  background: var(--bg-surface-elevated);
-  color: var(--text-primary);
-  border: 1.5px solid var(--border-color);
-  border-radius: 10px;
-  font-family: var(--font-body);
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background .15s, border-color .15s, box-shadow .15s;
-}
-.btn-google:hover {
-  background: var(--bg-hover);
-  border-color: rgba(99,102,241,.5);
-  box-shadow: 0 0 0 3px rgba(99,102,241,.1);
-}
-.btn-google:active { transform: scale(.99); }
-.btn-google:disabled { opacity: .55; cursor: not-allowed; }
 
 /* ── Shell Layout ────────────────────────────────────────── */
 .admin-layout {
@@ -577,6 +530,7 @@ body {
   flex-direction: column;
   box-shadow: var(--shadow-lg);
 }
+.reauth-card { max-width: 420px; }
 .modal-header {
   padding: 18px 24px;
   border-bottom: 1px solid var(--border-color);

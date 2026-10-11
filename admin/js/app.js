@@ -1,14 +1,30 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
 import {
-  getAuth, GoogleAuthProvider, onAuthStateChanged,
-  reauthenticateWithPopup, signInWithPopup, signOut,
+  getAuth, EmailAuthProvider, onAuthStateChanged,
+  reauthenticateWithCredential, signOut,
   signInWithEmailAndPassword,
 } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-functions.js';
 
-// ── Test credentials (remove before production) ────────────
-const TEST_USERNAME = 'doctor';
-const TEST_PASSWORD = '123';
+// A bare username maps to an internal Firebase email/password account.
+// Must match scripts/set-admin-login.mjs.
+const ADMIN_LOGIN_DOMAIN = 'admin.doctor-c7c29.web.app';
+const toLoginEmail = username =>
+  (username.includes('@') ? username : `${username}@${ADMIN_LOGIN_DOMAIN}`).toLowerCase();
+
+// The portal accepts only email/password sessions holding a staff claim.
+const hasPortalAccess = token =>
+  token.signInProvider === 'password' && Boolean(token.claims.isVerifier || token.claims.isSuperAdmin);
+
+const SIGN_IN_ERRORS = {
+  'auth/invalid-credential':     'Invalid username or password.',
+  'auth/invalid-email':          'Invalid username or password.',
+  'auth/user-disabled':          'This account has been disabled.',
+  'auth/too-many-requests':      'Too many attempts. Wait a few minutes and try again.',
+  'auth/network-request-failed': 'Network error. Check your connection and try again.',
+  'auth/operation-not-allowed':  'Email/password sign-in is not enabled for this project.',
+};
+const signInMessage = err => SIGN_IN_ERRORS[err.code] || 'Sign-in failed. Please try again.';
 
 // ── Safe DOM helpers (no innerHTML with user data) ─────────
 const el    = id           => document.getElementById(id);
@@ -29,13 +45,62 @@ let auth, functions, currentCase, currentDetails, _booted = false;
 const invoke = async (name, data = {}) =>
   (await httpsCallable(functions, name)(data)).data;
 
+// Sensitive callables demand auth_time within 10 minutes; re-prompt after 8.
 async function ensureRecentSignIn() {
-  // Skip step-up re-auth in test mode (no Google session)
-  if (!auth.currentUser) return;
+  if (!auth.currentUser) throw new Error('Your session has ended. Sign in again.');
   const token   = await auth.currentUser.getIdTokenResult();
   const authAge = Date.now() - Date.parse(token.authTime);
   if (!Number.isFinite(authAge) || authAge > 8 * 60 * 1000) {
-    await reauthenticateWithPopup(auth.currentUser, new GoogleAuthProvider());
+    await promptReauth();
+  }
+}
+
+let pendingReauth = null;
+
+/** Resolves once the password is re-confirmed; rejects if the dialog is cancelled. */
+function promptReauth() {
+  if (pendingReauth) return pendingReauth.promise;
+  pendingReauth = {};
+  pendingReauth.promise = new Promise((resolve, reject) => {
+    pendingReauth.resolve = resolve;
+    pendingReauth.reject  = reject;
+  });
+  el('reauth-form').reset();
+  showReauthErr('');
+  el('reauth-submit').disabled = false;
+  el('reauth-modal').classList.remove('hidden');
+  el('reauth-password').focus();
+  return pendingReauth.promise;
+}
+
+function closeReauth(error) {
+  el('reauth-modal').classList.add('hidden');
+  el('reauth-form').reset();
+  const pending = pendingReauth;
+  pendingReauth = null;
+  if (!pending) return;
+  if (error) pending.reject(error); else pending.resolve();
+}
+
+function showReauthErr(msg) {
+  const box = el('reauth-status');
+  box.textContent = msg;
+  box.hidden      = !msg;
+}
+
+async function submitReauth(event) {
+  event.preventDefault();
+  const password = el('reauth-password').value;
+  if (!password) { showReauthErr('Enter your password.'); return; }
+  const btn = el('reauth-submit');
+  btn.disabled = true;
+  try {
+    const user = auth.currentUser;
+    await reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, password));
+    closeReauth();
+  } catch (err) {
+    showReauthErr(err.code === 'auth/invalid-credential' ? 'Incorrect password.' : signInMessage(err));
+    btn.disabled = false;
   }
 }
 
@@ -278,11 +343,12 @@ function showWorkspace(name) {
 }
 
 function showLogin(msg = '') {
+  closeReauth(new Error('Signed out.'));
+  hideModal();
   el('admin-shell').hidden  = true;
   el('login-screen').hidden = false;
-  const btn = el('btn-signin');
-  btn.disabled    = false;
-  btn.textContent = 'Sign In';
+  el('tf-password').value   = '';
+  el('btn-signin').disabled = false;
   showLoginErr(msg);
 }
 
@@ -296,15 +362,19 @@ async function boot() {
   functions = getFunctions(app, 'asia-south1');  // must match setGlobalOptions in functions/src/index.ts
   _booted   = true;
 
-  // If a verified Firebase session is already persisted in the browser, skip login
+  // Single entry point into the workspace, for fresh and persisted sessions alike.
+  // Any session without portal access (e.g. an old Google session) is signed out.
   onAuthStateChanged(auth, async user => {
     if (!user) return;
     try {
       const token = await user.getIdTokenResult(true);
-      if (token.claims.isVerifier || token.claims.isSuperAdmin) {
-        showWorkspace(user.displayName || user.email || 'Verifier');
+      if (hasPortalAccess(token)) {
+        showWorkspace(user.displayName || user.email.split('@')[0]);
+        return;
       }
     } catch (_) {}
+    await signOut(auth).catch(() => {});
+    showLogin('This account does not have admin access.');
   });
 }
 
@@ -315,51 +385,32 @@ function showLoginErr(msg) {
   box.hidden      = !msg;
 }
 
-// Username / password login (test credentials only for now)
-el('login-form').addEventListener('submit', e => {
+el('login-form').addEventListener('submit', async e => {
   e.preventDefault();
   showLoginErr('');
 
   const username = el('tf-username').value.trim();
   const password = el('tf-password').value;
+  if (!username || !password) {
+    showLoginErr('Enter your username and password.');
+    return;
+  }
+  if (!_booted) {
+    showLoginErr('Still connecting to Firebase. Try again in a moment.');
+    return;
+  }
 
-  if (username === TEST_USERNAME && password === TEST_PASSWORD) {
-    doGoogleSignIn();
-  } else {
-    showLoginErr('Invalid username or password.');
+  const btn = el('btn-signin');
+  btn.disabled = true;
+  try {
+    await signInWithEmailAndPassword(auth, toLoginEmail(username), password);
+    el('tf-password').value = '';
+  } catch (err) {
+    showLoginErr(signInMessage(err));
+  } finally {
+    btn.disabled = false;
   }
 });
-
-// Google sign-in button
-el('btn-google').addEventListener('click', () => doGoogleSignIn());
-
-async function doGoogleSignIn() {
-  const signinBtn = el('btn-signin');
-  const googleBtn = el('btn-google');
-  signinBtn.disabled = true;
-  googleBtn.disabled = true;
-  googleBtn.textContent = 'Signing in…';
-  showLoginErr('');
-
-  try {
-    const cred  = await signInWithPopup(auth, new GoogleAuthProvider());
-    const token = await cred.user.getIdTokenResult(true);
-    if (!token.claims.isVerifier && !token.claims.isSuperAdmin) {
-      await signOut(auth);
-      showLoginErr('This Google account does not have verifier access.');
-      return;
-    }
-    showWorkspace(cred.user.displayName || cred.user.email || 'Verifier');
-  } catch (err) {
-    showLoginErr(err.code === 'auth/popup-closed-by-user'
-      ? 'Sign-in cancelled.'
-      : (err.message || 'Sign-in failed. Please try again.'));
-  } finally {
-    signinBtn.disabled = false;
-    googleBtn.disabled = false;
-    googleBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/><path fill="none" d="M0 0h48v48H0z"/></svg> Continue with Google`;
-  }
-}
 
 // Password show / hide
 el('toggle-pass').addEventListener('click', () => {
@@ -382,5 +433,7 @@ el('modal-cancel').addEventListener('click', hideModal);
 el('review-modal').addEventListener('click', e => {
   if (e.target === el('review-modal')) hideModal();
 });
+el('reauth-form').addEventListener('submit', submitReauth);
+el('reauth-cancel').addEventListener('click', () => closeReauth(new Error('Re-authentication cancelled.')));
 
 boot().catch(e => showLoginErr(e.message || 'Failed to connect to Firebase.'));
