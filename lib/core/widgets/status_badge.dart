@@ -1,5 +1,5 @@
 /**
- * Status Badge Widget
+ * Status Badge Widget — subtle tinted pill with a status dot.
  */
 
 import 'package:flutter/material.dart';
@@ -17,27 +17,50 @@ class StatusBadge extends StatelessWidget {
     this.color,
   });
 
+  static Color colorFor(String status, {Color? fallback}) {
+    final s = status.toLowerCase();
+    if (s.contains('approved') || s.contains('published') || s.contains('confirmed') ||
+        s.contains('verified') || s.contains('completed')) {
+      return AppColors.emerald;
+    } else if (s.contains('review') || s.contains('submitted') || s.contains('pending') ||
+        s.contains('offer') || s.contains('selected')) {
+      return AppColors.amber;
+    } else if (s.contains('reject') || s.contains('cancel') || s.contains('expired')) {
+      return AppColors.rose;
+    }
+    return fallback ?? AppColors.primary;
+  }
+
+  static String labelFor(String status) {
+    final words = status.replaceAll('_', ' ').trim().toLowerCase();
+    if (words.isEmpty) return words;
+    return words[0].toUpperCase() + words.substring(1);
+  }
+
   @override
   Widget build(BuildContext context) {
-    Color badgeColor = color ?? AppColors.primary;
-    if (status.toLowerCase().contains('approved') || status.toLowerCase().contains('published') || status.toLowerCase().contains('confirmed')) {
-      badgeColor = AppColors.emerald;
-    } else if (status.toLowerCase().contains('review') || status.toLowerCase().contains('submitted') || status.toLowerCase().contains('pending')) {
-      badgeColor = AppColors.amber;
-    } else if (status.toLowerCase().contains('reject') || status.toLowerCase().contains('cancel')) {
-      badgeColor = AppColors.rose;
-    }
+    final badgeColor = colorFor(status, fallback: color);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
       decoration: BoxDecoration(
-        color: badgeColor.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-        border: Border.all(color: badgeColor.withOpacity(0.3)),
+        color: badgeColor.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(AppSpacing.radiusPill),
       ),
-      child: Text(
-        status.toUpperCase().replaceAll('_', ' '),
-        style: AppTypography.labelBold(badgeColor).copyWith(fontSize: 10),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(color: badgeColor, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 5),
+          Text(
+            labelFor(status),
+            style: AppTypography.labelBold(badgeColor).copyWith(fontSize: 11),
+          ),
+        ],
       ),
     );
   }

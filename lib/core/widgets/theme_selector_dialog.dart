@@ -32,19 +32,19 @@ class ThemeSelectorDialog extends ConsumerWidget {
       mode: ThemeMode.light,
       label: 'Light',
       description: "Always use the app's light appearance",
-      icon: Icons.light_mode_rounded,
+      icon: Icons.light_mode_outlined,
     ),
     _ThemeOption(
       mode: ThemeMode.dark,
       label: 'Dark',
       description: "Always use the app's dark appearance",
-      icon: Icons.dark_mode_rounded,
+      icon: Icons.dark_mode_outlined,
     ),
     _ThemeOption(
       mode: ThemeMode.system,
       label: 'Default',
       description: 'Follow your device appearance setting',
-      icon: Icons.brightness_auto_rounded,
+      icon: Icons.brightness_auto_outlined,
     ),
   ];
 
@@ -72,7 +72,7 @@ class ThemeSelectorDialog extends ConsumerWidget {
               children: [
                 Text('Theme', style: AppTypography.headingSmall(colors.textPrimary)),
                 IconButton(
-                  icon: Icon(Icons.close_rounded, color: colors.textMuted),
+                  icon: Icon(Icons.close_outlined, color: colors.textMuted),
                   onPressed: () => Navigator.pop(context),
                 ),
               ],
@@ -90,7 +90,7 @@ class ThemeSelectorDialog extends ConsumerWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                   margin: const EdgeInsets.symmetric(vertical: 4),
                   decoration: BoxDecoration(
-                    color: isSelected ? colors.accent.withOpacity(0.15) : colors.surfaceElevated,
+                    color: isSelected ? colors.accentSoft : colors.surfaceElevated,
                     borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
                     border: Border.all(color: isSelected ? colors.accent : colors.border),
                   ),
@@ -111,7 +111,7 @@ class ThemeSelectorDialog extends ConsumerWidget {
                         ),
                       ),
                       if (isSelected)
-                        Icon(Icons.check_circle_rounded, color: colors.accent, size: 20),
+                        Icon(Icons.check_circle_outlined, color: colors.accent, size: 20),
                     ],
                   ),
                 ),

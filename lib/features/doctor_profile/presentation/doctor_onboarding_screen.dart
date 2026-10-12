@@ -63,27 +63,21 @@ class _DoctorOnboardingScreenState extends ConsumerState<DoctorOnboardingScreen>
               ),
               const SizedBox(height: AppSpacing.lg),
               AppTextField(
-                label: 'FULL NAME (AS PER COUNCIL REGISTRATION)',
+                label: 'Full name (as per council registration)',
                 controller: _nameController,
               ),
               const SizedBox(height: AppSpacing.md),
               Text(
-                'MEDICAL COUNCIL',
+                'Medical council',
                 style: AppTypography.labelBold(colors.textSecondary),
               ),
               const SizedBox(height: AppSpacing.xs),
               DropdownButtonFormField<String>(
                 value: _selectedCouncil,
-                dropdownColor: colors.surfaceElevated,
+                dropdownColor: colors.surface,
+                                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                 style: AppTypography.bodyLarge(colors.textPrimary),
-                decoration: InputDecoration(
-                  filled: true,
-                  fillColor: colors.surfaceElevated,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                    borderSide: BorderSide(color: colors.border),
-                  ),
-                ),
+                decoration: const InputDecoration(),
                 items: AppConstants.medicalCouncils
                     .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                     .toList(),
@@ -91,32 +85,26 @@ class _DoctorOnboardingScreenState extends ConsumerState<DoctorOnboardingScreen>
               ),
               const SizedBox(height: AppSpacing.md),
               AppTextField(
-                label: 'REGISTRATION NUMBER',
+                label: 'Registration number',
                 controller: _regNoController,
               ),
               const SizedBox(height: AppSpacing.md),
               AppTextField(
-                label: 'PRIMARY QUALIFICATIONS',
+                label: 'Primary qualifications',
                 controller: _qualificationController,
               ),
               const SizedBox(height: AppSpacing.md),
               Text(
-                'PRIMARY CLINICAL SPECIALTY',
+                'Primary clinical specialty',
                 style: AppTypography.labelBold(colors.textSecondary),
               ),
               const SizedBox(height: AppSpacing.xs),
               DropdownButtonFormField<String>(
                 value: _selectedSpecialty,
-                dropdownColor: colors.surfaceElevated,
+                dropdownColor: colors.surface,
+                                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                 style: AppTypography.bodyLarge(colors.textPrimary),
-                decoration: InputDecoration(
-                  filled: true,
-                  fillColor: colors.surfaceElevated,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                    borderSide: BorderSide(color: colors.border),
-                  ),
-                ),
+                decoration: const InputDecoration(),
                 items: AppConstants.specialties
                     .map((s) => DropdownMenuItem(value: s, child: Text(s)))
                     .toList(),
@@ -124,28 +112,22 @@ class _DoctorOnboardingScreenState extends ConsumerState<DoctorOnboardingScreen>
               ),
               const SizedBox(height: AppSpacing.md),
               AppTextField(
-                label: 'YEARS OF CLINICAL EXPERIENCE',
+                label: 'Years of clinical experience',
                 controller: _experienceController,
                 keyboardType: TextInputType.number,
               ),
               const SizedBox(height: AppSpacing.md),
               Text(
-                'PREFERRED WORK CITY',
+                'Preferred work city',
                 style: AppTypography.labelBold(colors.textSecondary),
               ),
               const SizedBox(height: AppSpacing.xs),
               DropdownButtonFormField<String>(
                 value: _selectedCity,
-                dropdownColor: colors.surfaceElevated,
+                dropdownColor: colors.surface,
+                                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                 style: AppTypography.bodyLarge(colors.textPrimary),
-                decoration: InputDecoration(
-                  filled: true,
-                  fillColor: colors.surfaceElevated,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                    borderSide: BorderSide(color: colors.border),
-                  ),
-                ),
+                decoration: const InputDecoration(),
                 items: AppConstants.majorCities
                     .map((city) => DropdownMenuItem(value: city, child: Text(city)))
                     .toList(),

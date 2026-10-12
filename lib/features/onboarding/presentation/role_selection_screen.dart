@@ -9,6 +9,7 @@ import '../../../core/design_system/app_colors.dart';
 import '../../../core/design_system/app_typography.dart';
 import '../../../core/design_system/app_spacing.dart';
 import '../../../core/design_system/app_cards.dart';
+import '../../../core/widgets/ui_kit.dart';
 
 class RoleSelectionScreen extends ConsumerWidget {
   const RoleSelectionScreen({super.key});
@@ -40,14 +41,7 @@ class RoleSelectionScreen extends ConsumerWidget {
                 onTap: () => context.go('/doctor-onboarding'),
                 child: Row(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                      ),
-                      child: const Icon(Icons.medical_services_rounded, color: AppColors.primary, size: 32),
-                    ),
+                    const IconTile(icon: Icons.medical_services_outlined, size: 52),
                     const SizedBox(width: AppSpacing.md),
                     Expanded(
                       child: Column(
@@ -65,7 +59,7 @@ class RoleSelectionScreen extends ConsumerWidget {
                         ],
                       ),
                     ),
-                    Icon(Icons.arrow_forward_ios_rounded, color: colors.textMuted, size: 16),
+                    Icon(Icons.chevron_right_outlined, color: colors.textMuted, size: 20),
                   ],
                 ),
               ),
@@ -74,14 +68,7 @@ class RoleSelectionScreen extends ConsumerWidget {
                 onTap: () => context.go('/hospital-dashboard'),
                 child: Row(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppColors.teal.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                      ),
-                      child: const Icon(Icons.local_hospital_rounded, color: AppColors.teal, size: 32),
-                    ),
+                    const IconTile(icon: Icons.local_hospital_outlined, size: 52, iconColor: AppColors.teal, background: Color(0x142A9D8F)),
                     const SizedBox(width: AppSpacing.md),
                     Expanded(
                       child: Column(
@@ -99,7 +86,7 @@ class RoleSelectionScreen extends ConsumerWidget {
                         ],
                       ),
                     ),
-                    Icon(Icons.arrow_forward_ios_rounded, color: colors.textMuted, size: 16),
+                    Icon(Icons.chevron_right_outlined, color: colors.textMuted, size: 20),
                   ],
                 ),
               ),

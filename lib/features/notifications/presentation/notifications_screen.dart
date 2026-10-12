@@ -6,17 +6,18 @@ import '../../../core/design_system/app_typography.dart';
 import '../../../core/design_system/app_spacing.dart';
 import '../../../core/design_system/app_cards.dart';
 import '../../../core/widgets/state_views.dart';
+import '../../../core/widgets/ui_kit.dart';
 import '../data/notification_repository.dart';
 
 class NotificationsScreen extends StatelessWidget {
   const NotificationsScreen({super.key});
 
   static const Map<String, IconData> _icons = {
-    'message': Icons.chat_bubble_outline_rounded,
-    'confirmed': Icons.check_circle_outline_rounded,
+    'message': Icons.chat_bubble_outline_outlined,
+    'confirmed': Icons.check_circle_outline_outlined,
     'new_duty': Icons.local_hospital_outlined,
     'verification': Icons.shield_outlined,
-    'info': Icons.info_outline_rounded,
+    'info': Icons.info_outline,
   };
 
   @override
@@ -26,25 +27,25 @@ class NotificationsScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: colors.bg,
       appBar: AppBar(
-        title: Text('Notifications', style: AppTypography.headingMedium(colors.textPrimary)),
+        title: const Text('Notifications'),
       ),
       body: SafeArea(
         child: StreamBuilder<List<Map<String, dynamic>>>(
           stream: NotificationRepository.watchAll(),
           builder: (context, snap) {
             if (snap.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
+              return const LoadingView();
             }
             final notifications = snap.data ?? [];
             if (notifications.isEmpty) {
               return const EmptyStateView(
-                icon: Icons.notifications_none_rounded,
+                icon: Icons.notifications_none_outlined,
                 title: 'No notifications yet',
                 description: 'Updates about your duties and verifications will appear here.',
               );
             }
             return ListView.separated(
-              padding: AppSpacing.paddingScreen,
+              padding: const EdgeInsets.fromLTRB(AppSpacing.gutter, 8, AppSpacing.gutter, AppSpacing.lg),
               itemCount: notifications.length,
               separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
               itemBuilder: (context, index) =>
@@ -83,27 +84,18 @@ class _NotificationCard extends StatelessWidget {
     final colors = context.appColors;
     final isUnread = notification['isRead'] == false;
     final icon = NotificationsScreen._icons[notification['type']] ??
-        Icons.notifications_active_rounded;
+        Icons.notifications_none_outlined;
 
     return AppCard(
       onTap: () => _open(context),
-      borderColor: isUnread ? AppColors.primary.withValues(alpha: 0.5) : null,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: isUnread
-                  ? AppColors.primary.withValues(alpha: 0.15)
-                  : colors.surfaceElevated,
-              borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-            ),
-            child: Icon(
-              icon,
-              size: 20,
-              color: isUnread ? AppColors.primary : colors.textMuted,
-            ),
+          IconTile(
+            icon: icon,
+            size: 42,
+            background: isUnread ? colors.accentSoft : colors.surfaceElevated,
+            iconColor: isUnread ? colors.accent : colors.textSecondary,
           ),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
@@ -111,7 +103,7 @@ class _NotificationCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(notification['title'] as String,
-                    style: AppTypography.labelBold(colors.textPrimary)),
+                    style: AppTypography.headingSmall(colors.textPrimary).copyWith(fontSize: 14)),
                 const SizedBox(height: 2),
                 Text(notification['body'] as String,
                     style: AppTypography.bodyMedium(colors.textSecondary)),

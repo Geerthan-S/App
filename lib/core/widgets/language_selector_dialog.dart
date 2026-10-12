@@ -40,7 +40,7 @@ class LanguageSelectorDialog extends ConsumerWidget {
                 style: AppTypography.headingSmall(colors.textPrimary),
               ),
               IconButton(
-                icon: Icon(Icons.close_rounded, color: colors.textMuted),
+                icon: Icon(Icons.close_outlined, color: colors.textMuted),
                 onPressed: () => Navigator.pop(context),
               ),
             ],
@@ -64,7 +64,7 @@ class LanguageSelectorDialog extends ConsumerWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 margin: const EdgeInsets.symmetric(vertical: 4),
                 decoration: BoxDecoration(
-                  color: isSelected ? colors.accent.withOpacity(0.15) : colors.surfaceElevated,
+                  color: isSelected ? colors.accentSoft : colors.surfaceElevated,
                   borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
                   border: Border.all(
                     color: isSelected ? colors.accent : colors.border,
@@ -80,7 +80,7 @@ class LanguageSelectorDialog extends ConsumerWidget {
                       ),
                     ),
                     if (isSelected)
-                      Icon(Icons.check_circle_rounded, color: colors.accent, size: 20),
+                      Icon(Icons.check_circle_outlined, color: colors.accent, size: 20),
                   ],
                 ),
               ),

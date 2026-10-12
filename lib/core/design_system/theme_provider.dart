@@ -1,6 +1,6 @@
 /**
  * Riverpod Theme Mode State Management Provider
- * Persists the user's Light / Dark / Default (system) selection so it
+ * Light is the default. Persists the user's Light / Dark / Default (system) selection so it
  * survives an app restart, and drives MaterialApp.themeMode reactively.
  */
 
@@ -11,7 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 const String _themeModePrefsKey = 'app_theme_mode';
 
 class ThemeModeNotifier extends StateNotifier<ThemeMode> {
-  ThemeModeNotifier() : super(ThemeMode.system) {
+  ThemeModeNotifier() : super(ThemeMode.light) {
     _restore();
   }
 

@@ -33,7 +33,7 @@ class ReviewsScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: colors.bg,
       appBar: AppBar(
-        title: Text(title, style: AppTypography.headingMedium(colors.textPrimary)),
+        title: Text(title),
       ),
       body: SafeArea(
         child: reviews.isEmpty

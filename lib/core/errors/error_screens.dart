@@ -57,7 +57,7 @@ class _ErrorScaffold extends StatelessWidget {
                   width: 88,
                   height: 88,
                   decoration: BoxDecoration(
-                    color: iconColor.withOpacity(0.12),
+                    color: iconColor.withValues(alpha: 0.12),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(icon, color: iconColor, size: 40),
@@ -138,7 +138,7 @@ class AppErrorScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _ErrorScaffold(
-      icon: Icons.error_outline_rounded,
+      icon: Icons.error_outline_outlined,
       iconColor: AppColors.rose,
       title: 'Something Went Wrong',
       message: 'This screen ran into a problem. You can head back to home and try again.',
@@ -159,7 +159,7 @@ class NoConnectionScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _ErrorScaffold(
-      icon: Icons.wifi_off_rounded,
+      icon: Icons.wifi_off_outlined,
       iconColor: AppColors.textDarkMuted,
       title: 'No Internet Connection',
       message: "You're offline. Check your connection and try again.",
@@ -184,7 +184,7 @@ class ContentNotFoundScreen extends StatelessWidget {
     super.key,
     this.title = 'Not Found',
     this.message = 'This content may have been removed or is no longer available.',
-    this.icon = Icons.search_off_rounded,
+    this.icon = Icons.search_off_outlined,
     required this.actionLabel,
     required this.onAction,
   });

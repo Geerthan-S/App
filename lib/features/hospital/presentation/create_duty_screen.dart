@@ -128,10 +128,6 @@ class _CreateDutyScreenState extends ConsumerState<CreateDutyScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: colors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppSpacing.radiusLg)),
-      ),
       builder: (ctx) => Padding(
         padding: AppSpacing.paddingScreen,
         child: Column(
@@ -174,7 +170,7 @@ class _CreateDutyScreenState extends ConsumerState<CreateDutyScreen> {
             const SizedBox(height: AppSpacing.md),
             AppButton(
               label: 'Confirm & Publish Duty',
-              icon: Icons.send_rounded,
+              icon: Icons.send_outlined,
               onPressed: () {
                 Navigator.pop(ctx);
                 _publishDuty();
@@ -247,7 +243,7 @@ class _CreateDutyScreenState extends ConsumerState<CreateDutyScreen> {
         title: Text(loc.translate('postDuty')),
         actions: [
           IconButton(
-            icon: const Icon(Icons.language_rounded),
+            icon: const Icon(Icons.translate_outlined),
             onPressed: () => LanguageSelectorDialog.show(context),
           ),
         ],
@@ -278,7 +274,7 @@ class _CreateDutyScreenState extends ConsumerState<CreateDutyScreen> {
                 const SizedBox(height: AppSpacing.lg),
 
                 // Organization selector
-                Text('ORGANIZATION', style: AppTypography.labelBold(colors.textSecondary)),
+                Text('Organization', style: AppTypography.labelBold(colors.textSecondary)),
                 const SizedBox(height: 6),
                 if (_organizations.isEmpty)
                   Text('No organization found. Create one from Hospital Profile.', style: AppTypography.bodySmall(colors.textMuted))
@@ -286,10 +282,11 @@ class _CreateDutyScreenState extends ConsumerState<CreateDutyScreen> {
                   DropdownButtonFormField<String>(
                     value: _selectedOrgId,
                     isExpanded: true,
-                    dropdownColor: colors.surfaceElevated,
+                    dropdownColor: colors.surface,
+                                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                     style: AppTypography.bodyLarge(colors.textPrimary),
                     decoration: InputDecoration(
-                      filled: true, fillColor: colors.surfaceElevated,
+                      filled: true, fillColor: colors.surface,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
                         borderSide: BorderSide(color: colors.border),
@@ -306,7 +303,7 @@ class _CreateDutyScreenState extends ConsumerState<CreateDutyScreen> {
                 const SizedBox(height: AppSpacing.md),
 
                 // Facility selector
-                Text('HOSPITAL FACILITY', style: AppTypography.labelBold(colors.textSecondary)),
+                Text('Hospital facility', style: AppTypography.labelBold(colors.textSecondary)),
                 const SizedBox(height: 6),
                 if (_facilities.isEmpty)
                   Text('No facility found. Add one from Hospital Profile.', style: AppTypography.bodySmall(colors.textMuted))
@@ -314,10 +311,11 @@ class _CreateDutyScreenState extends ConsumerState<CreateDutyScreen> {
                   DropdownButtonFormField<String>(
                     value: _selectedFacility?['name'] as String?,
                     isExpanded: true,
-                    dropdownColor: colors.surfaceElevated,
+                    dropdownColor: colors.surface,
+                                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                     style: AppTypography.bodyLarge(colors.textPrimary),
                     decoration: InputDecoration(
-                      filled: true, fillColor: colors.surfaceElevated,
+                      filled: true, fillColor: colors.surface,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
                         borderSide: BorderSide(color: colors.border),
@@ -335,15 +333,16 @@ class _CreateDutyScreenState extends ConsumerState<CreateDutyScreen> {
                 const SizedBox(height: AppSpacing.md),
 
                 // Specialty
-                Text('SPECIALTY REQUIRED', style: AppTypography.labelBold(colors.textSecondary)),
+                Text('Specialty required', style: AppTypography.labelBold(colors.textSecondary)),
                 const SizedBox(height: 6),
                 DropdownButtonFormField<String>(
                   value: _selectedSpecialty,
                   isExpanded: true,
-                  dropdownColor: colors.surfaceElevated,
+                  dropdownColor: colors.surface,
+                                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                   style: AppTypography.bodyLarge(colors.textPrimary),
                   decoration: InputDecoration(
-                    filled: true, fillColor: colors.surfaceElevated,
+                    filled: true, fillColor: colors.surface,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
                       borderSide: BorderSide(color: colors.border),
@@ -353,17 +352,17 @@ class _CreateDutyScreenState extends ConsumerState<CreateDutyScreen> {
                   onChanged: (v) => setState(() => _selectedSpecialty = v!),
                 ),
                 const SizedBox(height: AppSpacing.md),
-                AppTextField(label: 'DEPARTMENT / WARD', controller: _departmentController, hintText: 'e.g. ICU & Emergency'),
+                AppTextField(label: 'Department / ward', controller: _departmentController, hintText: 'e.g. ICU & Emergency'),
                 const SizedBox(height: AppSpacing.md),
-                AppTextField(label: 'MINIMUM QUALIFICATION', controller: _qualificationController),
+                AppTextField(label: 'Minimum qualification', controller: _qualificationController),
                 const SizedBox(height: AppSpacing.md),
-                AppTextField(label: 'MIN. YEARS EXPERIENCE', controller: _expController, keyboardType: TextInputType.number),
+                AppTextField(label: 'Min. years experience', controller: _expController, keyboardType: TextInputType.number),
                 const SizedBox(height: AppSpacing.md),
-                AppTextField(label: 'REQUIRED HEADCOUNT', controller: _headcountController, keyboardType: TextInputType.number),
+                AppTextField(label: 'Required headcount', controller: _headcountController, keyboardType: TextInputType.number),
                 const SizedBox(height: AppSpacing.md),
 
                 // Schedule
-                Text('SHIFT SCHEDULE', style: AppTypography.labelBold(colors.textSecondary)),
+                Text('Shift schedule', style: AppTypography.labelBold(colors.textSecondary)),
                 const SizedBox(height: 6),
                 AppCard(
                   child: Row(
@@ -407,7 +406,7 @@ class _CreateDutyScreenState extends ConsumerState<CreateDutyScreen> {
                 ),
                 const SizedBox(height: AppSpacing.md),
                 AppTextField(
-                  label: 'COMPENSATION AMOUNT (INR)',
+                  label: 'Compensation amount (INR)',
                   controller: _amountController,
                   keyboardType: TextInputType.number,
                   prefixIcon: Padding(
@@ -416,7 +415,7 @@ class _CreateDutyScreenState extends ConsumerState<CreateDutyScreen> {
                   ),
                 ),
                 const SizedBox(height: AppSpacing.md),
-                AppTextField(label: 'ADDITIONAL NOTES (OPTIONAL)', controller: _notesController, maxLines: 3),
+                AppTextField(label: 'Additional notes (optional)', controller: _notesController, maxLines: 3),
                 const SizedBox(height: AppSpacing.xl),
 
                 Row(
@@ -439,7 +438,7 @@ class _CreateDutyScreenState extends ConsumerState<CreateDutyScreen> {
                 AppButton(
                   label: loc.translate('publishDuty'),
                   isLoading: _isPublishing,
-                  icon: Icons.send_rounded,
+                  icon: Icons.send_outlined,
                   onPressed: _publishDuty,
                 ),
                 const SizedBox(height: AppSpacing.lg),

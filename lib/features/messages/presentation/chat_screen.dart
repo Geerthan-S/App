@@ -15,7 +15,7 @@ class ChatScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: colors.bg,
       appBar: AppBar(
-        title: Text(hospitalName, style: AppTypography.headingMedium(colors.textPrimary)),
+        title: Text(hospitalName),
       ),
       body: SafeArea(
         child: Center(
@@ -24,7 +24,17 @@ class ChatScreen extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.chat_bubble_outline_rounded, size: 64, color: colors.textMuted),
+                Container(
+                  width: 76,
+                  height: 76,
+                  decoration: BoxDecoration(
+                    color: colors.surface,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: colors.border),
+                    boxShadow: AppShadows.soft(colors),
+                  ),
+                  child: Icon(Icons.chat_bubble_outline_outlined, size: 32, color: colors.accent),
+                ),
                 const SizedBox(height: AppSpacing.md),
                 Text('Direct Messaging Coming Soon', style: AppTypography.headingSmall(colors.textPrimary)),
                 const SizedBox(height: AppSpacing.xs),
@@ -36,13 +46,8 @@ class ChatScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSpacing.xl),
                 OutlinedButton.icon(
-                  icon: const Icon(Icons.arrow_back_rounded, size: 18),
+                  icon: const Icon(Icons.arrow_back_outlined, size: 18),
                   label: const Text('Go Back'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.primaryLight,
-                    side: BorderSide(color: colors.border),
-                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
-                  ),
                   onPressed: () => Navigator.pop(context),
                 ),
               ],

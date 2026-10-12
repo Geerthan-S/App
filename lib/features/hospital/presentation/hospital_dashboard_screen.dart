@@ -68,10 +68,6 @@ class _HospitalDashboardScreenState extends ConsumerState<HospitalDashboardScree
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: colors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppSpacing.radiusLg)),
-      ),
       builder: (ctx) {
         return StatefulBuilder(builder: (context, setSheet) {
           if (loading && !requested) {
@@ -99,7 +95,7 @@ class _HospitalDashboardScreenState extends ConsumerState<HospitalDashboardScree
                   children: [
                     Text('Review Applicants', style: AppTypography.headingSmall(colors.textPrimary)),
                     IconButton(
-                      icon: Icon(Icons.close_rounded, color: colors.textMuted),
+                      icon: Icon(Icons.close_outlined, color: colors.textMuted),
                       onPressed: () => Navigator.pop(ctx),
                     ),
                   ],
@@ -125,10 +121,10 @@ class _HospitalDashboardScreenState extends ConsumerState<HospitalDashboardScree
                               children: [
                                 CircleAvatar(
                                   radius: 22,
-                                  backgroundColor: AppColors.primary,
+                                  backgroundColor: colors.accentSoft,
                                   child: Text(
                                     (app['name'] as String).split(' ').last.substring(0, 1),
-                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                    style: AppTypography.labelBold(colors.accent).copyWith(fontSize: 15),
                                   ),
                                 ),
                                 const SizedBox(width: AppSpacing.sm),
@@ -140,7 +136,7 @@ class _HospitalDashboardScreenState extends ConsumerState<HospitalDashboardScree
                                         Text(app['name'] as String, style: AppTypography.labelBold(colors.textPrimary)),
                                         const SizedBox(width: 4),
                                         if (app['isVerified'] == true)
-                                          const Icon(Icons.verified_rounded, color: AppColors.emerald, size: 14),
+                                          const Icon(Icons.verified_outlined, color: AppColors.emerald, size: 14),
                                       ]),
                                       Text('${app['regNo']} • ${app['qualification']}',
                                           style: AppTypography.bodySmall(colors.textMuted)),
@@ -214,10 +210,6 @@ class _HospitalDashboardScreenState extends ConsumerState<HospitalDashboardScree
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: colors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppSpacing.radiusLg)),
-      ),
       builder: (ctx) => StatefulBuilder(builder: (context, setSheet) {
         return Padding(
           padding: EdgeInsets.only(
@@ -318,7 +310,7 @@ class _HospitalDashboardScreenState extends ConsumerState<HospitalDashboardScree
       return Scaffold(
         appBar: AppBar(title: Text(loc.translate('hospitalOperations'))),
         body: const EmptyStateView(
-          icon: Icons.apartment_rounded,
+          icon: Icons.apartment_outlined,
           title: 'No organization found',
           description: 'Set up your hospital organization to start posting duties.',
         ),
@@ -330,7 +322,7 @@ class _HospitalDashboardScreenState extends ConsumerState<HospitalDashboardScree
         title: Text(loc.translate('hospitalOperations')),
         actions: [
           IconButton(
-            icon: const Icon(Icons.language_rounded),
+            icon: const Icon(Icons.translate_outlined),
             onPressed: () => LanguageSelectorDialog.show(context),
           ),
           IconButton(
@@ -386,11 +378,10 @@ class _HospitalDashboardScreenState extends ConsumerState<HospitalDashboardScree
                         ),
                       ),
                       OutlinedButton.icon(
-                        icon: const Icon(Icons.apartment_rounded, size: 16),
+                        icon: const Icon(Icons.apartment_outlined, size: 16),
                         label: const Text('Manage'),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.primaryLight,
-                          side: BorderSide(color: colors.border),
+                          foregroundColor: colors.accent,
                         ),
                         onPressed: () => context.push('/hospital-profile'),
                       ),
@@ -401,7 +392,7 @@ class _HospitalDashboardScreenState extends ConsumerState<HospitalDashboardScree
 
               AppButton(
                 label: loc.translate('postDuty'),
-                icon: Icons.add_circle_outline_rounded,
+                icon: Icons.add_circle_outline_outlined,
                 onPressed: () => context.push('/create-duty'),
               ),
               const SizedBox(height: AppSpacing.lg),
@@ -453,7 +444,7 @@ class _HospitalDashboardScreenState extends ConsumerState<HospitalDashboardScree
                                 Text('${duty['remainingHeadcount']} slot open',
                                     style: AppTypography.bodySmall(AppColors.amber)),
                                 OutlinedButton.icon(
-                                  icon: const Icon(Icons.people_outline_rounded, size: 16),
+                                  icon: const Icon(Icons.people_outline_outlined, size: 16),
                                   label: Text(loc.translate('reviewApplicants')),
                                   style: OutlinedButton.styleFrom(
                                     side: BorderSide(color: colors.border),
@@ -499,8 +490,8 @@ class _HospitalDashboardScreenState extends ConsumerState<HospitalDashboardScree
                         child: Row(
                           children: [
                             CircleAvatar(
-                              backgroundColor: AppColors.emerald.withValues(alpha: 0.15),
-                              child: const Icon(Icons.check_circle_rounded, color: AppColors.emerald),
+                              backgroundColor: AppColors.emerald.withValues(alpha: 0.1),
+                              child: const Icon(Icons.check_circle_outlined, color: AppColors.emerald),
                             ),
                             const SizedBox(width: AppSpacing.sm),
                             Expanded(
@@ -515,8 +506,7 @@ class _HospitalDashboardScreenState extends ConsumerState<HospitalDashboardScree
                             ),
                             OutlinedButton(
                               style: OutlinedButton.styleFrom(
-                                foregroundColor: AppColors.primaryLight,
-                                side: BorderSide(color: colors.border),
+                                foregroundColor: colors.accent,
                               ),
                               onPressed: () => _showReviewModal(asg),
                               child: const Text('Review'),

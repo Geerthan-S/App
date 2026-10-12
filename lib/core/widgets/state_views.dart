@@ -20,8 +20,13 @@ class LoadingView extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+          const SizedBox(
+            width: 28,
+            height: 28,
+            child: CircularProgressIndicator(
+              strokeWidth: 2.5,
+              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+            ),
           ),
           if (message != null) ...[
             const SizedBox(height: AppSpacing.md),
@@ -51,11 +56,11 @@ class ErrorView extends StatelessWidget {
     final colors = context.appColors;
     return Center(
       child: Padding(
-        padding: AppSpacing.paddingScreen,
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl, vertical: AppSpacing.xl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline_rounded, color: AppColors.rose, size: 48),
+            const _StateIcon(icon: Icons.error_outline_outlined, color: AppColors.rose),
             const SizedBox(height: AppSpacing.md),
             Text(
               'Something Went Wrong',
@@ -103,11 +108,11 @@ class EmptyStateView extends StatelessWidget {
     final colors = context.appColors;
     return Center(
       child: Padding(
-        padding: AppSpacing.paddingScreen,
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl, vertical: AppSpacing.xl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: colors.textMuted, size: 56),
+            _StateIcon(icon: icon, color: colors.textSecondary),
             const SizedBox(height: AppSpacing.md),
             Text(
               title,
@@ -130,6 +135,30 @@ class EmptyStateView extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Soft circular backdrop for empty/error state icons.
+class _StateIcon extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+
+  const _StateIcon({required this.icon, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    return Container(
+      width: 76,
+      height: 76,
+      decoration: BoxDecoration(
+        color: colors.surface,
+        shape: BoxShape.circle,
+        border: Border.all(color: colors.border),
+        boxShadow: AppShadows.soft(colors),
+      ),
+      child: Icon(icon, color: color, size: 32),
     );
   }
 }

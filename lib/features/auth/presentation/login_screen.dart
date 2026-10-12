@@ -10,6 +10,7 @@ import '../../../core/design_system/app_colors.dart';
 import '../../../core/design_system/app_typography.dart';
 import '../../../core/design_system/app_spacing.dart';
 import '../../../core/design_system/app_buttons.dart';
+import '../../../core/design_system/app_cards.dart';
 import '../../../core/design_system/app_inputs.dart';
 import '../data/auth_repository.dart';
 import '../../../core/config/local_test_config.dart';
@@ -135,29 +136,39 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final colors = context.appColors;
     return Scaffold(
       body: SafeArea(
-        child: Padding(
-          padding: AppSpacing.paddingScreen,
-          child: Column(
+        // Scrolls on short screens (or with the keyboard open) while keeping
+        // the sign-in card anchored to the bottom when there is room.
+        child: LayoutBuilder(
+          builder: (context, constraints) => SingleChildScrollView(
+            padding: AppSpacing.paddingScreen,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: constraints.maxHeight - AppSpacing.paddingScreen.vertical,
+              ),
+              child: IntrinsicHeight(
+                child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: AppSpacing.xl),
               Container(
-                padding: const EdgeInsets.all(AppSpacing.sm),
+                width: 64,
+                height: 64,
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                  border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                  color: colors.surface,
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                  border: Border.all(color: colors.border),
+                  boxShadow: AppShadows.soft(colors),
                 ),
-                child: const Icon(
-                  Icons.local_hospital_rounded,
-                  color: AppColors.primary,
-                  size: 36,
+                child: Icon(
+                  Icons.local_hospital_outlined,
+                  color: colors.accent,
+                  size: 30,
                 ),
               ),
               const SizedBox(height: AppSpacing.lg),
               Text(
                 'Healthcare Workforce Platform',
-                style: AppTypography.headingLarge(colors.textPrimary),
+                style: AppTypography.display(colors.textPrimary),
               ),
               const SizedBox(height: AppSpacing.xs),
               Text(
@@ -166,14 +177,34 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ),
               if (_error != null) ...[
                 const SizedBox(height: AppSpacing.lg),
-                Text(_error!, style: AppTypography.bodySmall(AppColors.rose)),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(AppSpacing.sm),
+                  decoration: BoxDecoration(
+                    color: AppColors.rose.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.error_outline_outlined, color: AppColors.rose, size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(_error!, style: AppTypography.bodySmall(AppColors.rose))),
+                    ],
+                  ),
+                ),
               ],
               const Spacer(),
+              AppCard(
+                padding: const EdgeInsets.all(AppSpacing.lg - 4),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
               _GoogleSignInButton(
                 isLoading: _isGoogleLoading,
                 onPressed: _isBusy ? null : _signInWithGoogle,
               ),
-              const SizedBox(height: AppSpacing.lg),
+              const SizedBox(height: AppSpacing.md),
               Row(
                 children: [
                   Expanded(child: Divider(color: colors.border)),
@@ -189,9 +220,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   Expanded(child: Divider(color: colors.border)),
                 ],
               ),
-              const SizedBox(height: AppSpacing.lg),
+              const SizedBox(height: AppSpacing.md),
               AppTextField(
-                label: 'MOBILE NUMBER',
+                label: 'Mobile number',
                 hintText: '98765 43210',
                 controller: _phoneController,
                 keyboardType: TextInputType.phone,
@@ -202,20 +233,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   child: Text(
                     '+91',
-                    style: TextStyle(
-                      color: colors.textPrimary,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: AppTypography.labelBold(colors.textPrimary).copyWith(fontSize: 14),
                   ),
                 ),
               ),
-              const SizedBox(height: AppSpacing.sm),
+              const SizedBox(height: AppSpacing.md),
               AppButton(
                 label: 'Get Verification OTP',
                 isLoading: _isPhoneLoading,
                 onPressed: _isBusy ? null : _sendOtp,
               ),
-              const SizedBox(height: AppSpacing.sm),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
               Center(
                 child: Text(
                   'By continuing, you agree to verified identity & privacy standards',
@@ -225,6 +256,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ),
               const SizedBox(height: AppSpacing.xs),
             ],
+                ),
+              ),
+            ),
           ),
         ),
       ),
@@ -243,13 +277,13 @@ class _GoogleSignInButton extends StatelessWidget {
     final colors = context.appColors;
     return SizedBox(
       width: double.infinity,
-      height: 48,
+      height: 52,
       child: OutlinedButton(
         style: OutlinedButton.styleFrom(
           backgroundColor: colors.surface,
           side: BorderSide(color: colors.border),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
           ),
         ),
         onPressed: (isLoading || onPressed == null) ? null : onPressed,

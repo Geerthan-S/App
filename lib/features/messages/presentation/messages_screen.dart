@@ -8,6 +8,8 @@ import '../../../core/design_system/app_spacing.dart';
 import '../../../core/design_system/app_buttons.dart';
 import '../../../core/widgets/status_badge.dart';
 import '../../../core/widgets/state_views.dart';
+import '../../../core/widgets/ui_kit.dart';
+import '../../../core/design_system/app_cards.dart';
 import '../../doctor_profile/data/doctor_repository.dart';
 import '../../../core/errors/error_envelope.dart';
 
@@ -20,29 +22,54 @@ class MessagesScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: colors.bg,
-      appBar: AppBar(
-        title: Text('My Duties', style: AppTypography.headingMedium(colors.textPrimary)),
-      ),
       body: SafeArea(
+        bottom: false,
         child: StreamBuilder<List<Map<String, dynamic>>>(
           stream: DoctorRepository.watchAssignments(),
           builder: (context, snap) {
+            final header = Padding(
+              padding: const EdgeInsets.fromLTRB(AppSpacing.gutter, 16, AppSpacing.gutter, 4),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('My Duties', style: AppTypography.headingLarge(colors.textPrimary)),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Offers, confirmed shifts and completed duties',
+                    style: AppTypography.bodyMedium(colors.textSecondary),
+                  ),
+                ],
+              ),
+            );
             if (snap.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
+              return Column(children: [header, const Expanded(child: LoadingView())]);
             }
             final assignments = snap.data ?? [];
             if (assignments.isEmpty) {
-              return const EmptyStateView(
-                icon: Icons.assignment_outlined,
-                title: 'No active assignments',
-                description: 'When a hospital selects you for a duty, it will appear here.',
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  header,
+                  const Expanded(
+                    child: EmptyStateView(
+                      icon: Icons.assignment_outlined,
+                      title: 'No active assignments',
+                      description: 'When a hospital selects you for a duty, it will appear here.',
+                    ),
+                  ),
+                ],
               );
             }
             return ListView.separated(
-              itemCount: assignments.length,
-              separatorBuilder: (_, __) => const Divider(height: 1, indent: 76),
-              itemBuilder: (context, index) =>
-                  _AssignmentTile(assignment: assignments[index]),
+              padding: const EdgeInsets.only(bottom: AppSpacing.navBarClearance),
+              itemCount: assignments.length + 1,
+              separatorBuilder: (_, i) => SizedBox(height: i == 0 ? AppSpacing.md : AppSpacing.sm),
+              itemBuilder: (context, index) => index == 0
+                  ? header
+                  : Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.gutter),
+                      child: _AssignmentTile(assignment: assignments[index - 1]),
+                    ),
             );
           },
         ),
@@ -122,10 +149,6 @@ class _AssignmentTileState extends State<_AssignmentTile> {
       builder: (ctx) {
         final colors = ctx.appColors;
         return AlertDialog(
-          backgroundColor: colors.surface,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-          ),
           title: Text('Decline Offer?', style: AppTypography.headingSmall(colors.textPrimary)),
           content: Text(
             'Are you sure you want to decline this duty offer? This cannot be undone.',
@@ -137,7 +160,7 @@ class _AssignmentTileState extends State<_AssignmentTile> {
               child: Text('Keep Offer', style: TextStyle(color: colors.textMuted)),
             ),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.rose),
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.rose, foregroundColor: Colors.white),
               onPressed: () => Navigator.pop(ctx, true),
               child: const Text('Decline'),
             ),
@@ -190,13 +213,9 @@ class _AssignmentTileState extends State<_AssignmentTile> {
       await showDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
-          backgroundColor: colors.surface,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-          ),
           title: Row(
             children: [
-              const Icon(Icons.contact_phone_rounded, color: AppColors.primary),
+              const IconTile(icon: Icons.contact_phone_outlined, size: 36),
               const SizedBox(width: 8),
               Text('Hospital Contact', style: AppTypography.headingSmall(colors.textPrimary)),
             ],
@@ -277,16 +296,12 @@ class _AssignmentTileState extends State<_AssignmentTile> {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: colors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppSpacing.radiusLg)),
-      ),
       builder: (ctx) => StatefulBuilder(builder: (bCtx, setSheet) {
         return Padding(
           padding: EdgeInsets.only(
-            left: 16,
-            right: 16,
-            top: 20,
+            left: AppSpacing.gutter,
+            right: AppSpacing.gutter,
+            top: 0,
             bottom: MediaQuery.of(bCtx).viewInsets.bottom + 20,
           ),
           child: SingleChildScrollView(
@@ -325,12 +340,8 @@ class _AssignmentTileState extends State<_AssignmentTile> {
                   controller: commentCtrl,
                   maxLines: 3,
                   maxLength: 500,
-                  decoration: InputDecoration(
+                  decoration: const InputDecoration(
                     hintText: 'Share your experience at this hospital...',
-                    hintStyle: AppTypography.bodyMedium(colors.textMuted),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                    ),
                   ),
                 ),
                 const SizedBox(height: AppSpacing.md),
@@ -423,22 +434,12 @@ class _AssignmentTileState extends State<_AssignmentTile> {
     final isCompleted = status == 'completed';
     final expiry = _expiryLabel();
 
-    return InkWell(
+    return AppCard(
       onTap: () => _openAssignment(context),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(
+      child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            CircleAvatar(
-              radius: 24,
-              backgroundColor: AppColors.primary.withValues(alpha: 0.12),
-              child: const Icon(
-                Icons.local_hospital_rounded,
-                color: AppColors.primary,
-                size: 22,
-              ),
-            ),
+            const IconTile(icon: Icons.local_hospital_outlined, size: 46),
             const SizedBox(width: AppSpacing.sm),
             Expanded(
               child: Column(
@@ -449,7 +450,7 @@ class _AssignmentTileState extends State<_AssignmentTile> {
                       Expanded(
                         child: Text(
                           widget.assignment['facilityName'] as String,
-                          style: AppTypography.labelBold(colors.textPrimary),
+                          style: AppTypography.headingSmall(colors.textPrimary),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -460,13 +461,13 @@ class _AssignmentTileState extends State<_AssignmentTile> {
                   const SizedBox(height: 3),
                   Text(
                     '${widget.assignment['specialtyName']} • ${widget.assignment['department']}',
-                    style: AppTypography.bodyMedium(colors.textSecondary),
+                    style: AppTypography.bodySmall(colors.accent).copyWith(fontWeight: FontWeight.w500),
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 8),
                   Row(
                     children: [
-                      Icon(Icons.schedule_rounded, size: 12, color: colors.textMuted),
+                      Icon(Icons.schedule_outlined, size: 12, color: colors.textMuted),
                       const SizedBox(width: 4),
                       Text(
                         widget.assignment['startAt'] as String,
@@ -474,8 +475,8 @@ class _AssignmentTileState extends State<_AssignmentTile> {
                       ),
                       const Spacer(),
                       Text(
-                        '₹${widget.assignment['amount']}',
-                        style: AppTypography.labelBold(AppColors.emerald),
+                        formatInr(widget.assignment['amount']),
+                        style: AppTypography.labelBold(colors.textPrimary),
                       ),
                     ],
                   ),
@@ -484,17 +485,7 @@ class _AssignmentTileState extends State<_AssignmentTile> {
                   if (isSelected) ...[
                     const SizedBox(height: 6),
                     if (expiry != null)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: AppColors.amber.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          expiry,
-                          style: AppTypography.bodySmall(AppColors.amber),
-                        ),
-                      ),
+                      InfoChip(icon: Icons.timer_outlined, label: expiry, color: AppColors.amber),
                     const SizedBox(height: AppSpacing.sm),
                     Row(
                       children: [
@@ -508,12 +499,14 @@ class _AssignmentTileState extends State<_AssignmentTile> {
                         ),
                         const SizedBox(width: 8),
                         SizedBox(
-                          width: 72,
-                          child: TextButton(
+                          width: 92,
+                          height: 52,
+                          child: OutlinedButton(
                             onPressed:
                                 _isConfirming || _isDeclining ? null : _decline,
-                            style: TextButton.styleFrom(
+                            style: OutlinedButton.styleFrom(
                               foregroundColor: AppColors.rose,
+                              padding: EdgeInsets.zero,
                             ),
                             child: _isDeclining
                                 ? const SizedBox(
@@ -536,12 +529,10 @@ class _AssignmentTileState extends State<_AssignmentTile> {
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton.icon(
-                        icon: const Icon(Icons.contact_phone_rounded, size: 16),
+                        icon: const Icon(Icons.contact_phone_outlined, size: 16),
                         label: const Text('View Hospital Contact'),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.primaryLight,
-                          side: BorderSide(color: colors.border),
-                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          foregroundColor: colors.accent,
                         ),
                         onPressed: _showContact,
                       ),
@@ -554,12 +545,10 @@ class _AssignmentTileState extends State<_AssignmentTile> {
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton.icon(
-                        icon: const Icon(Icons.star_outline_rounded, size: 16),
+                        icon: const Icon(Icons.star_outline_outlined, size: 16),
                         label: const Text('Leave a Review'),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.amber,
-                          side: const BorderSide(color: AppColors.amber),
-                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          foregroundColor: colors.textPrimary,
                         ),
                         onPressed: () => _showReviewModal(context),
                       ),
@@ -569,7 +558,6 @@ class _AssignmentTileState extends State<_AssignmentTile> {
               ),
             ),
           ],
-        ),
       ),
     );
   }

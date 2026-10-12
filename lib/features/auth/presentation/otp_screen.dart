@@ -133,7 +133,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
               ),
               const SizedBox(height: AppSpacing.xl),
               AppTextField(
-                label: 'SECURITY CODE (OTP)',
+                label: 'Security code (OTP)',
                 hintText: '123456',
                 controller: _otpController,
                 keyboardType: TextInputType.number,

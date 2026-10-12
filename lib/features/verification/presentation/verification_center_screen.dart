@@ -235,7 +235,7 @@ class _VerificationCenterScreenState
         title: Text(loc.translate('verificationCenter')),
         actions: [
           IconButton(
-            icon: const Icon(Icons.language_rounded),
+            icon: const Icon(Icons.translate_outlined),
             tooltip: 'Language Navigation',
             onPressed: () => LanguageSelectorDialog.show(context),
           ),
@@ -293,18 +293,19 @@ class _VerificationCenterScreenState
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'MEDICAL COUNCIL',
+                      'Medical council',
                       style: AppTypography.labelBold(colors.textSecondary),
                     ),
                     const SizedBox(height: 6),
                     DropdownButtonFormField<String>(
                       value: _selectedCouncil,
                       isExpanded: true,
-                      dropdownColor: colors.surfaceElevated,
+                      dropdownColor: colors.surface,
+                                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                       style: AppTypography.bodyLarge(colors.textPrimary),
                       decoration: InputDecoration(
                         filled: true,
-                        fillColor: colors.surfaceElevated,
+                        fillColor: colors.surface,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(
                             AppSpacing.radiusSm,
@@ -325,18 +326,18 @@ class _VerificationCenterScreenState
                     ),
                     const SizedBox(height: AppSpacing.md),
                     AppTextField(
-                      label: 'REGISTRATION NUMBER',
+                      label: 'Registration number',
                       controller: _regNoController,
                       hintText: 'e.g. TNMC_98234 or KMC_45678',
                     ),
                     const SizedBox(height: AppSpacing.md),
                     AppTextField(
-                      label: 'DOCTOR REGISTERED NAME',
+                      label: 'Doctor registered name',
                       controller: _nameController,
                     ),
                     const SizedBox(height: AppSpacing.md),
                     AppTextField(
-                      label: 'PRIMARY QUALIFICATION',
+                      label: 'Primary qualification',
                       controller: _qualificationController,
                     ),
                     const SizedBox(height: AppSpacing.lg),
@@ -344,7 +345,7 @@ class _VerificationCenterScreenState
                       AppButton(
                         label: 'Submit Case for Review',
                         isLoading: _isSubmitting,
-                        icon: Icons.send_rounded,
+                        icon: Icons.send_outlined,
                         onPressed: _submitCase,
                       ),
                       const SizedBox(height: AppSpacing.md),
@@ -352,7 +353,7 @@ class _VerificationCenterScreenState
                     AppButton(
                       label: 'Request Registration Review',
                       isLoading: _isChecking,
-                      icon: Icons.verified_user_rounded,
+                      icon: Icons.verified_user_outlined,
                       onPressed: ['submitted', 'under_review', 'needs_information'].contains(_caseStatus)
                           ? _runVerificationCheck
                           : null,
@@ -371,10 +372,10 @@ class _VerificationCenterScreenState
                 const SizedBox(height: AppSpacing.xs),
                 AppCard(
                   borderColor: _lastResult!.outcome == 'MATCH'
-                      ? AppColors.emerald.withOpacity(0.5)
+                      ? AppColors.emerald.withValues(alpha: 0.5)
                       : (_lastResult!.outcome == 'MISMATCH'
-                            ? AppColors.amber.withOpacity(0.5)
-                            : AppColors.rose.withOpacity(0.5)),
+                            ? AppColors.amber.withValues(alpha: 0.5)
+                            : AppColors.rose.withValues(alpha: 0.5)),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -385,10 +386,10 @@ class _VerificationCenterScreenState
                             children: [
                               Icon(
                                 _lastResult!.outcome == 'MATCH'
-                                    ? Icons.check_circle_rounded
+                                    ? Icons.check_circle_outlined
                                     : (_lastResult!.outcome == 'MISMATCH'
-                                          ? Icons.warning_amber_rounded
-                                          : Icons.error_outline_rounded),
+                                          ? Icons.warning_amber_outlined
+                                          : Icons.error_outline_outlined),
                                 color: _lastResult!.outcome == 'MATCH'
                                     ? AppColors.emerald
                                     : (_lastResult!.outcome == 'MISMATCH'
@@ -433,12 +434,12 @@ class _VerificationCenterScreenState
                           padding: const EdgeInsets.all(10),
                           margin: const EdgeInsets.only(bottom: AppSpacing.sm),
                           decoration: BoxDecoration(
-                            color: AppColors.amber.withOpacity(0.1),
+                            color: AppColors.amber.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(
                               AppSpacing.radiusSm,
                             ),
                             border: Border.all(
-                              color: AppColors.amber.withOpacity(0.3),
+                              color: AppColors.amber.withValues(alpha: 0.3),
                             ),
                           ),
                           child: Text(
@@ -454,8 +455,8 @@ class _VerificationCenterScreenState
                             children: [
                               Icon(
                                 cmp.isMatch
-                                    ? Icons.check_rounded
-                                    : Icons.close_rounded,
+                                    ? Icons.check_outlined
+                                    : Icons.close_outlined,
                                 color: cmp.isMatch
                                     ? AppColors.emerald
                                     : AppColors.rose,
@@ -542,7 +543,7 @@ class _VerificationCenterScreenState
                           ),
                         ),
                         const Icon(
-                          Icons.lock_rounded,
+                          Icons.lock_outlined,
                           color: AppColors.emerald,
                           size: 18,
                         ),
@@ -552,32 +553,28 @@ class _VerificationCenterScreenState
                 },
               ),
               const SizedBox(height: AppSpacing.md),
-              AppButton(
+              AppSecondaryButton(
                 label: 'Upload Registration Certificate (PDF / Image)',
                 isLoading: _isUploading,
-                icon: Icons.upload_file_rounded,
-                backgroundColor: colors.surfaceElevated,
+                icon: Icons.upload_file_outlined,
+                foregroundColor: colors.accent,
                 onPressed: _uploadEvidenceDocument,
               ),
               const SizedBox(height: AppSpacing.md),
 
               // Appeal & Human Review Section
-              Center(
-                child: TextButton.icon(
-                  icon: const Icon(
-                    Icons.support_agent_rounded,
-                    size: 18,
-                    color: AppColors.primaryLight,
-                  ),
-                  label: const Text(
-                    'Appeals will be available after manual review setup',
-                    style: TextStyle(
-                      color: AppColors.primaryLight,
-                      fontWeight: FontWeight.bold,
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.support_agent_outlined, size: 16, color: colors.textMuted),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      'Appeals will be available after manual review setup',
+                      style: AppTypography.bodySmall(colors.textSecondary),
                     ),
                   ),
-                  onPressed: null,
-                ),
+                ],
               ),
               const SizedBox(height: AppSpacing.lg),
             ],

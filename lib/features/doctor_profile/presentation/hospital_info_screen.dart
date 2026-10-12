@@ -46,7 +46,7 @@ class _HospitalInfoScreenState extends State<HospitalInfoScreen> {
     return Scaffold(
       backgroundColor: colors.bg,
       appBar: AppBar(
-        title: Text('Hospital Profile', style: AppTypography.headingMedium(colors.textPrimary)),
+        title: Text('Hospital Profile'),
       ),
       body: SafeArea(
         child: _loading
@@ -59,7 +59,7 @@ class _HospitalInfoScreenState extends State<HospitalInfoScreen> {
                   )
                 : _org == null
                     ? const EmptyStateView(
-                        icon: Icons.error_outline_rounded,
+                        icon: Icons.error_outline_outlined,
                         title: 'Organization not found',
                         description: 'This hospital profile could not be loaded.',
                       )
@@ -94,7 +94,7 @@ class _HospitalInfoScreenState extends State<HospitalInfoScreen> {
                         color: AppColors.primary.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                       ),
-                      child: const Icon(Icons.local_hospital_rounded, color: AppColors.primary, size: 28),
+                      child: const Icon(Icons.local_hospital_outlined, color: AppColors.primary, size: 28),
                     ),
                     const SizedBox(width: AppSpacing.md),
                     Expanded(
@@ -110,7 +110,7 @@ class _HospitalInfoScreenState extends State<HospitalInfoScreen> {
                             ),
                             if (isVerified) ...[
                               const SizedBox(width: 4),
-                              const Icon(Icons.verified_rounded, color: AppColors.emerald, size: 18),
+                              const Icon(Icons.verified_outlined, color: AppColors.emerald, size: 18),
                             ],
                           ]),
                           const SizedBox(height: 2),
@@ -180,8 +180,7 @@ class _HospitalInfoScreenState extends State<HospitalInfoScreen> {
               icon: const Icon(Icons.reviews_outlined, size: 18),
               label: const Text('No reviews yet'),
               style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.primaryLight,
-                side: BorderSide(color: colors.border),
+                foregroundColor: colors.accent,
                 padding: const EdgeInsets.symmetric(vertical: 14),
               ),
               onPressed: null,
@@ -192,11 +191,10 @@ class _HospitalInfoScreenState extends State<HospitalInfoScreen> {
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
-              icon: const Icon(Icons.arrow_back_rounded, size: 18),
+              icon: const Icon(Icons.arrow_back_outlined, size: 18),
               label: const Text('Back to Profile'),
               style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.primaryLight,
-                side: BorderSide(color: colors.border),
+                foregroundColor: colors.accent,
                 padding: const EdgeInsets.symmetric(vertical: 14),
               ),
               onPressed: () => context.pop(),

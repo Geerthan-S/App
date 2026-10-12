@@ -9,6 +9,7 @@ import '../../../core/design_system/app_buttons.dart';
 import '../../../core/design_system/app_cards.dart';
 import '../../../core/design_system/app_inputs.dart';
 import '../../../core/widgets/state_views.dart';
+import '../../../core/widgets/ui_kit.dart';
 import '../../duty_marketplace/data/duty_repository.dart';
 import '../../../core/errors/error_envelope.dart';
 import '../../../core/config/backend_config.dart';
@@ -212,14 +213,7 @@ class _AddPostScreenState extends State<AddPostScreen> {
     });
   }
 
-  InputDecoration _dropdownDecoration(AppColorsExtension colors) => InputDecoration(
-        filled: true,
-        fillColor: colors.surfaceElevated,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-          borderSide: BorderSide(color: colors.border),
-        ),
-      );
+  InputDecoration _dropdownDecoration(AppColorsExtension colors) => const InputDecoration();
 
   @override
   Widget build(BuildContext context) {
@@ -228,25 +222,31 @@ class _AddPostScreenState extends State<AddPostScreen> {
     return Scaffold(
       backgroundColor: colors.bg,
       appBar: AppBar(
-        title: Text('Post a Duty', style: AppTypography.headingMedium(colors.textPrimary)),
+        centerTitle: false,
+        toolbarHeight: 64,
+        titleSpacing: AppSpacing.gutter,
+        titleTextStyle: AppTypography.headingLarge(colors.textPrimary),
+        title: const Text('Post a Duty'),
       ),
       body: SafeArea(
+        bottom: false,
         child: _loadingOrgs
             ? const Center(child: CircularProgressIndicator())
             : _organizations.isEmpty
                 ? EmptyStateView(
-                    icon: Icons.apartment_rounded,
+                    icon: Icons.apartment_outlined,
                     title: 'No organization found',
                     description: _orgError ?? 'Set up your hospital organization to post duties.',
                   )
                 : _facilities.isEmpty
                     ? const EmptyStateView(
-                        icon: Icons.location_city_rounded,
+                        icon: Icons.location_city_outlined,
                         title: 'No facility found',
                         description: 'Add a facility to your organization before posting duties.',
                       )
                     : SingleChildScrollView(
-                        padding: AppSpacing.paddingScreen,
+                        padding: const EdgeInsets.fromLTRB(
+                            AppSpacing.gutter, 8, AppSpacing.gutter, AppSpacing.navBarClearance),
                         child: Form(
                           key: _formKey,
                           child: Column(
@@ -254,12 +254,13 @@ class _AddPostScreenState extends State<AddPostScreen> {
                             children: [
                               // Org selector
                               if (_organizations.length > 1) ...[
-                                Text('ORGANIZATION', style: AppTypography.labelBold(colors.textSecondary)),
+                                Text('Organization', style: AppTypography.labelBold(colors.textSecondary)),
                                 const SizedBox(height: 6),
                                 DropdownButtonFormField<String>(
                                   value: _selectedOrgId,
                                   isExpanded: true,
-                                  dropdownColor: colors.surfaceElevated,
+                                  dropdownColor: colors.surface,
+                                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                                   style: AppTypography.bodyLarge(colors.textPrimary),
                                   decoration: _dropdownDecoration(colors),
                                   items: _organizations.map((o) => DropdownMenuItem<String>(
@@ -273,12 +274,13 @@ class _AddPostScreenState extends State<AddPostScreen> {
 
                               // Facility selector
                               if (_facilities.length > 1) ...[
-                                Text('FACILITY', style: AppTypography.labelBold(colors.textSecondary)),
+                                Text('Facility', style: AppTypography.labelBold(colors.textSecondary)),
                                 const SizedBox(height: 6),
                                 DropdownButtonFormField<String>(
                                   value: _selectedFacilityId,
                                   isExpanded: true,
-                                  dropdownColor: colors.surfaceElevated,
+                                  dropdownColor: colors.surface,
+                                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                                   style: AppTypography.bodyLarge(colors.textPrimary),
                                   decoration: _dropdownDecoration(colors),
                                   items: _facilities.map((f) => DropdownMenuItem<String>(
@@ -300,8 +302,8 @@ class _AddPostScreenState extends State<AddPostScreen> {
                                 AppCard(
                                   child: Row(
                                     children: [
-                                      const Icon(Icons.location_on_rounded, color: AppColors.primaryLight, size: 18),
-                                      const SizedBox(width: 8),
+                                      const IconTile(icon: Icons.location_on_outlined, size: 36),
+                                      const SizedBox(width: 12),
                                       Expanded(child: Text(
                                         '$_selectedFacilityName · $_selectedFacilityCity',
                                         style: AppTypography.bodyMedium(colors.textPrimary),
@@ -312,12 +314,13 @@ class _AddPostScreenState extends State<AddPostScreen> {
                                 const SizedBox(height: AppSpacing.md),
                               ],
 
-                              Text('SPECIALTY', style: AppTypography.labelBold(colors.textSecondary)),
+                              Text('Specialty', style: AppTypography.labelBold(colors.textSecondary)),
                               const SizedBox(height: 6),
                               DropdownButtonFormField<String>(
                                 value: _selectedSpecialty,
                                 isExpanded: true,
-                                dropdownColor: colors.surfaceElevated,
+                                dropdownColor: colors.surface,
+                                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                                 style: AppTypography.bodyLarge(colors.textPrimary),
                                 decoration: _dropdownDecoration(colors),
                                 items: AppConstants.specialties.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
@@ -326,14 +329,14 @@ class _AddPostScreenState extends State<AddPostScreen> {
                               const SizedBox(height: AppSpacing.md),
 
                               AppTextField(
-                                label: 'DEPARTMENT',
+                                label: 'Department',
                                 hintText: 'e.g. ICU & Emergency',
                                 controller: _departmentController,
                                 validator: (v) => (v == null || v.trim().isEmpty) ? 'Department is required' : null,
                               ),
                               const SizedBox(height: AppSpacing.md),
 
-                              Text('SHIFT DATE & TIME', style: AppTypography.labelBold(colors.textSecondary)),
+                              Text('Shift date & time', style: AppTypography.labelBold(colors.textSecondary)),
                               const SizedBox(height: 6),
                               AppCard(
                                 child: Column(
@@ -352,8 +355,7 @@ class _AddPostScreenState extends State<AddPostScreen> {
                                         ),
                                         OutlinedButton(
                                           style: OutlinedButton.styleFrom(
-                                            foregroundColor: AppColors.primaryLight,
-                                            side: BorderSide(color: colors.border),
+                                            foregroundColor: colors.accent,
                                           ),
                                           onPressed: _pickDate,
                                           child: const Text('Change'),
@@ -374,7 +376,7 @@ class _AddPostScreenState extends State<AddPostScreen> {
                               const SizedBox(height: AppSpacing.md),
 
                               AppTextField(
-                                label: 'COMPENSATION (₹ PER SHIFT)',
+                                label: 'Compensation (₹ per shift)',
                                 hintText: 'e.g. 6500',
                                 controller: _amountController,
                                 keyboardType: TextInputType.number,
@@ -387,7 +389,7 @@ class _AddPostScreenState extends State<AddPostScreen> {
                               const SizedBox(height: AppSpacing.md),
 
                               AppTextField(
-                                label: 'QUALIFICATION REQUIRED',
+                                label: 'Qualification required',
                                 hintText: 'e.g. MBBS, MD / DNB',
                                 controller: _qualificationController,
                                 validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
@@ -395,16 +397,16 @@ class _AddPostScreenState extends State<AddPostScreen> {
                               const SizedBox(height: AppSpacing.md),
 
                               AppTextField(
-                                label: 'ADDITIONAL NOTES (OPTIONAL)',
+                                label: 'Additional notes (optional)',
                                 hintText: 'Any special requirements...',
                                 controller: _notesController,
                                 maxLines: 2,
                               ),
-                              const SizedBox(height: AppSpacing.xl),
+                              const SizedBox(height: AppSpacing.lg),
 
                               AppButton(
                                 label: 'Post Duty',
-                                icon: Icons.add_circle_outline_rounded,
+                                icon: Icons.add_circle_outline_outlined,
                                 isLoading: _isPosting,
                                 onPressed: _submit,
                               ),
@@ -434,8 +436,8 @@ class _TimePickerTile extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: colors.surfaceElevated,
-          borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+          color: colors.bg,
+          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
           border: Border.all(color: colors.border),
         ),
         child: Column(
@@ -445,7 +447,7 @@ class _TimePickerTile extends StatelessWidget {
             const SizedBox(height: 2),
             Row(
               children: [
-                const Icon(Icons.access_time_rounded, size: 16, color: AppColors.primaryLight),
+                Icon(Icons.access_time_outlined, size: 16, color: colors.accent),
                 const SizedBox(width: 6),
                 Text(time.format(context), style: AppTypography.labelBold(colors.textPrimary)),
               ],

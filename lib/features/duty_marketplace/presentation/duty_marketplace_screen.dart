@@ -3,11 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/design_system/app_colors.dart';
-import '../../../core/design_system/app_typography.dart';
 import '../../../core/design_system/app_spacing.dart';
-import '../../../core/design_system/app_cards.dart';
+import '../../../core/design_system/app_inputs.dart';
 import '../../../core/widgets/state_views.dart';
-import '../../../core/widgets/status_badge.dart';
+import '../../../core/widgets/duty_post_card.dart';
+import '../../../core/widgets/ui_kit.dart';
 import '../../../core/widgets/language_selector_dialog.dart';
 import '../../../core/localization/language_provider.dart';
 import '../data/duty_repository.dart';
@@ -36,16 +36,17 @@ class _DutyMarketplaceScreenState extends ConsumerState<DutyMarketplaceScreen> {
     final loc = ref.watch(localizationProvider);
 
     return Scaffold(
+      backgroundColor: colors.bg,
       appBar: AppBar(
         title: Text(loc.translate('marketplace')),
         actions: [
           IconButton(
-            icon: const Icon(Icons.language_rounded),
+            icon: const Icon(Icons.translate_outlined),
             tooltip: 'Change Language',
             onPressed: () => LanguageSelectorDialog.show(context),
           ),
           IconButton(
-            icon: const Icon(Icons.notifications_outlined),
+            icon: const Icon(Icons.notifications_none_outlined),
             onPressed: () => context.push('/notifications'),
           ),
         ],
@@ -54,34 +55,34 @@ class _DutyMarketplaceScreenState extends ConsumerState<DutyMarketplaceScreen> {
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-              child: TextField(
+              padding: const EdgeInsets.fromLTRB(AppSpacing.gutter, 8, AppSpacing.gutter, 12),
+              child: AppSearchField(
                 controller: _searchController,
-                style: AppTypography.bodyMedium(colors.textPrimary),
+                hintText: 'Search by specialty, hospital or area...',
                 onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
-                decoration: InputDecoration(
-                  hintText: 'Search by specialty, hospital or area...',
-                  hintStyle: AppTypography.bodyMedium(colors.textMuted),
-                  prefixIcon: Icon(Icons.search_rounded, color: colors.textMuted),
-                  filled: true,
-                  fillColor: colors.surfaceElevated,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                    borderSide: BorderSide(color: colors.border),
-                  ),
-                ),
+                showClear: _searchQuery.isNotEmpty,
+                onClear: () => setState(() {
+                  _searchController.clear();
+                  _searchQuery = '';
+                }),
               ),
             ),
             SizedBox(
-              height: 44,
-              child: ListView(
+              height: 42,
+              child: ListView.separated(
                 scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                children: [
-                  _chip('All'),
-                  ...AppConstants.specialties.map(_chip),
-                ],
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.gutter, vertical: 2),
+                itemCount: AppConstants.specialties.length + 1,
+                separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.xs),
+                itemBuilder: (context, i) {
+                  final label = i == 0 ? 'All' : AppConstants.specialties[i - 1];
+                  return AppFilterChip(
+                    label: label,
+                    icon: i == 0 ? Icons.apps_outlined : null,
+                    selected: _selectedSpecialty == label,
+                    onTap: () => setState(() => _selectedSpecialty = label),
+                  );
+                },
               ),
             ),
             const SizedBox(height: AppSpacing.xs),
@@ -92,11 +93,11 @@ class _DutyMarketplaceScreenState extends ConsumerState<DutyMarketplaceScreen> {
                 ),
                 builder: (context, snap) {
                   if (snap.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
+                    return const LoadingView();
                   }
                   if (snap.hasError) {
                     return const EmptyStateView(
-                      icon: Icons.cloud_off_rounded,
+                      icon: Icons.cloud_off_outlined,
                       title: 'Could not load duties',
                       description: 'Check your connection and try again.',
                     );
@@ -114,121 +115,22 @@ class _DutyMarketplaceScreenState extends ConsumerState<DutyMarketplaceScreen> {
                   }
                   if (duties.isEmpty) {
                     return const EmptyStateView(
-                      icon: Icons.search_off_rounded,
+                      icon: Icons.search_off_outlined,
                       title: 'No duties found',
                       description: 'Try a different specialty or check back later.',
                     );
                   }
                   return ListView.separated(
-                    padding: AppSpacing.paddingScreen,
+                    padding: const EdgeInsets.fromLTRB(AppSpacing.gutter, 12, AppSpacing.gutter, AppSpacing.lg),
                     itemCount: duties.length,
                     separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.md),
-                    itemBuilder: (context, index) => _buildDutyCard(duties[index]),
+                    itemBuilder: (context, index) => DutyPostCard(duty: duties[index]),
                   );
                 },
               ),
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _chip(String label) {
-    final colors = context.appColors;
-    final isSelected = _selectedSpecialty == label;
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: FilterChip(
-        label: Text(label),
-        selected: isSelected,
-        labelStyle: AppTypography.labelBold(isSelected ? Colors.white : colors.textSecondary),
-        backgroundColor: colors.surfaceElevated,
-        selectedColor: AppColors.primary,
-        checkmarkColor: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppSpacing.radiusPill),
-          side: BorderSide(color: isSelected ? AppColors.primary : colors.border),
-        ),
-        onSelected: (_) => setState(() => _selectedSpecialty = label),
-      ),
-    );
-  }
-
-  Widget _buildDutyCard(Map<String, dynamic> duty) {
-    final colors = context.appColors;
-    return AppCard(
-      onTap: () => context.push('/duty-details', extra: duty),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Flexible(
-                    child: Text(
-                      duty['facilityName'] as String,
-                      style: AppTypography.headingSmall(colors.textPrimary),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  if (duty['isVerifiedOrg'] == true)
-                    const Icon(Icons.verified_rounded, color: AppColors.emerald, size: 16),
-                ],
-              ),
-              StatusBadge(status: duty['status'] as String),
-            ],
-          ),
-          const SizedBox(height: 2),
-          Text(
-            duty['distanceKm'] != null
-                ? '${duty['city']} • ${duty['distanceKm']} km away'
-                : duty['city'] as String,
-            style: AppTypography.bodySmall(colors.textMuted),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: colors.surfaceElevated,
-              borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.medical_services_outlined, size: 16, color: AppColors.primaryLight),
-                    const SizedBox(width: 6),
-                    Text(duty['specialtyName'] as String, style: AppTypography.labelBold(colors.textPrimary)),
-                  ],
-                ),
-                Text('₹${duty['amount']} / shift', style: AppTypography.labelBold(AppColors.emerald)),
-              ],
-            ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Row(
-            children: [
-              Icon(Icons.access_time_rounded, size: 14, color: colors.textMuted),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Text(
-                  '${duty['startAt']} - ${duty['endAt']}',
-                  style: AppTypography.bodySmall(colors.textSecondary),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              Text(
-                '${duty['remainingHeadcount']} slot${(duty['remainingHeadcount'] as int) == 1 ? '' : 's'} open',
-                style: AppTypography.bodySmall(AppColors.amber),
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }

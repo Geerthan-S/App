@@ -11,6 +11,7 @@ import '../design_system/app_typography.dart';
 import '../design_system/app_spacing.dart';
 import '../design_system/app_cards.dart';
 import 'status_badge.dart';
+import 'ui_kit.dart';
 
 class DutyPostCard extends StatelessWidget {
   final Map<String, dynamic> duty;
@@ -20,7 +21,15 @@ class DutyPostCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
+    final specialty = duty['specialtyName'] as String? ?? '';
+    final department = duty['department'] as String? ?? '';
+    final city = duty['city'] as String? ?? '';
+    final distance = duty['distanceKm'];
+    final remaining = duty['remainingHeadcount'] ?? 1;
+    final shiftType = duty['shiftType'] as String?;
+
     return AppCard(
+      padding: const EdgeInsets.all(AppSpacing.md),
       onTap: () => context.push('/duty-details', extra: duty),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -28,15 +37,7 @@ class DutyPostCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                ),
-                child: const Icon(Icons.local_hospital_rounded, color: AppColors.primary, size: 24),
-              ),
+              const IconTile(icon: Icons.local_hospital_outlined, size: 48),
               const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: Column(
@@ -44,69 +45,93 @@ class DutyPostCard extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Expanded(
+                        Flexible(
                           child: Text(
-                            duty['facilityName'] as String,
+                            duty['facilityName'] as String? ?? '—',
                             style: AppTypography.headingSmall(colors.textPrimary),
+                            maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         if (duty['isVerifiedOrg'] == true) ...[
                           const SizedBox(width: 4),
-                          const Icon(Icons.verified_rounded, color: AppColors.emerald, size: 16),
+                          const Icon(Icons.verified_outlined, color: AppColors.emerald, size: 16),
                         ],
                       ],
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '${duty['specialtyName']} • ${duty['city']}',
+                      [specialty, department].where((s) => s.isNotEmpty).join(' · '),
+                      style: AppTypography.bodySmall(colors.accent).copyWith(fontWeight: FontWeight.w500),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              // Feeds only list published duties, so the badge is shown only
+              // when a duty is in some other state.
+              if ((duty['status'] as String? ?? 'published') != 'published') ...[
+                const SizedBox(width: AppSpacing.xs),
+                StatusBadge(status: duty['status'] as String),
+              ],
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
+            children: [
+              if (shiftType != null && shiftType.isNotEmpty)
+                InfoChip(icon: Icons.schedule_outlined, label: shiftType),
+              InfoChip(
+                icon: Icons.location_on_outlined,
+                label: distance != null ? '$city · $distance km' : (city.isEmpty ? 'Location TBA' : city),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Row(
+            children: [
+              Icon(Icons.calendar_today_outlined, size: 14, color: colors.textMuted),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  '${duty['startAt']}  →  ${duty['endAt']}',
+                  style: AppTypography.bodySmall(colors.textSecondary),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+            child: Divider(color: colors.border, height: 1),
+          ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: formatInr(duty['amount']),
+                      style: AppTypography.headingSmall(colors.textPrimary).copyWith(fontSize: 16, fontWeight: FontWeight.w700),
+                    ),
+                    TextSpan(
+                      text: ' / ${basisLabel(duty['basis'])}',
                       style: AppTypography.bodySmall(colors.textMuted),
                     ),
                   ],
                 ),
               ),
-              StatusBadge(status: duty['status'] as String),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: colors.surfaceElevated,
-              borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.access_time_rounded, size: 14, color: colors.textMuted),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    '${duty['startAt']} - ${duty['endAt']}',
-                    style: AppTypography.bodySmall(colors.textSecondary),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                Text(
-                  '₹${duty['amount']} / shift',
-                  style: AppTypography.labelBold(AppColors.emerald),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Row(
-            children: [
-              Icon(Icons.location_on_outlined, size: 14, color: colors.textMuted),
-              const SizedBox(width: 4),
-              Text(
-                duty['distanceKm'] != null ? '${duty['distanceKm']} km away' : duty['city'] as String? ?? '',
-                style: AppTypography.bodySmall(colors.textMuted),
-              ),
               const Spacer(),
               Text(
-                '${duty['remainingHeadcount']} slot open',
-                style: AppTypography.bodySmall(AppColors.amber),
+                '$remaining ${remaining == 1 ? 'slot' : 'slots'} open',
+                style: AppTypography.bodySmall(AppColors.emerald).copyWith(fontWeight: FontWeight.w600),
               ),
+              const SizedBox(width: 4),
+              Icon(Icons.chevron_right_outlined, size: 18, color: colors.textMuted),
             ],
           ),
         ],
