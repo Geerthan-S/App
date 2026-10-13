@@ -56,8 +56,11 @@ class GoRouterRefreshStream extends ChangeNotifier {
 final appRouter = GoRouter(
   navigatorKey: _rootNavigatorKey,
   initialLocation: '/login',
-  refreshListenable: GoRouterRefreshStream(FirebaseAuth.instance.authStateChanges()),
-  errorBuilder: (context, state) => NotFoundScreen(attemptedPath: state.uri.toString()),
+  refreshListenable: GoRouterRefreshStream(
+    FirebaseAuth.instance.authStateChanges(),
+  ),
+  errorBuilder: (context, state) =>
+      NotFoundScreen(attemptedPath: state.uri.toString()),
   redirect: (context, state) async {
     final user = FirebaseAuth.instance.currentUser;
     final location = state.matchedLocation;
@@ -79,7 +82,11 @@ final appRouter = GoRouter(
     } catch (e, st) {
       // Callables enforce consent server-side regardless; do not trap the user
       // on a screen when the state cannot be read (e.g. offline).
-      AppLogger.error('Could not read onboarding state', error: e, stackTrace: st);
+      AppLogger.error(
+        'Could not read onboarding state',
+        error: e,
+        stackTrace: st,
+      );
       return isLoggingIn ? '/home' : null;
     }
     if (!consented) {
@@ -91,10 +98,7 @@ final appRouter = GoRouter(
     return null;
   },
   routes: [
-    GoRoute(
-      path: '/login',
-      builder: (context, state) => const LoginScreen(),
-    ),
+    GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
     GoRoute(
       path: '/otp',
       builder: (context, state) {
@@ -136,7 +140,8 @@ final appRouter = GoRouter(
         if (duty is! Map<String, dynamic>) {
           return ContentNotFoundScreen(
             title: 'Duty Not Found',
-            message: 'This duty may have been filled, removed, or is no longer available.',
+            message:
+                'This duty may have been filled, removed, or is no longer available.',
             icon: Icons.event_busy_outlined,
             actionLabel: 'Back to Marketplace',
             onAction: () => context.go('/marketplace'),
@@ -152,7 +157,8 @@ final appRouter = GoRouter(
         if (duty is! Map<String, dynamic>) {
           return ContentNotFoundScreen(
             title: 'Post Not Found',
-            message: 'This post may have been removed by its author or is no longer available.',
+            message:
+                'This post may have been removed by its author or is no longer available.',
             icon: Icons.article_outlined,
             actionLabel: 'Back to Home',
             onAction: () => context.go('/home'),
@@ -168,7 +174,8 @@ final appRouter = GoRouter(
         if (conversation is! Map<String, dynamic>) {
           return ContentNotFoundScreen(
             title: 'Conversation Not Found',
-            message: 'This conversation may have been deleted or is no longer available.',
+            message:
+                'This conversation may have been deleted or is no longer available.',
             icon: Icons.forum_outlined,
             actionLabel: 'Back to Messages',
             onAction: () => context.go('/messages'),
@@ -193,7 +200,9 @@ final appRouter = GoRouter(
       path: '/hospital-info',
       builder: (context, state) {
         final extra = state.extra;
-        final orgId = extra is Map<String, dynamic> ? extra['organizationId'] as String? : null;
+        final orgId = extra is Map<String, dynamic>
+            ? extra['organizationId'] as String?
+            : null;
         return HospitalInfoScreen(organizationId: orgId);
       },
     ),
@@ -217,19 +226,14 @@ final appRouter = GoRouter(
     // The former local-only demo screens for applications and assignments
     // were retired; offers and duties are handled by the persisted workflow
     // in My Duties, so old links land there.
-    GoRoute(
-      path: '/applications',
-      redirect: (context, state) => '/messages',
-    ),
-    GoRoute(
-      path: '/assignments',
-      redirect: (context, state) => '/messages',
-    ),
+    GoRoute(path: '/applications', redirect: (context, state) => '/messages'),
+    GoRoute(path: '/assignments', redirect: (context, state) => '/messages'),
 
     // Stateful Nested Shell for Main Bottom Navigation
-    // Home / Search / Add Post / Messages / Profile
+    // Home / Search / Post (/add-post) / Duties (/messages, My Duties) / Profile
     StatefulShellRoute.indexedStack(
-      builder: (context, state, navigationShell) => MainScaffold(navigationShell: navigationShell),
+      builder: (context, state, navigationShell) =>
+          MainScaffold(navigationShell: navigationShell),
       branches: [
         StatefulShellBranch(
           routes: [

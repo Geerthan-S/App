@@ -8,7 +8,9 @@ class DutyRepository {
   static final _functions = BackendConfig.functions;
   static final _dateFmt = DateFormat('d MMM, hh:mm a');
 
-  static Stream<List<Map<String, dynamic>>> watchPublished({String? specialty}) {
+  static Stream<List<Map<String, dynamic>>> watchPublished({
+    String? specialty,
+  }) {
     Query<Map<String, dynamic>> q = _db
         .collection('duties')
         .where('status', isEqualTo: 'published')
@@ -18,7 +20,7 @@ class DutyRepository {
       q = q.where('specialtyName', isEqualTo: specialty);
     }
     return q.snapshots().map(
-      (snap) => snap.docs.map((doc) => _toUiMap(doc.id, doc.data())).toList(),
+      (snap) => snap.docs.map((doc) => toUiMap(doc.id, doc.data())).toList(),
     );
   }
 
@@ -46,36 +48,42 @@ class DutyRepository {
     String? notes,
   }) async {
     final shiftType = _shiftType(startAt, endAt);
-    final createResult = await _functions.httpsCallable('createDuty').call<Map<String, dynamic>>({
-      'organizationId': organizationId,
-      'facilityId': facilityId,
-      'facilityName': facilityName,
-      'city': city,
-      'department': department,
-      'specialtyId': specialtyName.toLowerCase().replaceAll(' ', '_'),
-      'specialtyName': specialtyName,
-      'qualificationRequired': qualificationRequired,
-      'experienceMinYears': experienceMinYears,
-      'schedule': {
-        'startAt': startAt.toUtc().toIso8601String(),
-        'endAt': endAt.toUtc().toIso8601String(),
-        'shiftType': shiftType,
-      },
-      'headcount': headcount,
-      'paymentTerms': {
-        'amount': amount,
-        'currency': 'INR',
-        'basis': 'per_shift',
-        'expectedPaymentTiming': 'end_of_shift',
-      },
-      if (notes != null && notes.isNotEmpty) 'notes': notes,
+    final createResult = await _functions
+        .httpsCallable('createDuty')
+        .call<Map<String, dynamic>>({
+          'organizationId': organizationId,
+          'facilityId': facilityId,
+          'facilityName': facilityName,
+          'city': city,
+          'department': department,
+          'specialtyId': specialtyName.toLowerCase().replaceAll(' ', '_'),
+          'specialtyName': specialtyName,
+          'qualificationRequired': qualificationRequired,
+          'experienceMinYears': experienceMinYears,
+          'schedule': {
+            'startAt': startAt.toUtc().toIso8601String(),
+            'endAt': endAt.toUtc().toIso8601String(),
+            'shiftType': shiftType,
+          },
+          'headcount': headcount,
+          'paymentTerms': {
+            'amount': amount,
+            'currency': 'INR',
+            'basis': 'per_shift',
+            'expectedPaymentTiming': 'end_of_shift',
+          },
+          if (notes != null && notes.isNotEmpty) 'notes': notes,
+        });
+    final dutyId =
+        (createResult.data as Map<String, dynamic>)['dutyId'] as String;
+    await _functions.httpsCallable('publishDuty').call<Map<String, dynamic>>({
+      'dutyId': dutyId,
     });
-    final dutyId = (createResult.data as Map<String, dynamic>)['dutyId'] as String;
-    await _functions.httpsCallable('publishDuty').call<Map<String, dynamic>>({'dutyId': dutyId});
     return dutyId;
   }
 
-  static Map<String, dynamic> _toUiMap(String docId, Map<String, dynamic> data) {
+  /// Flattens a `duties/{id}` document into the map the duty screens read.
+  static Map<String, dynamic> toUiMap(String docId, Map<String, dynamic> data) {
     final schedule = data['schedule'] as Map<String, dynamic>? ?? {};
     final paymentTerms = data['paymentTerms'] as Map<String, dynamic>? ?? {};
     final startRaw = schedule['startAt'] as String?;
@@ -91,11 +99,15 @@ class DutyRepository {
       'qualificationRequired': data['qualificationRequired'] ?? '',
       'startAt': _fmt(startRaw),
       'endAt': _fmt(endRaw),
+      // Raw ISO timestamps for layouts that format dates themselves.
+      'startAtIso': startRaw,
+      'endAtIso': endRaw,
       'shiftType': _shiftTypeStr(startRaw, endRaw),
       'headcount': (data['headcount'] as num?)?.toInt() ?? 1,
       'remainingHeadcount': (data['remainingHeadcount'] as num?)?.toInt() ?? 1,
       'amount': (paymentTerms['amount'] as num?)?.toInt() ?? 0,
       'basis': paymentTerms['basis'] ?? 'per_shift',
+      'paymentTiming': paymentTerms['expectedPaymentTiming'],
       'isVerifiedOrg': data['isVerifiedOrg'] ?? false,
       'status': data['status'] ?? 'published',
       'notes': data['notes'] ?? '',
@@ -123,8 +135,8 @@ class DutyRepository {
   static String _shiftTypeStr(String? startIso, String? endIso) {
     if (startIso == null || endIso == null) return 'Shift';
     try {
-      final s = DateTime.parse(startIso);
-      final e = DateTime.parse(endIso);
+      final s = DateTime.parse(startIso).toLocal();
+      final e = DateTime.parse(endIso).toLocal();
       final hours = e.difference(s).inHours;
       if (s.hour >= 20 || s.hour < 6) return 'Night Duty ($hours hrs)';
       if (s.hour < 14) return 'Morning Shift ($hours hrs)';

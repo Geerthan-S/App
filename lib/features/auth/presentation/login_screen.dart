@@ -97,10 +97,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           await _authRepository.signInWithPhoneCredential(credential);
           if (mounted) context.go('/consent');
         } on FirebaseAuthException catch (e) {
-          if (mounted)
+          if (mounted) {
             setState(
               () => _error = e.message ?? 'Sign-in failed. Please try again.',
             );
+          }
         } finally {
           if (mounted) setState(() => _isPhoneLoading = false);
         }
@@ -143,119 +144,137 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             padding: AppSpacing.paddingScreen,
             child: ConstrainedBox(
               constraints: BoxConstraints(
-                minHeight: constraints.maxHeight - AppSpacing.paddingScreen.vertical,
+                minHeight:
+                    constraints.maxHeight - AppSpacing.paddingScreen.vertical,
               ),
               child: IntrinsicHeight(
                 child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: AppSpacing.xl),
-              Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  color: colors.surface,
-                  borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-                  border: Border.all(color: colors.border),
-                  boxShadow: AppShadows.soft(colors),
-                ),
-                child: Icon(
-                  Icons.local_hospital_outlined,
-                  color: colors.accent,
-                  size: 30,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              Text(
-                'Healthcare Workforce Platform',
-                style: AppTypography.display(colors.textPrimary),
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                'Verified on-demand duty coordination for licensed doctors and healthcare facilities.',
-                style: AppTypography.bodyMedium(colors.textSecondary),
-              ),
-              if (_error != null) ...[
-                const SizedBox(height: AppSpacing.lg),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(AppSpacing.sm),
-                  decoration: BoxDecoration(
-                    color: AppColors.rose.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Icon(Icons.error_outline_outlined, color: AppColors.rose, size: 18),
-                      const SizedBox(width: 8),
-                      Expanded(child: Text(_error!, style: AppTypography.bodySmall(AppColors.rose))),
-                    ],
-                  ),
-                ),
-              ],
-              const Spacer(),
-              AppCard(
-                padding: const EdgeInsets.all(AppSpacing.lg - 4),
-                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-              _GoogleSignInButton(
-                isLoading: _isGoogleLoading,
-                onPressed: _isBusy ? null : _signInWithGoogle,
-              ),
-              const SizedBox(height: AppSpacing.md),
-              Row(
-                children: [
-                  Expanded(child: Divider(color: colors.border)),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.sm,
+                    const SizedBox(height: AppSpacing.xl),
+                    Row(
+                      children: [
+                        Container(
+                          width: 10,
+                          height: 10,
+                          decoration: BoxDecoration(
+                            color: colors.highlight,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'HealthForce',
+                          style: AppTypography.headingSmall(colors.textPrimary),
+                        ),
+                      ],
                     ),
-                    child: Text(
-                      'OR',
-                      style: AppTypography.bodySmall(colors.textMuted),
+                    const SizedBox(height: AppSpacing.xl),
+                    Text(
+                      'Healthcare Workforce Platform',
+                      style: AppTypography.display(colors.textPrimary),
                     ),
-                  ),
-                  Expanded(child: Divider(color: colors.border)),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.md),
-              AppTextField(
-                label: 'Mobile number',
-                hintText: '98765 43210',
-                controller: _phoneController,
-                keyboardType: TextInputType.phone,
-                prefixIcon: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 14,
-                  ),
-                  child: Text(
-                    '+91',
-                    style: AppTypography.labelBold(colors.textPrimary).copyWith(fontSize: 14),
-                  ),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              AppButton(
-                label: 'Get Verification OTP',
-                isLoading: _isPhoneLoading,
-                onPressed: _isBusy ? null : _sendOtp,
-              ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      'Verified on-demand duty coordination for licensed doctors and healthcare facilities.',
+                      style: AppTypography.bodyMedium(colors.textSecondary),
+                    ),
+                    if (_error != null) ...[
+                      const SizedBox(height: AppSpacing.lg),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(AppSpacing.sm),
+                        decoration: BoxDecoration(
+                          color: AppColors.rose.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(
+                            AppSpacing.radiusMd,
+                          ),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(
+                              Icons.error_outline_outlined,
+                              color: AppColors.rose,
+                              size: 18,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _error!,
+                                style: AppTypography.bodySmall(AppColors.rose),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    const Spacer(),
+                    AppCard(
+                      padding: const EdgeInsets.all(AppSpacing.lg - 4),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _GoogleSignInButton(
+                            isLoading: _isGoogleLoading,
+                            onPressed: _isBusy ? null : _signInWithGoogle,
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          Row(
+                            children: [
+                              Expanded(child: Divider(color: colors.border)),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: AppSpacing.sm,
+                                ),
+                                child: Text(
+                                  'OR',
+                                  style: AppTypography.bodySmall(
+                                    colors.textMuted,
+                                  ),
+                                ),
+                              ),
+                              Expanded(child: Divider(color: colors.border)),
+                            ],
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          AppTextField(
+                            label: 'Mobile number',
+                            hintText: '98765 43210',
+                            controller: _phoneController,
+                            keyboardType: TextInputType.phone,
+                            prefixIcon: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 14,
+                              ),
+                              child: Text(
+                                '+91',
+                                style: AppTypography.labelBold(
+                                  colors.textPrimary,
+                                ).copyWith(fontSize: 14),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          AppButton(
+                            label: 'Get Verification OTP',
+                            isLoading: _isPhoneLoading,
+                            onPressed: _isBusy ? null : _sendOtp,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    Center(
+                      child: Text(
+                        'By continuing, you agree to verified identity & privacy standards',
+                        style: AppTypography.bodySmall(colors.textMuted),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
                   ],
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              Center(
-                child: Text(
-                  'By continuing, you agree to verified identity & privacy standards',
-                  style: AppTypography.bodySmall(colors.textMuted),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xs),
-            ],
                 ),
               ),
             ),
@@ -288,12 +307,12 @@ class _GoogleSignInButton extends StatelessWidget {
         ),
         onPressed: (isLoading || onPressed == null) ? null : onPressed,
         child: isLoading
-            ? const SizedBox(
+            ? SizedBox(
                 width: 20,
                 height: 20,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: AppColors.primary,
+                  color: context.appColors.textPrimary,
                 ),
               )
             : Row(

@@ -1,8 +1,9 @@
 /**
  * Design System — Reusable Card Containers
  *
- * White surface, 18px radius, hairline border and a very diffuse shadow
- * (soft-material elevation used sparingly).
+ * Flat white surface on the warm canvas with a 20px radius. No border or
+ * shadow by default; pass [borderColor] for an outlined variant or
+ * [elevated] for the rare floating surface.
  */
 
 import 'package:flutter/material.dart';
@@ -17,7 +18,7 @@ class AppCard extends StatelessWidget {
   final EdgeInsetsGeometry? margin;
   final Color? color;
 
-  /// Soft shadow elevation. Disable for cards nested inside other surfaces.
+  /// Soft shadow elevation, reserved for surfaces that float above content.
   final bool elevated;
 
   const AppCard({
@@ -28,7 +29,7 @@ class AppCard extends StatelessWidget {
     this.borderColor,
     this.margin,
     this.color,
-    this.elevated = true,
+    this.elevated = false,
   });
 
   @override
@@ -40,7 +41,7 @@ class AppCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: color ?? colors.surface,
         borderRadius: radius,
-        border: Border.all(color: borderColor ?? colors.border, width: 1),
+        border: borderColor != null ? Border.all(color: borderColor!) : null,
         boxShadow: elevated ? AppShadows.soft(colors) : null,
       ),
       child: Material(
@@ -49,7 +50,7 @@ class AppCard extends StatelessWidget {
           onTap: onTap,
           borderRadius: radius,
           splashColor: colors.accentSoft,
-          highlightColor: colors.accentSoft.withValues(alpha: 0.5),
+          highlightColor: colors.accentSoft.withValues(alpha: 0.6),
           child: Padding(
             padding: padding ?? AppSpacing.paddingCard,
             child: child,

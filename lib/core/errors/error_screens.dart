@@ -141,7 +141,8 @@ class AppErrorScreen extends StatelessWidget {
       icon: Icons.error_outline_outlined,
       iconColor: AppColors.rose,
       title: 'Something Went Wrong',
-      message: 'This screen ran into a problem. You can head back to home and try again.',
+      message:
+          'This screen ran into a problem. You can head back to home and try again.',
       detail: details?.exceptionAsString(),
       actionLabel: 'Go to Home',
       onAction: () => context.go('/home'),
@@ -183,7 +184,8 @@ class ContentNotFoundScreen extends StatelessWidget {
   const ContentNotFoundScreen({
     super.key,
     this.title = 'Not Found',
-    this.message = 'This content may have been removed or is no longer available.',
+    this.message =
+        'This content may have been removed or is no longer available.',
     this.icon = Icons.search_off_outlined,
     required this.actionLabel,
     required this.onAction,
@@ -193,7 +195,7 @@ class ContentNotFoundScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return _ErrorScaffold(
       icon: icon,
-      iconColor: AppColors.teal,
+      iconColor: context.appColors.textSecondary,
       title: title,
       message: message,
       actionLabel: actionLabel,

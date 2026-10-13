@@ -11,7 +11,6 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/design_system/app_colors.dart';
 import '../../../core/design_system/app_typography.dart';
 import '../../../core/design_system/app_spacing.dart';
-import '../../../core/design_system/app_cards.dart';
 import '../../../core/design_system/app_buttons.dart';
 import '../../../core/design_system/app_inputs.dart';
 import '../../../core/widgets/status_badge.dart';
@@ -25,7 +24,8 @@ class DoctorProfileScreen extends ConsumerStatefulWidget {
   const DoctorProfileScreen({super.key});
 
   @override
-  ConsumerState<DoctorProfileScreen> createState() => _DoctorProfileScreenState();
+  ConsumerState<DoctorProfileScreen> createState() =>
+      _DoctorProfileScreenState();
 }
 
 class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
@@ -59,15 +59,22 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
       _qualifications = profile['qualification'] as String? ?? '';
       _council = profile['council'] as String? ?? '';
       _registrationNo = profile['registrationNo'] as String? ?? '';
-      _primarySpecialty = profile['primarySpecialty'] as String? ?? AppConstants.specialties.first;
+      _primarySpecialty =
+          profile['primarySpecialty'] as String? ??
+          AppConstants.specialties.first;
       _experienceYears = (profile['yearsOfExperience'] as num?)?.toInt() ?? 0;
       final cities = profile['preferredCities'];
-      _preferredHubs = cities is List ? (cities as List).join(', ') : (cities as String? ?? '');
+      _preferredHubs = cities is List
+          ? (cities as List).join(', ')
+          : (cities as String? ?? '');
       _bio = profile['bio'] as String? ?? '';
       _isVerified = profile['isVerified'] == true;
       final specialties = profile['specialties'];
       if (specialties is List) {
-        _specialtyChips = specialties.cast<String>().where((s) => s != _primarySpecialty).toList();
+        _specialtyChips = specialties
+            .cast<String>()
+            .where((s) => s != _primarySpecialty)
+            .toList();
       }
     });
   }
@@ -80,7 +87,10 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
       setState(() {
         _reviewCount = reviews.length;
         if (reviews.isNotEmpty) {
-          final total = reviews.fold<num>(0, (s, r) => s + (r['rating'] as num));
+          final total = reviews.fold<num>(
+            0,
+            (s, r) => s + (r['rating'] as num),
+          );
           _doctorRating = total / reviews.length;
         } else {
           _doctorRating = 0.0;
@@ -100,80 +110,15 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
     return checks.where((c) => c).length / checks.length;
   }
 
-  String get _initials {
-    final parts = _fullName.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
-    if (parts.isEmpty) return 'Dr';
-    if (parts.length == 1) return parts.first[0].toUpperCase();
-    return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
-  }
-
-  Widget _buildReviewLinkCard({
-    required String title,
-    required double rating,
-    required int count,
-    required VoidCallback onTap,
-  }) {
-    final colors = context.appColors;
-    return AppCard(
-      onTap: onTap,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: AppTypography.bodySmall(colors.textSecondary)),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              const Icon(Icons.star_rounded, color: AppColors.amber, size: 18),
-              const SizedBox(width: 4),
-              Text(rating.toStringAsFixed(1), style: AppTypography.headingSmall(colors.textPrimary)),
-              const SizedBox(width: 4),
-              Text('($count)', style: AppTypography.bodySmall(colors.textMuted)),
-              const Spacer(),
-              Icon(Icons.chevron_right_outlined, color: colors.textMuted, size: 18),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAccountTile({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-    Color? color,
-  }) {
-    final colors = context.appColors;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        child: Row(
-          children: [
-            IconTile(
-              icon: icon,
-              size: 38,
-              iconColor: color ?? colors.textSecondary,
-              background: color != null ? color.withValues(alpha: 0.08) : null,
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              child: Text(label, style: AppTypography.bodyLarge(color ?? colors.textPrimary).copyWith(fontSize: 14)),
-            ),
-            Icon(Icons.chevron_right_outlined, color: colors.textMuted, size: 20),
-          ],
-        ),
-      ),
-    );
-  }
-
   Future<void> _openDoctorReviews(BuildContext context) async {
     final uid = _uid;
     if (uid == null) return;
     final reviews = await DoctorRepository.watchReviews(uid).first;
     if (!mounted) return;
-    context.push('/reviews', extra: {'title': 'Doctor Reviews', 'reviews': reviews});
+    context.push(
+      '/reviews',
+      extra: {'title': 'Doctor Reviews', 'reviews': reviews},
+    );
   }
 
   void _showEditProfileSheet() {
@@ -190,6 +135,7 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       builder: (ctx) {
         return StatefulBuilder(
           builder: (context, setSheetState) {
@@ -205,34 +151,36 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('Edit Doctor Profile', style: AppTypography.headingSmall(colors.textPrimary)),
-                        IconButton(
-                          icon: Icon(Icons.close_outlined, color: colors.textMuted),
-                          onPressed: () => Navigator.pop(ctx),
-                        ),
-                      ],
+                    SheetHeader(
+                      title: 'Edit profile',
+                      onClose: () => Navigator.pop(ctx),
                     ),
-                    const SizedBox(height: AppSpacing.sm),
+                    const SizedBox(height: AppSpacing.md),
 
                     // Re-verification warning alert
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         color: AppColors.amber.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                        borderRadius: BorderRadius.circular(
+                          AppSpacing.radiusMd,
+                        ),
                       ),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(Icons.info_outline, color: AppColors.amber, size: 20),
+                          const Icon(
+                            Icons.info_outline,
+                            color: AppColors.amber,
+                            size: 20,
+                          ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               'Important: Modifying your registered name or primary qualifications will reset your verified status and trigger an automated re-verification check.',
-                              style: AppTypography.bodySmall(colors.textPrimary),
+                              style: AppTypography.bodySmall(
+                                colors.textPrimary,
+                              ),
                             ),
                           ),
                         ],
@@ -242,23 +190,44 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
 
                     AppTextField(label: 'Full name', controller: nameCtrl),
                     const SizedBox(height: AppSpacing.md),
-                    AppTextField(label: 'Medical council', controller: councilCtrl, hintText: 'e.g. Tamil Nadu Medical Council'),
+                    AppTextField(
+                      label: 'Medical council',
+                      controller: councilCtrl,
+                      hintText: 'e.g. Tamil Nadu Medical Council',
+                    ),
                     const SizedBox(height: AppSpacing.md),
-                    AppTextField(label: 'Council registration number', controller: regNoCtrl, hintText: 'e.g. TNMC/98234'),
+                    AppTextField(
+                      label: 'Council registration number',
+                      controller: regNoCtrl,
+                      hintText: 'e.g. TNMC/98234',
+                    ),
                     const SizedBox(height: AppSpacing.md),
                     AppTextField(label: 'Qualifications', controller: qualCtrl),
                     const SizedBox(height: AppSpacing.md),
-                    Text('Primary specialty', style: AppTypography.labelBold(colors.textSecondary)),
+                    Text(
+                      'Primary specialty',
+                      style: AppTypography.labelBold(colors.textSecondary),
+                    ),
                     const SizedBox(height: 6),
                     DropdownButtonFormField<String>(
                       value: selectedSpec,
                       dropdownColor: colors.surface,
                       borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                      icon: Icon(Icons.expand_more_outlined, color: colors.textMuted),
-                      style: AppTypography.bodyLarge(colors.textPrimary).copyWith(fontSize: 14),
+                      icon: Icon(
+                        Icons.expand_more_outlined,
+                        color: colors.textMuted,
+                      ),
+                      style: AppTypography.bodyLarge(
+                        colors.textPrimary,
+                      ).copyWith(fontSize: 14),
                       decoration: const InputDecoration(),
-                      items: AppConstants.specialties.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
-                      onChanged: (val) => setSheetState(() => selectedSpec = val!),
+                      items: AppConstants.specialties
+                          .map(
+                            (s) => DropdownMenuItem(value: s, child: Text(s)),
+                          )
+                          .toList(),
+                      onChanged: (val) =>
+                          setSheetState(() => selectedSpec = val!),
                     ),
                     const SizedBox(height: AppSpacing.md),
                     AppTextField(
@@ -280,11 +249,17 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
                     ),
                     const SizedBox(height: AppSpacing.lg),
                     AppButton(
-                      label: 'Save Profile Changes',
+                      label: 'Save changes',
                       onPressed: () async {
-                        final qualChanged = qualCtrl.text.trim() != _qualifications;
+                        final qualChanged =
+                            qualCtrl.text.trim() != _qualifications;
                         final nameChanged = nameCtrl.text.trim() != _fullName;
-                        final cities = hubsCtrl.text.trim().split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+                        final cities = hubsCtrl.text
+                            .trim()
+                            .split(',')
+                            .map((s) => s.trim())
+                            .where((s) => s.isNotEmpty)
+                            .toList();
                         Navigator.pop(ctx);
                         try {
                           await DoctorRepository.saveProfile(
@@ -294,7 +269,9 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
                             qualification: qualCtrl.text.trim(),
                             primarySpecialty: selectedSpec,
                             preferredCities: cities.isNotEmpty ? cities : [''],
-                            yearsOfExperience: int.tryParse(expCtrl.text.trim()) ?? _experienceYears,
+                            yearsOfExperience:
+                                int.tryParse(expCtrl.text.trim()) ??
+                                _experienceYears,
                             bio: bioCtrl.text.trim(),
                           );
                           if (mounted) {
@@ -304,24 +281,37 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
                               _registrationNo = regNoCtrl.text.trim();
                               _qualifications = qualCtrl.text.trim();
                               _primarySpecialty = selectedSpec;
-                              _experienceYears = int.tryParse(expCtrl.text.trim()) ?? _experienceYears;
+                              _experienceYears =
+                                  int.tryParse(expCtrl.text.trim()) ??
+                                  _experienceYears;
                               _preferredHubs = hubsCtrl.text.trim();
                               _bio = bioCtrl.text.trim();
-                              if (qualChanged || nameChanged) _isVerified = false;
+                              if (qualChanged || nameChanged) {
+                                _isVerified = false;
+                              }
                             });
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                backgroundColor: qualChanged || nameChanged ? AppColors.amber : AppColors.emerald,
-                                content: Text(qualChanged || nameChanged
-                                    ? 'Credential change detected. Re-verification required.'
-                                    : 'Doctor profile updated successfully.'),
+                                backgroundColor: qualChanged || nameChanged
+                                    ? AppColors.amber
+                                    : AppColors.emerald,
+                                content: Text(
+                                  qualChanged || nameChanged
+                                      ? 'Credential change detected. Re-verification required.'
+                                      : 'Doctor profile updated successfully.',
+                                ),
                               ),
                             );
                           }
                         } catch (_) {
                           if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(backgroundColor: AppColors.rose, content: Text('Could not save profile. Try again.')),
+                              const SnackBar(
+                                backgroundColor: AppColors.rose,
+                                content: Text(
+                                  'Could not save profile. Try again.',
+                                ),
+                              ),
                             );
                           }
                         }
@@ -343,6 +333,7 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
     final colors = context.appColors;
     final loc = ref.watch(localizationProvider);
     final statusColor = _isVerified ? AppColors.emerald : AppColors.amber;
+    final completion = (_profileCompletion * 100).round();
 
     return Scaffold(
       backgroundColor: colors.bg,
@@ -355,7 +346,7 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.translate_outlined),
-            tooltip: 'Language Navigation',
+            tooltip: 'Language',
             onPressed: () => LanguageSelectorDialog.show(context),
           ),
           IconButton(
@@ -369,197 +360,174 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
       body: SafeArea(
         bottom: false,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(AppSpacing.gutter, 8, AppSpacing.gutter, AppSpacing.navBarClearance),
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.gutter,
+            8,
+            AppSpacing.gutter,
+            AppSpacing.navBarClearance,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Doctor Header Card
-              AppCard(
-                padding: const EdgeInsets.all(AppSpacing.lg - 4),
-                child: Column(
-                  children: [
-                    Row(
+              // Identity
+              Row(
+                children: [
+                  InitialsAvatar(name: _fullName, size: 64, fallback: 'Dr'),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          width: 64,
-                          height: 64,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: colors.accentSoft,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: colors.surface, width: 3),
-                            boxShadow: AppShadows.subtle(colors),
-                          ),
-                          child: Text(_initials, style: AppTypography.headingMedium(colors.accent)),
-                        ),
-                        const SizedBox(width: AppSpacing.md),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Flexible(
-                                    child: Text(
-                                      _fullName,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: AppTypography.headingMedium(colors.textPrimary),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Icon(
-                                    _isVerified ? Icons.verified_outlined : Icons.pending_outlined,
-                                    color: statusColor,
-                                    size: 18,
-                                  ),
-                                ],
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                _fullName.isEmpty ? 'Your name' : _fullName,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTypography.headingLarge(
+                                  colors.textPrimary,
+                                ).copyWith(fontSize: 20),
                               ),
-                              const SizedBox(height: 2),
-                              Text(_qualifications, style: AppTypography.bodyMedium(colors.accent).copyWith(fontWeight: FontWeight.w500)),
-                              Text('$_experienceYears Years Clinical Experience', style: AppTypography.bodySmall(colors.textSecondary)),
+                            ),
+                            if (_isVerified) ...[
+                              const SizedBox(width: 6),
+                              const VerifiedMark(size: 17),
                             ],
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        if (_qualifications.isNotEmpty)
+                          Text(
+                            _qualifications,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTypography.bodyMedium(
+                              colors.textSecondary,
+                            ).copyWith(fontSize: 14),
                           ),
+                        Text(
+                          '$_experienceYears ${_experienceYears == 1 ? 'year' : 'years'} clinical experience',
+                          style: AppTypography.bodySmall(colors.textSecondary),
                         ),
                       ],
                     ),
-                    const SizedBox(height: AppSpacing.md),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        icon: const Icon(Icons.edit_outlined, size: 16),
-                        label: const Text('Edit Profile & Bio'),
-                        style: OutlinedButton.styleFrom(foregroundColor: colors.accent),
-                        onPressed: _showEditProfileSheet,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-
-              // Quick Stats
-              Row(
-                children: [
-                  Expanded(child: StatTile(icon: Icons.work_history_outlined, value: '$_experienceYears yrs', label: 'Experience')),
-                  const SizedBox(width: AppSpacing.sm),
-                  Expanded(child: StatTile(icon: Icons.medical_services_outlined, value: '${_specialtyChips.length + 1}', label: 'Specialties')),
-                  const SizedBox(width: AppSpacing.sm),
-                  Expanded(child: StatTile(icon: Icons.star_outline_outlined, value: _doctorRating.toStringAsFixed(1), label: 'Rating')),
+                  ),
                 ],
               ),
               const SizedBox(height: AppSpacing.md),
+              AppSecondaryButton(
+                label: 'Edit profile',
+                icon: Icons.edit_outlined,
+                onPressed: _showEditProfileSheet,
+              ),
+              const SizedBox(height: AppSpacing.lg),
 
-              // Profile Completion
-              AppCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('Profile Strength', style: AppTypography.labelBold(colors.textPrimary)),
-                        Text(
-                          '${(_profileCompletion * 100).round()}%',
-                          style: AppTypography.labelBold(colors.accent),
-                        ),
-                      ],
+              // Verification
+              RowGroup(
+                children: [
+                  ListRow(
+                    icon: _isVerified
+                        ? Icons.verified_user_outlined
+                        : Icons.gpp_maybe_outlined,
+                    iconColor: statusColor,
+                    title: 'Council verification',
+                    subtitle: _isVerified
+                        ? '${_council.isEmpty ? 'Medical council' : _council} · Verified'
+                        : 'Pending council review / re-verification',
+                    onTap: () => context.push('/verification'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.section),
+
+              // Professional details
+              const GroupLabel('Professional details'),
+              _Rows(
+                children: [
+                  if (_council.isNotEmpty)
+                    DetailRow(label: 'Council', value: _council),
+                  if (_registrationNo.isNotEmpty)
+                    DetailRow(
+                      label: 'Registration no.',
+                      value: _registrationNo,
                     ),
-                    const SizedBox(height: 10),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(AppSpacing.radiusPill),
-                      child: LinearProgressIndicator(
-                        value: _profileCompletion,
-                        minHeight: 6,
-                        backgroundColor: colors.surfaceElevated,
-                        valueColor: AlwaysStoppedAnimation<Color>(colors.accent),
-                      ),
-                    ),
-                  ],
-                ),
+                  DetailRow(
+                    label: 'Experience',
+                    value: '$_experienceYears yrs',
+                  ),
+                  DetailRow(
+                    label: 'Rating',
+                    value: _reviewCount == 0
+                        ? 'No reviews yet'
+                        : '${_doctorRating.toStringAsFixed(1)} · $_reviewCount ${_reviewCount == 1 ? 'review' : 'reviews'}',
+                  ),
+                ],
               ),
               const SizedBox(height: AppSpacing.md),
-
-              // Verification Quick Link Card
-              AppCard(
-                onTap: () => context.push('/verification'),
-                child: Row(
-                  children: [
-                    IconTile(
-                      icon: _isVerified ? Icons.verified_user_outlined : Icons.gpp_maybe_outlined,
-                      iconColor: statusColor,
-                      background: statusColor.withValues(alpha: 0.1),
-                    ),
-                    const SizedBox(width: AppSpacing.md),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Medical Council Verification', style: AppTypography.headingSmall(colors.textPrimary).copyWith(fontSize: 14)),
-                          const SizedBox(height: 2),
-                          Text(
-                            _isVerified
-                                ? 'Tamil Nadu Medical Council • Verified'
-                                : 'Pending Council Review / Re-verification',
-                            style: AppTypography.bodySmall(statusColor).copyWith(fontWeight: FontWeight.w500),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Icon(Icons.chevron_right_outlined, color: colors.textMuted, size: 20),
-                  ],
-                ),
-              ),
-              const SizedBox(height: AppSpacing.section),
-
-              // Clinical Bio
-              const SectionHeader(title: 'Professional Summary'),
-              const SizedBox(height: AppSpacing.sm),
-              AppCard(
-                child: SizedBox(
-                  width: double.infinity,
-                  child: Text(
-                    _bio.isEmpty ? 'Add a short professional bio from Edit Profile.' : _bio,
-                    style: AppTypography.bodyMedium(_bio.isEmpty ? colors.textMuted : colors.textSecondary),
+              Row(
+                children: [
+                  Text(
+                    'Profile completeness',
+                    style: AppTypography.bodySmall(colors.textSecondary),
                   ),
+                  const Spacer(),
+                  Text(
+                    '$completion%',
+                    style: AppTypography.labelBold(colors.textPrimary),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(AppSpacing.radiusPill),
+                child: LinearProgressIndicator(
+                  value: _profileCompletion,
+                  minHeight: 4,
+                  backgroundColor: colors.surfaceElevated,
+                  valueColor: AlwaysStoppedAnimation<Color>(colors.accent),
                 ),
               ),
               const SizedBox(height: AppSpacing.section),
 
-              // Specialty Areas
-              const SectionHeader(title: 'Clinical Specialties'),
-              const SizedBox(height: AppSpacing.sm),
+              // About
+              const GroupLabel('About'),
+              Text(
+                _bio.isEmpty
+                    ? 'Add a short professional bio from Edit profile.'
+                    : _bio,
+                style: AppTypography.bodyMedium(
+                  _bio.isEmpty ? colors.textMuted : colors.textPrimary,
+                ).copyWith(fontSize: 14),
+              ),
+              const SizedBox(height: AppSpacing.section),
+
+              // Specialties
+              const GroupLabel('Specialties'),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  InfoChip(icon: Icons.medical_services_outlined, label: _primarySpecialty, color: colors.accent),
+                  _PrimaryChip(label: _primarySpecialty),
                   ..._specialtyChips.map(
-                    (specialty) => InfoChip(icon: Icons.local_offer_outlined, label: specialty),
+                    (specialty) => InfoChip(label: specialty),
                   ),
                 ],
               ),
               const SizedBox(height: AppSpacing.section),
 
-              // Preferred Hubs
-              const SectionHeader(title: 'Preferred Work Hubs'),
-              const SizedBox(height: AppSpacing.sm),
-              AppCard(
-                child: Row(
-                  children: [
-                    const IconTile(icon: Icons.location_on_outlined, size: 38),
-                    const SizedBox(width: AppSpacing.sm),
-                    Expanded(
-                      child: Text(
-                        _preferredHubs.isEmpty ? '—' : _preferredHubs,
-                        style: AppTypography.bodyLarge(colors.textPrimary).copyWith(fontSize: 14),
-                      ),
-                    ),
-                  ],
-                ),
+              // Work preferences
+              const GroupLabel('Work preferences'),
+              _Rows(
+                children: [
+                  DetailRow(
+                    label: 'Preferred hubs',
+                    value: _preferredHubs.isEmpty ? '—' : _preferredHubs,
+                  ),
+                ],
               ),
               const SizedBox(height: AppSpacing.section),
 
-              // My Duties — real assignments from Firestore
+              // My assignments — real assignments from Firestore
               StreamBuilder<List<Map<String, dynamic>>>(
                 stream: DoctorRepository.watchAssignments(),
                 builder: (context, snap) {
@@ -569,119 +537,157 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       SectionHeader(
-                        title: 'My Assignments',
-                        actionLabel: 'View all',
+                        title: 'My assignments',
+                        actionLabel: 'See all',
                         onAction: () => context.go('/messages'),
                       ),
-                      const SizedBox(height: AppSpacing.sm),
-                      ...assignments.take(3).map((asg) => Padding(
-                        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                        child: AppCard(
-                          child: Row(
-                            children: [
-                              const IconTile(icon: Icons.local_hospital_outlined, size: 40),
-                              const SizedBox(width: AppSpacing.sm),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(asg['facilityName'] as String, style: AppTypography.headingSmall(colors.textPrimary).copyWith(fontSize: 14), overflow: TextOverflow.ellipsis),
-                                    const SizedBox(height: 2),
-                                    Text('${asg['specialtyName']} • ${asg['startAt']}', style: AppTypography.bodySmall(colors.textSecondary), overflow: TextOverflow.ellipsis),
-                                  ],
-                                ),
+                      const SizedBox(height: 4),
+                      _Rows(
+                        children: [
+                          for (final asg in assignments.take(3))
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          asg['facilityName'] as String? ?? '—',
+                                          style: AppTypography.headingSmall(
+                                            colors.textPrimary,
+                                          ).copyWith(fontSize: 14),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          '${asg['specialtyName']} · ${asg['startAt']}',
+                                          style: AppTypography.bodySmall(
+                                            colors.textSecondary,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: AppSpacing.sm),
+                                  StatusBadge(
+                                    status: asg['status'] as String? ?? '',
+                                  ),
+                                ],
                               ),
-                              const SizedBox(width: AppSpacing.xs),
-                              StatusBadge(status: asg['status'] as String),
-                            ],
-                          ),
-                        ),
-                      )),
-                      const SizedBox(height: AppSpacing.section - AppSpacing.sm),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.section),
                     ],
                   );
                 },
               ),
 
-              // Hospital / Clinic
-              const SectionHeader(title: 'Hospital / Clinic'),
-              const SizedBox(height: AppSpacing.sm),
-              AppCard(
-                onTap: () => context.push('/hospital-info'),
-                child: Row(
-                  children: [
-                    const IconTile(icon: Icons.local_hospital_outlined),
-                    const SizedBox(width: AppSpacing.md),
-                    Expanded(
-                      child: Text(
-                        'My Hospital / Clinic',
-                        style: AppTypography.headingSmall(colors.textPrimary).copyWith(fontSize: 14),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    Icon(Icons.chevron_right_outlined, color: colors.textMuted, size: 20),
-                  ],
-                ),
-              ),
-              const SizedBox(height: AppSpacing.section),
-
-              // Reviews
-              const SectionHeader(title: 'Reviews'),
-              const SizedBox(height: AppSpacing.sm),
-              Row(
+              // Reviews and workplace
+              const GroupLabel('Reviews & workplace'),
+              RowGroup(
                 children: [
-                  Expanded(
-                    child: _buildReviewLinkCard(
-                      title: 'Doctor Reviews',
-                      rating: _doctorRating,
-                      count: _reviewCount,
-                      onTap: () => _openDoctorReviews(context),
-                    ),
+                  ListRow(
+                    icon: Icons.star_outline_rounded,
+                    title: 'Doctor reviews',
+                    subtitle: _reviewCount == 0
+                        ? 'No reviews yet'
+                        : '${_doctorRating.toStringAsFixed(1)} average · $_reviewCount ${_reviewCount == 1 ? 'review' : 'reviews'}',
+                    onTap: () => _openDoctorReviews(context),
                   ),
-                  const SizedBox(width: AppSpacing.sm),
-                  Expanded(
-                    child: _buildReviewLinkCard(
-                      title: 'Hospital Reviews',
-                      rating: 0.0,
-                      count: 0,
-                      onTap: () => context.push('/reviews', extra: {
+                  ListRow(
+                    icon: Icons.reviews_outlined,
+                    title: 'Hospital reviews',
+                    onTap: () => context.push(
+                      '/reviews',
+                      extra: {
                         'title': 'Hospital Reviews',
                         'reviews': <Map<String, dynamic>>[],
-                      }),
+                      },
                     ),
+                  ),
+                  ListRow(
+                    icon: Icons.local_hospital_outlined,
+                    title: 'My hospital / clinic',
+                    onTap: () => context.push('/hospital-info'),
                   ),
                 ],
               ),
               const SizedBox(height: AppSpacing.section),
 
               // Account
-              const SectionHeader(title: 'Account'),
-              const SizedBox(height: AppSpacing.sm),
-              AppCard(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 4),
-                child: Column(
-                  children: [
-                    _buildAccountTile(
-                      icon: Icons.settings_outlined,
-                      label: 'Settings',
-                      onTap: () => context.push('/settings'),
-                    ),
-                    const Divider(),
-                    _buildAccountTile(
-                      icon: Icons.logout_outlined,
-                      label: 'Logout',
-                      color: AppColors.rose,
-                      onTap: () async {
-                        await AuthRepository().signOut();
-                        if (context.mounted) context.go('/login');
-                      },
-                    ),
-                  ],
-                ),
+              const GroupLabel('Account'),
+              RowGroup(
+                children: [
+                  ListRow(
+                    icon: Icons.settings_outlined,
+                    title: 'Settings',
+                    onTap: () => context.push('/settings'),
+                  ),
+                  ListRow(
+                    icon: Icons.logout_outlined,
+                    title: 'Log out',
+                    color: AppColors.rose,
+                    trailing: const SizedBox.shrink(),
+                    onTap: () async {
+                      await AuthRepository().signOut();
+                      if (context.mounted) context.go('/login');
+                    },
+                  ),
+                ],
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Label/value rows on the canvas separated by hairline dividers.
+class _Rows extends StatelessWidget {
+  final List<Widget> children;
+
+  const _Rows({required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    return Column(
+      children: [
+        for (var i = 0; i < children.length; i++) ...[
+          if (i > 0) Divider(height: 1, color: colors.border),
+          children[i],
+        ],
+      ],
+    );
+  }
+}
+
+/// Primary specialty: the one filled chip in the specialties list.
+class _PrimaryChip extends StatelessWidget {
+  final String label;
+
+  const _PrimaryChip({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: colors.accent,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusPill),
+      ),
+      child: Text(
+        label,
+        style: AppTypography.bodySmall(
+          colors.onAccent,
+        ).copyWith(fontWeight: FontWeight.w600),
       ),
     );
   }

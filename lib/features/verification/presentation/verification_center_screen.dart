@@ -41,7 +41,8 @@ class _VerificationCenterScreenState
 
   String _caseStatus = 'loading';
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _caseSubscription;
-  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _evidenceSubscription;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
+  _evidenceSubscription;
   bool _isChecking = false;
   bool _isSubmitting = false;
   bool _isUploading = false;
@@ -61,7 +62,11 @@ class _VerificationCenterScreenState
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not submit this case. Complete your profile and try again.')),
+          const SnackBar(
+            content: Text(
+              'Could not submit this case. Complete your profile and try again.',
+            ),
+          ),
         );
       }
     } finally {
@@ -83,13 +88,16 @@ class _VerificationCenterScreenState
           .collection('verificationCases')
           .doc(caseId)
           .snapshots()
-          .listen((snapshot) {
-            if (!mounted) return;
-            final status = snapshot.data()?['status'] as String?;
-            setState(() => _caseStatus = status ?? 'not_started');
-          }, onError: (_) {
-            if (mounted) setState(() => _caseStatus = 'unavailable');
-          });
+          .listen(
+            (snapshot) {
+              if (!mounted) return;
+              final status = snapshot.data()?['status'] as String?;
+              setState(() => _caseStatus = status ?? 'not_started');
+            },
+            onError: (_) {
+              if (mounted) setState(() => _caseStatus = 'unavailable');
+            },
+          );
       final uid = FirebaseAuth.instance.currentUser?.uid;
       if (uid != null) {
         _evidenceSubscription = FirebaseFirestore.instance
@@ -105,7 +113,8 @@ class _VerificationCenterScreenState
                     final data = doc.data();
                     return <String, dynamic>{
                       'fileName': 'Evidence ${doc.id.substring(0, 8)}',
-                      'size': '${((data['sizeBytes'] as num? ?? 0) / 1024).round()} KB',
+                      'size':
+                          '${((data['sizeBytes'] as num? ?? 0) / 1024).round()} KB',
                       'scanStatus': data['scanStatus'] ?? 'pending',
                     };
                   })
@@ -166,10 +175,7 @@ class _VerificationCenterScreenState
             : 'Your registration check was recorded for reviewer assessment.';
 
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: AppColors.amber,
-            content: Text(message),
-          ),
+          SnackBar(backgroundColor: AppColors.amber, content: Text(message)),
         );
       }
     } catch (_) {
@@ -205,7 +211,9 @@ class _VerificationCenterScreenState
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               backgroundColor: AppColors.emerald,
-              content: Text('Document uploaded. Security screening is pending.'),
+              content: Text(
+                'Document uploaded. Security screening is pending.',
+              ),
             ),
           );
         }
@@ -267,14 +275,14 @@ class _VerificationCenterScreenState
                       _caseStatus == 'approved'
                           ? 'An authorized reviewer approved this verification case.'
                           : _caseStatus == 'needs_information'
-                              ? 'A reviewer needs more information. Please upload the requested proof.'
-                              : _caseStatus == 'under_review'
-                                  ? 'Your case is waiting for an authorized reviewer to check the official source.'
-                                  : _caseStatus == 'loading'
-                                      ? 'Loading your current verification case.'
-                                      : _caseStatus == 'unavailable'
-                                          ? 'Verification status is temporarily unavailable. Please try again.'
-                                          : 'Complete your doctor profile and submit your evidence for review.',
+                          ? 'A reviewer needs more information. Please upload the requested proof.'
+                          : _caseStatus == 'under_review'
+                          ? 'Your case is waiting for an authorized reviewer to check the official source.'
+                          : _caseStatus == 'loading'
+                          ? 'Loading your current verification case.'
+                          : _caseStatus == 'unavailable'
+                          ? 'Verification status is temporarily unavailable. Please try again.'
+                          : 'Complete your doctor profile and submit your evidence for review.',
                       style: AppTypography.bodyMedium(colors.textSecondary),
                     ),
                   ],
@@ -301,7 +309,7 @@ class _VerificationCenterScreenState
                       value: _selectedCouncil,
                       isExpanded: true,
                       dropdownColor: colors.surface,
-                                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                       style: AppTypography.bodyLarge(colors.textPrimary),
                       decoration: InputDecoration(
                         filled: true,
@@ -341,7 +349,8 @@ class _VerificationCenterScreenState
                       controller: _qualificationController,
                     ),
                     const SizedBox(height: AppSpacing.lg),
-                    if (_caseStatus == 'draft' || _caseStatus == 'needs_information') ...[
+                    if (_caseStatus == 'draft' ||
+                        _caseStatus == 'needs_information') ...[
                       AppButton(
                         label: 'Submit Case for Review',
                         isLoading: _isSubmitting,
@@ -354,7 +363,12 @@ class _VerificationCenterScreenState
                       label: 'Request Registration Review',
                       isLoading: _isChecking,
                       icon: Icons.verified_user_outlined,
-                      onPressed: ['submitted', 'under_review', 'needs_information'].contains(_caseStatus)
+                      onPressed:
+                          [
+                            'submitted',
+                            'under_review',
+                            'needs_information',
+                          ].contains(_caseStatus)
                           ? _runVerificationCheck
                           : null,
                     ),
@@ -366,7 +380,7 @@ class _VerificationCenterScreenState
               // Side-by-Side Comparison Card
               if (_lastResult != null) ...[
                 Text(
-                'Verification Review Result',
+                  'Verification Review Result',
                   style: AppTypography.headingSmall(colors.textPrimary),
                 ),
                 const SizedBox(height: AppSpacing.xs),
@@ -486,7 +500,7 @@ class _VerificationCenterScreenState
                                 child: Text(
                                   cmp.official,
                                   style: AppTypography.bodySmall(
-                                    AppColors.primaryLight,
+                                    colors.textSecondary,
                                   ),
                                 ),
                               ),
@@ -517,10 +531,10 @@ class _VerificationCenterScreenState
                   return AppCard(
                     child: Row(
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.description_outlined,
-                          color: AppColors.primary,
-                          size: 28,
+                          color: colors.textSecondary,
+                          size: 24,
                         ),
                         const SizedBox(width: AppSpacing.sm),
                         Expanded(
@@ -566,7 +580,11 @@ class _VerificationCenterScreenState
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.support_agent_outlined, size: 16, color: colors.textMuted),
+                  Icon(
+                    Icons.support_agent_outlined,
+                    size: 16,
+                    color: colors.textMuted,
+                  ),
                   const SizedBox(width: 6),
                   Flexible(
                     child: Text(

@@ -9,14 +9,25 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppTypography {
-  /// Large page titles and greetings.
+  /// Large page headlines (Home headline, Duty Details pay).
   static TextStyle display(Color color) => GoogleFonts.plusJakartaSans(
-    fontSize: 26,
+    fontSize: 30,
     fontWeight: FontWeight.w700,
-    letterSpacing: -0.6,
-    height: 1.2,
+    letterSpacing: -1.0,
+    height: 1.12,
     color: color,
   );
+
+  /// Money and other figures: tabular digits so columns of amounts align.
+  static TextStyle amount(Color color, {double fontSize = 17}) =>
+      GoogleFonts.plusJakartaSans(
+        fontSize: fontSize,
+        fontWeight: FontWeight.w700,
+        letterSpacing: fontSize >= 30 ? -1.6 : -0.3,
+        height: 1.1,
+        color: color,
+        fontFeatures: const [FontFeature.tabularFigures()],
+      );
 
   /// Page titles.
   static TextStyle headingLarge(Color color) => GoogleFonts.plusJakartaSans(

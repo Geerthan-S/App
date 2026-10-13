@@ -14,9 +14,7 @@ class ChatScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: colors.bg,
-      appBar: AppBar(
-        title: Text(hospitalName),
-      ),
+      appBar: AppBar(title: Text(hospitalName)),
       body: SafeArea(
         child: Center(
           child: Padding(
@@ -28,15 +26,20 @@ class ChatScreen extends StatelessWidget {
                   width: 76,
                   height: 76,
                   decoration: BoxDecoration(
-                    color: colors.surface,
+                    color: colors.surfaceElevated,
                     shape: BoxShape.circle,
-                    border: Border.all(color: colors.border),
-                    boxShadow: AppShadows.soft(colors),
                   ),
-                  child: Icon(Icons.chat_bubble_outline_outlined, size: 32, color: colors.accent),
+                  child: Icon(
+                    Icons.chat_bubble_outline_outlined,
+                    size: 32,
+                    color: colors.accent,
+                  ),
                 ),
                 const SizedBox(height: AppSpacing.md),
-                Text('Direct Messaging Coming Soon', style: AppTypography.headingSmall(colors.textPrimary)),
+                Text(
+                  'Direct Messaging Coming Soon',
+                  style: AppTypography.headingSmall(colors.textPrimary),
+                ),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
                   'Real-time chat between doctors and hospitals will be available in a future update. '

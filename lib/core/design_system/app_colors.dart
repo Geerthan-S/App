@@ -1,56 +1,53 @@
 /**
- * Design System — Curated Healthcare Color Palette
+ * Design System — Warm Neutral Palette
  *
- * Light, minimal medical palette: off-white canvas, white cards, charcoal
- * text and a single restrained blue accent. Blue is reserved for primary
- * actions, selected navigation, links and key highlights — never large
- * saturated surfaces.
+ * Warm off-white canvas, white surfaces, near-black ink for primary actions
+ * and the one hero surface per screen, and a lime highlight used sparingly
+ * (selected status tags, the most urgent item). Status colors are muted so
+ * they read as information rather than decoration.
  */
 
 import 'package:flutter/material.dart';
 
 class AppColors {
-  // Brand & Accents
-  static const Color primary = Color(0xFF356AE6);        // Medical Blue (primary accent)
-  static const Color primaryDark = Color(0xFF2A56C2);
-  static const Color primaryLight = Color(0xFF5B88EE);   // Readable lighter accent (icons, links)
-  static const Color primarySoft = Color(0xFFEBF0FC);    // Tinted chip / selected background
+  // Brand
+  static const Color ink = Color(0xFF15171B); // Primary actions, hero surfaces
+  static const Color lime = Color(0xFFD6F25E); // Sparing highlight
+  static const Color onLime = Color(0xFF15171B);
 
-  static const Color teal = Color(0xFF2A9D8F);           // Clinical Teal (secondary)
-  static const Color emerald = Color(0xFF24A879);        // Success / Verified
-  static const Color amber = Color(0xFFE8A23A);          // Warning / Pending
-  static const Color rose = Color(0xFFD9534F);           // Error / Rejected
+  // Status
+  static const Color emerald = Color(0xFF1F8A5B); // Success / Verified
+  static const Color amber = Color(0xFFB7791F); // Warning / Pending / Scarcity
+  static const Color rose = Color(0xFFD64545); // Error / Rejected
 
   // Dark Theme Surfaces (optional theme — light is the default)
-  static const Color bgDark = Color(0xFF15171C);
-  static const Color surfaceDark = Color(0xFF1E2128);
-  static const Color surfaceElevatedDark = Color(0xFF272B33);
-  static const Color borderDark = Color(0xFF30343D);
+  static const Color bgDark = Color(0xFF121315);
+  static const Color surfaceDark = Color(0xFF1B1C1F);
+  static const Color surfaceElevatedDark = Color(0xFF25262A);
+  static const Color borderDark = Color(0xFF2E2F33);
 
   // Light Theme Surfaces
-  static const Color bgLight = Color(0xFFF7F8FA);        // Main background
-  static const Color surfaceLight = Color(0xFFFFFFFF);   // Card background
-  static const Color surfaceElevatedLight = Color(0xFFF0F3F8); // Muted icon / field background
-  static const Color borderLight = Color(0xFFE8EBF0);    // Subtle borders & dividers
+  static const Color bgLight = Color(0xFFF4F4F1); // Warm canvas
+  static const Color surfaceLight = Color(0xFFFFFFFF); // Surfaces
+  static const Color surfaceElevatedLight = Color(
+    0xFFEBEBE6,
+  ); // Muted fills (fields, avatars, tracks)
+  static const Color borderLight = Color(0xFFE4E4DF); // Hairline dividers
 
   // Text Neutral Tokens
-  static const Color textDarkPrimary = Color(0xFFF1F2F4);
-  static const Color textDarkSecondary = Color(0xFFA4A9B3);
-  static const Color textDarkMuted = Color(0xFF7D828C);
+  static const Color textDarkPrimary = Color(0xFFF2F2EE);
+  static const Color textDarkSecondary = Color(0xFFA3A5AA);
+  static const Color textDarkMuted = Color(0xFF75777D);
 
-  static const Color textLightPrimary = Color(0xFF202124); // Charcoal
-  static const Color textLightSecondary = Color(0xFF747983); // Muted gray
-  static const Color textLightMuted = Color(0xFF9CA1AA);
-
-  // Shadow tint used for soft card elevation in the light theme.
-  static const Color shadowLight = Color(0xFF1B2333);
+  static const Color textLightPrimary = Color(0xFF15171B);
+  static const Color textLightSecondary = Color(0xFF6B6E75);
+  static const Color textLightMuted = Color(0xFF9A9DA3);
 }
 
-/// Theme-aware neutral tokens (background/surface/text/accent) that flip
-/// between the light and dark palettes above. Brand/status colors
-/// (primary, teal, emerald, amber, rose) stay constant across themes and
-/// are used directly from [AppColors] — only surfaces, text, and the
-/// on-background accent shade need to adapt.
+/// Theme-aware tokens that flip between the light and dark palettes above.
+/// `accent` is the ink used for primary actions and selection (near-black in
+/// light, near-white in dark); `highlight` is the lime used sparingly. Status
+/// colors (emerald, amber, rose) stay constant and come from [AppColors].
 class AppColorsExtension extends ThemeExtension<AppColorsExtension> {
   final Color bg;
   final Color surface;
@@ -62,6 +59,8 @@ class AppColorsExtension extends ThemeExtension<AppColorsExtension> {
   final Color accent;
   final Color onAccent;
   final Color accentSoft;
+  final Color highlight;
+  final Color onHighlight;
   final Color shadow;
 
   const AppColorsExtension({
@@ -75,6 +74,8 @@ class AppColorsExtension extends ThemeExtension<AppColorsExtension> {
     required this.accent,
     required this.onAccent,
     required this.accentSoft,
+    required this.highlight,
+    required this.onHighlight,
     required this.shadow,
   });
 
@@ -86,10 +87,12 @@ class AppColorsExtension extends ThemeExtension<AppColorsExtension> {
     textPrimary: AppColors.textLightPrimary,
     textSecondary: AppColors.textLightSecondary,
     textMuted: AppColors.textLightMuted,
-    accent: AppColors.primary,
+    accent: AppColors.ink,
     onAccent: Colors.white,
-    accentSoft: AppColors.primarySoft,
-    shadow: Color(0x0F1B2333),
+    accentSoft: Color(0xFFE6E6E0),
+    highlight: AppColors.lime,
+    onHighlight: AppColors.onLime,
+    shadow: Color(0x0F15171B),
   );
 
   static const dark = AppColorsExtension(
@@ -100,12 +103,13 @@ class AppColorsExtension extends ThemeExtension<AppColorsExtension> {
     textPrimary: AppColors.textDarkPrimary,
     textSecondary: AppColors.textDarkSecondary,
     textMuted: AppColors.textDarkMuted,
-    // Lighter accent shade so the primary blue keeps proper contrast when
-    // used as bare icon/text color directly on a dark surface.
-    accent: AppColors.primaryLight,
-    onAccent: Colors.white,
-    accentSoft: Color(0xFF243150),
-    shadow: Color(0x33000000),
+    // Inverted ink: primary actions are near-white with dark labels.
+    accent: AppColors.textDarkPrimary,
+    onAccent: AppColors.ink,
+    accentSoft: Color(0xFF2A2B2F),
+    highlight: AppColors.lime,
+    onHighlight: AppColors.onLime,
+    shadow: Color(0x40000000),
   );
 
   @override
@@ -120,6 +124,8 @@ class AppColorsExtension extends ThemeExtension<AppColorsExtension> {
     Color? accent,
     Color? onAccent,
     Color? accentSoft,
+    Color? highlight,
+    Color? onHighlight,
     Color? shadow,
   }) {
     return AppColorsExtension(
@@ -133,6 +139,8 @@ class AppColorsExtension extends ThemeExtension<AppColorsExtension> {
       accent: accent ?? this.accent,
       onAccent: onAccent ?? this.onAccent,
       accentSoft: accentSoft ?? this.accentSoft,
+      highlight: highlight ?? this.highlight,
+      onHighlight: onHighlight ?? this.onHighlight,
       shadow: shadow ?? this.shadow,
     );
   }
@@ -151,6 +159,8 @@ class AppColorsExtension extends ThemeExtension<AppColorsExtension> {
       accent: Color.lerp(accent, other.accent, t)!,
       onAccent: Color.lerp(onAccent, other.onAccent, t)!,
       accentSoft: Color.lerp(accentSoft, other.accentSoft, t)!,
+      highlight: Color.lerp(highlight, other.highlight, t)!,
+      onHighlight: Color.lerp(onHighlight, other.onHighlight, t)!,
       shadow: Color.lerp(shadow, other.shadow, t)!,
     );
   }
@@ -159,5 +169,6 @@ class AppColorsExtension extends ThemeExtension<AppColorsExtension> {
 /// Convenience accessor so screens can write `context.appColors.textPrimary`
 /// instead of `Theme.of(context).extension<AppColorsExtension>()!`.
 extension AppColorsContextX on BuildContext {
-  AppColorsExtension get appColors => Theme.of(this).extension<AppColorsExtension>()!;
+  AppColorsExtension get appColors =>
+      Theme.of(this).extension<AppColorsExtension>()!;
 }

@@ -6,7 +6,7 @@ import '../../../core/design_system/app_colors.dart';
 import '../../../core/design_system/app_spacing.dart';
 import '../../../core/design_system/app_inputs.dart';
 import '../../../core/widgets/state_views.dart';
-import '../../../core/widgets/duty_post_card.dart';
+import '../../../core/widgets/duty_row.dart';
 import '../../../core/widgets/ui_kit.dart';
 import '../../../core/widgets/language_selector_dialog.dart';
 import '../../../core/localization/language_provider.dart';
@@ -16,7 +16,8 @@ class DutyMarketplaceScreen extends ConsumerStatefulWidget {
   const DutyMarketplaceScreen({super.key});
 
   @override
-  ConsumerState<DutyMarketplaceScreen> createState() => _DutyMarketplaceScreenState();
+  ConsumerState<DutyMarketplaceScreen> createState() =>
+      _DutyMarketplaceScreenState();
 }
 
 class _DutyMarketplaceScreenState extends ConsumerState<DutyMarketplaceScreen> {
@@ -55,11 +56,17 @@ class _DutyMarketplaceScreenState extends ConsumerState<DutyMarketplaceScreen> {
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(AppSpacing.gutter, 8, AppSpacing.gutter, 12),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.gutter,
+                8,
+                AppSpacing.gutter,
+                12,
+              ),
               child: AppSearchField(
                 controller: _searchController,
                 hintText: 'Search by specialty, hospital or area...',
-                onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
+                onChanged: (v) =>
+                    setState(() => _searchQuery = v.toLowerCase()),
                 showClear: _searchQuery.isNotEmpty,
                 onClear: () => setState(() {
                   _searchController.clear();
@@ -71,14 +78,19 @@ class _DutyMarketplaceScreenState extends ConsumerState<DutyMarketplaceScreen> {
               height: 42,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.gutter, vertical: 2),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.gutter,
+                  vertical: 2,
+                ),
                 itemCount: AppConstants.specialties.length + 1,
-                separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.xs),
+                separatorBuilder: (_, __) =>
+                    const SizedBox(width: AppSpacing.xs),
                 itemBuilder: (context, i) {
-                  final label = i == 0 ? 'All' : AppConstants.specialties[i - 1];
+                  final label = i == 0
+                      ? 'All'
+                      : AppConstants.specialties[i - 1];
                   return AppFilterChip(
                     label: label,
-                    icon: i == 0 ? Icons.apps_outlined : null,
                     selected: _selectedSpecialty == label,
                     onTap: () => setState(() => _selectedSpecialty = label),
                   );
@@ -89,7 +101,9 @@ class _DutyMarketplaceScreenState extends ConsumerState<DutyMarketplaceScreen> {
             Expanded(
               child: StreamBuilder<List<Map<String, dynamic>>>(
                 stream: DutyRepository.watchPublished(
-                  specialty: _selectedSpecialty == 'All' ? null : _selectedSpecialty,
+                  specialty: _selectedSpecialty == 'All'
+                      ? null
+                      : _selectedSpecialty,
                 ),
                 builder: (context, snap) {
                   if (snap.connectionState == ConnectionState.waiting) {
@@ -105,7 +119,8 @@ class _DutyMarketplaceScreenState extends ConsumerState<DutyMarketplaceScreen> {
                   var duties = snap.data ?? [];
                   if (_searchQuery.isNotEmpty) {
                     duties = duties.where((d) {
-                      final facility = (d['facilityName'] as String).toLowerCase();
+                      final facility = (d['facilityName'] as String)
+                          .toLowerCase();
                       final spec = (d['specialtyName'] as String).toLowerCase();
                       final city = (d['city'] as String).toLowerCase();
                       return facility.contains(_searchQuery) ||
@@ -117,14 +132,22 @@ class _DutyMarketplaceScreenState extends ConsumerState<DutyMarketplaceScreen> {
                     return const EmptyStateView(
                       icon: Icons.search_off_outlined,
                       title: 'No duties found',
-                      description: 'Try a different specialty or check back later.',
+                      description:
+                          'Try a different specialty or check back later.',
                     );
                   }
                   return ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(AppSpacing.gutter, 12, AppSpacing.gutter, AppSpacing.lg),
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.gutter,
+                      4,
+                      AppSpacing.gutter,
+                      AppSpacing.lg,
+                    ),
                     itemCount: duties.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.md),
-                    itemBuilder: (context, index) => DutyPostCard(duty: duties[index]),
+                    separatorBuilder: (_, __) =>
+                        Divider(height: 1, color: colors.border),
+                    itemBuilder: (context, index) =>
+                        DutyRow(duty: duties[index]),
                   );
                 },
               ),

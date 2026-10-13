@@ -9,12 +9,14 @@ import '../../../core/design_system/app_buttons.dart';
 import '../../../core/widgets/status_badge.dart';
 import '../../../core/widgets/state_views.dart';
 import '../../../core/widgets/ui_kit.dart';
-import '../../../core/design_system/app_cards.dart';
 import '../../doctor_profile/data/doctor_repository.dart';
 import '../../../core/errors/error_envelope.dart';
 
 class MessagesScreen extends StatelessWidget {
   const MessagesScreen({super.key});
+
+  static const _offerStatuses = {'selected'};
+  static const _upcomingStatuses = {'confirmed', 'in_progress'};
 
   @override
   Widget build(BuildContext context) {
@@ -28,21 +30,36 @@ class MessagesScreen extends StatelessWidget {
           stream: DoctorRepository.watchAssignments(),
           builder: (context, snap) {
             final header = Padding(
-              padding: const EdgeInsets.fromLTRB(AppSpacing.gutter, 16, AppSpacing.gutter, 4),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.gutter,
+                20,
+                AppSpacing.gutter,
+                4,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('My Duties', style: AppTypography.headingLarge(colors.textPrimary)),
+                  Text(
+                    'My Duties',
+                    style: AppTypography.display(colors.textPrimary),
+                  ),
                   const SizedBox(height: 4),
                   Text(
                     'Offers, confirmed shifts and completed duties',
-                    style: AppTypography.bodyMedium(colors.textSecondary),
+                    style: AppTypography.bodyMedium(
+                      colors.textSecondary,
+                    ).copyWith(fontSize: 14),
                   ),
                 ],
               ),
             );
             if (snap.connectionState == ConnectionState.waiting) {
-              return Column(children: [header, const Expanded(child: LoadingView())]);
+              return Column(
+                children: [
+                  header,
+                  const Expanded(child: LoadingView()),
+                ],
+              );
             }
             final assignments = snap.data ?? [];
             if (assignments.isEmpty) {
@@ -52,24 +69,66 @@ class MessagesScreen extends StatelessWidget {
                   header,
                   const Expanded(
                     child: EmptyStateView(
-                      icon: Icons.assignment_outlined,
+                      icon: Icons.event_note_outlined,
                       title: 'No active assignments',
-                      description: 'When a hospital selects you for a duty, it will appear here.',
+                      description:
+                          'When a hospital selects you for a duty, it will appear here.',
                     ),
                   ),
                 ],
               );
             }
-            return ListView.separated(
-              padding: const EdgeInsets.only(bottom: AppSpacing.navBarClearance),
-              itemCount: assignments.length + 1,
-              separatorBuilder: (_, i) => SizedBox(height: i == 0 ? AppSpacing.md : AppSpacing.sm),
-              itemBuilder: (context, index) => index == 0
-                  ? header
-                  : Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.gutter),
-                      child: _AssignmentTile(assignment: assignments[index - 1]),
+
+            final sections = <String, List<Map<String, dynamic>>>{
+              'Offers': assignments
+                  .where((a) => _offerStatuses.contains(a['status']))
+                  .toList(),
+              'Upcoming': assignments
+                  .where((a) => _upcomingStatuses.contains(a['status']))
+                  .toList(),
+              'Past': assignments
+                  .where(
+                    (a) =>
+                        !_offerStatuses.contains(a['status']) &&
+                        !_upcomingStatuses.contains(a['status']),
+                  )
+                  .toList(),
+            };
+
+            return ListView(
+              padding: const EdgeInsets.only(
+                bottom: AppSpacing.navBarClearance,
+              ),
+              children: [
+                header,
+                for (final entry in sections.entries)
+                  if (entry.value.isNotEmpty) ...[
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.gutter,
+                        AppSpacing.section,
+                        AppSpacing.gutter,
+                        4,
+                      ),
+                      child: SectionHeader(title: entry.key),
                     ),
+                    for (var i = 0; i < entry.value.length; i++)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.gutter,
+                        ),
+                        child: Column(
+                          children: [
+                            if (i > 0) Divider(height: 1, color: colors.border),
+                            _AssignmentTile(
+                              key: ValueKey(entry.value[i]['assignmentId']),
+                              assignment: entry.value[i],
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+              ],
             );
           },
         ),
@@ -80,7 +139,7 @@ class MessagesScreen extends StatelessWidget {
 
 class _AssignmentTile extends StatefulWidget {
   final Map<String, dynamic> assignment;
-  const _AssignmentTile({required this.assignment});
+  const _AssignmentTile({super.key, required this.assignment});
 
   @override
   State<_AssignmentTile> createState() => _AssignmentTileState();
@@ -98,7 +157,9 @@ class _AssignmentTileState extends State<_AssignmentTile> {
     try {
       final diff = DateTime.parse(exp).toLocal().difference(DateTime.now());
       if (diff.isNegative) return 'Offer expired';
-      if (diff.inHours > 0) return 'Expires in ${diff.inHours}h ${diff.inMinutes % 60}m';
+      if (diff.inHours > 0) {
+        return 'Expires in ${diff.inHours}h ${diff.inMinutes % 60}m';
+      }
       return 'Expires in ${diff.inMinutes}m';
     } catch (_) {
       return null;
@@ -149,7 +210,10 @@ class _AssignmentTileState extends State<_AssignmentTile> {
       builder: (ctx) {
         final colors = ctx.appColors;
         return AlertDialog(
-          title: Text('Decline Offer?', style: AppTypography.headingSmall(colors.textPrimary)),
+          title: Text(
+            'Decline Offer?',
+            style: AppTypography.headingSmall(colors.textPrimary),
+          ),
           content: Text(
             'Are you sure you want to decline this duty offer? This cannot be undone.',
             style: AppTypography.bodyMedium(colors.textSecondary),
@@ -157,10 +221,16 @@ class _AssignmentTileState extends State<_AssignmentTile> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: Text('Keep Offer', style: TextStyle(color: colors.textMuted)),
+              child: Text(
+                'Keep Offer',
+                style: TextStyle(color: colors.textMuted),
+              ),
             ),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.rose, foregroundColor: Colors.white),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.rose,
+                foregroundColor: Colors.white,
+              ),
               onPressed: () => Navigator.pop(ctx, true),
               child: const Text('Decline'),
             ),
@@ -176,9 +246,9 @@ class _AssignmentTileState extends State<_AssignmentTile> {
         widget.assignment['assignmentId'] as String,
       );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Offer declined.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Offer declined.')));
       }
     } on FirebaseFunctionsException catch (e) {
       if (mounted) {
@@ -213,13 +283,7 @@ class _AssignmentTileState extends State<_AssignmentTile> {
       await showDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: Row(
-            children: [
-              const IconTile(icon: Icons.contact_phone_outlined, size: 36),
-              const SizedBox(width: 8),
-              Text('Hospital Contact', style: AppTypography.headingSmall(colors.textPrimary)),
-            ],
-          ),
+          title: const Text('Hospital contact'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -232,7 +296,11 @@ class _AssignmentTileState extends State<_AssignmentTile> {
               if ((contact['phone'] as String? ?? '').isNotEmpty) ...[
                 Row(
                   children: [
-                    Icon(Icons.phone_outlined, size: 14, color: colors.textMuted),
+                    Icon(
+                      Icons.phone_outlined,
+                      size: 14,
+                      color: colors.textMuted,
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       contact['phone'] as String,
@@ -246,7 +314,11 @@ class _AssignmentTileState extends State<_AssignmentTile> {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.location_on_outlined, size: 14, color: colors.textMuted),
+                    Icon(
+                      Icons.location_on_outlined,
+                      size: 14,
+                      color: colors.textMuted,
+                    ),
                     const SizedBox(width: 4),
                     Expanded(
                       child: Text(
@@ -291,138 +363,146 @@ class _AssignmentTileState extends State<_AssignmentTile> {
     final commentCtrl = TextEditingController();
     int selectedRating = 0;
     bool submitting = false;
-    final colors = context.appColors;
-
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      builder: (ctx) => StatefulBuilder(builder: (bCtx, setSheet) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: AppSpacing.gutter,
-            right: AppSpacing.gutter,
-            top: 0,
-            bottom: MediaQuery.of(bCtx).viewInsets.bottom + 20,
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Review Hospital',
-                  style: AppTypography.headingSmall(colors.textPrimary),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'How was your experience at ${widget.assignment['facilityName']}?',
-                  style: AppTypography.bodySmall(colors.textMuted),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(
-                    5,
-                    (i) => IconButton(
-                      icon: Icon(
-                        i < selectedRating
-                            ? Icons.star_rounded
-                            : Icons.star_border_rounded,
-                        color: AppColors.amber,
-                        size: 36,
+      useSafeArea: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (bCtx, setSheet) {
+          return Padding(
+            padding: EdgeInsets.only(
+              left: AppSpacing.gutter,
+              right: AppSpacing.gutter,
+              top: 0,
+              bottom: MediaQuery.of(bCtx).viewInsets.bottom + 20,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SheetHeader(
+                    title: 'Review hospital',
+                    subtitle:
+                        'How was your experience at ${widget.assignment['facilityName']}?',
+                    onClose: () => Navigator.pop(ctx),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(
+                      5,
+                      (i) => IconButton(
+                        tooltip: i == 0 ? '1 star' : '${i + 1} stars',
+                        icon: Icon(
+                          i < selectedRating
+                              ? Icons.star_rounded
+                              : Icons.star_border_rounded,
+                          color: AppColors.amber,
+                          size: 36,
+                        ),
+                        onPressed: () => setSheet(() => selectedRating = i + 1),
                       ),
-                      onPressed: () => setSheet(() => selectedRating = i + 1),
                     ),
                   ),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                TextField(
-                  controller: commentCtrl,
-                  maxLines: 3,
-                  maxLength: 500,
-                  decoration: const InputDecoration(
-                    hintText: 'Share your experience at this hospital...',
+                  const SizedBox(height: AppSpacing.sm),
+                  TextField(
+                    controller: commentCtrl,
+                    maxLines: 3,
+                    maxLength: 500,
+                    decoration: const InputDecoration(
+                      hintText: 'Share your experience at this hospital...',
+                    ),
                   ),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                AppButton(
-                  label: 'Submit Review',
-                  isLoading: submitting,
-                  onPressed: selectedRating > 0
-                      ? () async {
-                          if (commentCtrl.text.trim().isEmpty) return;
-                          setSheet(() => submitting = true);
-                          try {
-                            await DoctorRepository.submitReview(
-                              targetId: widget.assignment['organizationId'] as String,
-                              targetType: 'organization',
-                              assignmentId: widget.assignment['assignmentId'] as String,
-                              rating: selectedRating,
-                              comment: commentCtrl.text.trim(),
-                            );
-                            if (ctx.mounted) Navigator.pop(ctx);
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  backgroundColor: AppColors.emerald,
-                                  content: Text('Review submitted successfully.'),
-                                ),
+                  const SizedBox(height: AppSpacing.md),
+                  AppButton(
+                    label: 'Submit Review',
+                    isLoading: submitting,
+                    onPressed: selectedRating > 0
+                        ? () async {
+                            if (commentCtrl.text.trim().isEmpty) return;
+                            setSheet(() => submitting = true);
+                            try {
+                              await DoctorRepository.submitReview(
+                                targetId:
+                                    widget.assignment['organizationId']
+                                        as String,
+                                targetType: 'organization',
+                                assignmentId:
+                                    widget.assignment['assignmentId'] as String,
+                                rating: selectedRating,
+                                comment: commentCtrl.text.trim(),
                               );
-                            }
-                          } on FirebaseFunctionsException catch (e) {
-                            setSheet(() => submitting = false);
-                            final msg = e.domainCode == 'APPLICATION_ALREADY_EXISTS'
-                                ? 'You already reviewed this assignment.'
-                                : e.message ?? 'Review failed. Try again.';
-                            if (ctx.mounted) {
-                              ScaffoldMessenger.of(ctx).showSnackBar(
-                                SnackBar(
-                                  backgroundColor: AppColors.rose,
-                                  content: Text(msg),
-                                ),
-                              );
-                            }
-                          } catch (_) {
-                            setSheet(() => submitting = false);
-                            if (ctx.mounted) {
-                              ScaffoldMessenger.of(ctx).showSnackBar(
-                                const SnackBar(
-                                  backgroundColor: AppColors.rose,
-                                  content: Text('Review failed. Try again.'),
-                                ),
-                              );
+                              if (ctx.mounted) Navigator.pop(ctx);
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    backgroundColor: AppColors.emerald,
+                                    content: Text(
+                                      'Review submitted successfully.',
+                                    ),
+                                  ),
+                                );
+                              }
+                            } on FirebaseFunctionsException catch (e) {
+                              setSheet(() => submitting = false);
+                              final msg =
+                                  e.domainCode == 'APPLICATION_ALREADY_EXISTS'
+                                  ? 'You already reviewed this assignment.'
+                                  : e.message ?? 'Review failed. Try again.';
+                              if (ctx.mounted) {
+                                ScaffoldMessenger.of(ctx).showSnackBar(
+                                  SnackBar(
+                                    backgroundColor: AppColors.rose,
+                                    content: Text(msg),
+                                  ),
+                                );
+                              }
+                            } catch (_) {
+                              setSheet(() => submitting = false);
+                              if (ctx.mounted) {
+                                ScaffoldMessenger.of(ctx).showSnackBar(
+                                  const SnackBar(
+                                    backgroundColor: AppColors.rose,
+                                    content: Text('Review failed. Try again.'),
+                                  ),
+                                );
+                              }
                             }
                           }
-                        }
-                      : null,
-                ),
-              ],
+                        : null,
+                  ),
+                ],
+              ),
             ),
-          ),
-        );
-      }),
+          );
+        },
+      ),
     );
   }
 
   void _openAssignment(BuildContext context) {
     final dutyId = widget.assignment['dutyId'] as String?;
     if (dutyId == null || dutyId.isEmpty) return;
-    context.push('/duty-details', extra: {
-      'dutyId': dutyId,
-      'facilityName': widget.assignment['facilityName'],
-      'department': widget.assignment['department'],
-      'specialtyName': widget.assignment['specialtyName'],
-      'startAt': widget.assignment['startAt'],
-      'endAt': widget.assignment['startAt'],
-      'amount': widget.assignment['amount'],
-      'basis': 'per_shift',
-      'status': widget.assignment['status'],
-      'city': '',
-      'qualificationRequired': '',
-      'headcount': 1,
-      'remainingHeadcount': 0,
-      'isVerifiedOrg': true,
-    });
+    context.push(
+      '/duty-details',
+      extra: {
+        'dutyId': dutyId,
+        'facilityName': widget.assignment['facilityName'],
+        'department': widget.assignment['department'],
+        'specialtyName': widget.assignment['specialtyName'],
+        'startAt': widget.assignment['startAt'],
+        'endAt': widget.assignment['endAt'],
+        'startAtIso': widget.assignment['startAtIso'],
+        'endAtIso': widget.assignment['endAtIso'],
+        'amount': widget.assignment['amount'],
+        'basis': widget.assignment['basis'],
+        'paymentTiming': widget.assignment['paymentTiming'],
+        'status': widget.assignment['status'],
+        'city': '',
+        'qualificationRequired': '',
+      },
+    );
   }
 
   @override
@@ -433,132 +513,136 @@ class _AssignmentTileState extends State<_AssignmentTile> {
     final isConfirmed = status == 'confirmed' || status == 'in_progress';
     final isCompleted = status == 'completed';
     final expiry = _expiryLabel();
+    final start = parseIsoLocal(widget.assignment['startAtIso']);
+    final subtitle = [
+      widget.assignment['specialtyName'] as String? ?? '',
+      widget.assignment['department'] as String? ?? '',
+    ].where((s) => s.isNotEmpty).join(' · ');
+    final busy = _isConfirming || _isDeclining;
 
-    return AppCard(
+    return InkWell(
       onTap: () => _openAssignment(context),
-      child: Row(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const IconTile(icon: Icons.local_hospital_outlined, size: 46),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                DateBlock(date: start),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: Text(
-                          widget.assignment['facilityName'] as String,
-                          style: AppTypography.headingSmall(colors.textPrimary),
+                      Text(
+                        widget.assignment['facilityName'] as String? ?? '—',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTypography.headingSmall(colors.textPrimary),
+                      ),
+                      if (subtitle.isNotEmpty) ...[
+                        const SizedBox(height: 3),
+                        Text(
+                          subtitle,
+                          maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      StatusBadge(status: status),
-                    ],
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    '${widget.assignment['specialtyName']} • ${widget.assignment['department']}',
-                    style: AppTypography.bodySmall(colors.accent).copyWith(fontWeight: FontWeight.w500),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Icon(Icons.schedule_outlined, size: 12, color: colors.textMuted),
-                      const SizedBox(width: 4),
-                      Text(
-                        widget.assignment['startAt'] as String,
-                        style: AppTypography.bodySmall(colors.textMuted),
-                      ),
-                      const Spacer(),
-                      Text(
-                        formatInr(widget.assignment['amount']),
-                        style: AppTypography.labelBold(colors.textPrimary),
-                      ),
-                    ],
-                  ),
-
-                  // Offer pending: expiry chip + Accept / Decline
-                  if (isSelected) ...[
-                    const SizedBox(height: 6),
-                    if (expiry != null)
-                      InfoChip(icon: Icons.timer_outlined, label: expiry, color: AppColors.amber),
-                    const SizedBox(height: AppSpacing.sm),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: AppButton(
-                            label: 'Accept Offer',
-                            isLoading: _isConfirming,
-                            onPressed:
-                                _isConfirming || _isDeclining ? null : _accept,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        SizedBox(
-                          width: 92,
-                          height: 52,
-                          child: OutlinedButton(
-                            onPressed:
-                                _isConfirming || _isDeclining ? null : _decline,
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: AppColors.rose,
-                              padding: EdgeInsets.zero,
-                            ),
-                            child: _isDeclining
-                                ? const SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Text('Decline'),
-                          ),
+                          style: AppTypography.bodySmall(
+                            colors.textSecondary,
+                          ).copyWith(fontSize: 12.5),
                         ),
                       ],
-                    ),
-                  ],
-
-                  // Confirmed / in-progress: contact button
-                  if (isConfirmed) ...[
-                    const SizedBox(height: AppSpacing.sm),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        icon: const Icon(Icons.contact_phone_outlined, size: 16),
-                        label: const Text('View Hospital Contact'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: colors.accent,
-                        ),
-                        onPressed: _showContact,
+                      const SizedBox(height: 2),
+                      Text(
+                        start != null
+                            ? formatDayTime(start)
+                            : '${widget.assignment['startAt'] ?? ''}',
+                        style: AppTypography.bodySmall(
+                          colors.textSecondary,
+                        ).copyWith(fontSize: 12.5),
                       ),
-                    ),
-                  ],
-
-                  // Completed: review button
-                  if (isCompleted) ...[
-                    const SizedBox(height: AppSpacing.sm),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        icon: const Icon(Icons.star_outline_outlined, size: 16),
-                        label: const Text('Leave a Review'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: colors.textPrimary,
-                        ),
-                        onPressed: () => _showReviewModal(context),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
+                      const SizedBox(height: 8),
+                      if (isSelected && expiry != null)
+                        HighlightTag(expiry)
+                      else
+                        StatusBadge(status: status),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Text(
+                  formatInr(widget.assignment['amount']),
+                  style: AppTypography.amount(colors.textPrimary),
+                ),
+              ],
             ),
+
+            // Offer pending: Accept / Decline
+            if (isSelected) ...[
+              const SizedBox(height: AppSpacing.md),
+              _ActionIndent(
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: AppButton(
+                        label: 'Accept offer',
+                        isLoading: _isConfirming,
+                        onPressed: busy ? null : _accept,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    Expanded(
+                      child: AppSecondaryButton(
+                        label: 'Decline',
+                        foregroundColor: AppColors.rose,
+                        isLoading: _isDeclining,
+                        onPressed: busy ? null : _decline,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
+            // Confirmed / in-progress: contact
+            if (isConfirmed) ...[
+              const SizedBox(height: AppSpacing.sm),
+              _ActionIndent(
+                child: AppSecondaryButton(
+                  label: 'View hospital contact',
+                  icon: Icons.call_outlined,
+                  onPressed: _showContact,
+                ),
+              ),
+            ],
+
+            // Completed: review
+            if (isCompleted) ...[
+              const SizedBox(height: AppSpacing.sm),
+              _ActionIndent(
+                child: AppSecondaryButton(
+                  label: 'Leave a review',
+                  icon: Icons.star_outline_rounded,
+                  onPressed: () => _showReviewModal(context),
+                ),
+              ),
+            ],
           ],
+        ),
       ),
     );
+  }
+}
+
+/// Indents a row's actions to the text column (date block width + gap).
+class _ActionIndent extends StatelessWidget {
+  final Widget child;
+
+  const _ActionIndent({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(padding: const EdgeInsets.only(left: 58), child: child);
   }
 }

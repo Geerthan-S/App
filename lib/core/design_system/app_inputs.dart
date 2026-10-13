@@ -39,10 +39,7 @@ class AppTextField extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: AppTypography.labelBold(colors.textSecondary),
-        ),
+        Text(label, style: AppTypography.labelBold(colors.textSecondary)),
         const SizedBox(height: AppSpacing.xs),
         TextFormField(
           controller: controller,
@@ -51,7 +48,9 @@ class AppTextField extends StatelessWidget {
           obscureText: obscureText,
           maxLines: maxLines,
           onChanged: onChanged,
-          style: AppTypography.bodyLarge(colors.textPrimary).copyWith(fontSize: 14),
+          style: AppTypography.bodyLarge(
+            colors.textPrimary,
+          ).copyWith(fontSize: 14),
           cursorColor: colors.accent,
           decoration: InputDecoration(
             hintText: hintText,
@@ -64,8 +63,8 @@ class AppTextField extends StatelessWidget {
   }
 }
 
-/// Minimal search field: white pill-ish surface with a subtle border and an
-/// outline search icon. Used by Search, Messages and other list filters.
+/// Minimal search field: flat surface, no border until focused, outline
+/// search icon. Used by Search, the Marketplace and other list filters.
 class AppSearchField extends StatelessWidget {
   final TextEditingController? controller;
   final String hintText;
@@ -98,14 +97,29 @@ class AppSearchField extends StatelessWidget {
       style: AppTypography.bodyLarge(colors.textPrimary).copyWith(fontSize: 14),
       decoration: InputDecoration(
         hintText: hintText,
-        prefixIcon: Icon(Icons.search_outlined, color: colors.textMuted, size: 20),
+        prefixIcon: Icon(
+          Icons.search_outlined,
+          color: colors.textMuted,
+          size: 20,
+        ),
         suffixIcon: showClear
             ? IconButton(
-                icon: Icon(Icons.close_outlined, color: colors.textMuted, size: 18),
+                icon: Icon(
+                  Icons.close_outlined,
+                  color: colors.textMuted,
+                  size: 18,
+                ),
                 onPressed: onClear,
               )
             : trailing,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 15,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+          borderSide: BorderSide.none,
+        ),
       ),
     );
   }

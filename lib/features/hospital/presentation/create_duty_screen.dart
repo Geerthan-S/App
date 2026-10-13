@@ -82,7 +82,12 @@ class _CreateDutyScreenState extends ConsumerState<CreateDutyScreen> {
         }
       });
     } catch (_) {
-      if (mounted) setState(() => _errorMessage = 'Could not load organizations. Make sure you are signed in as hospital staff.');
+      if (mounted) {
+        setState(
+          () => _errorMessage =
+              'Could not load organizations. Make sure you are signed in as hospital staff.',
+        );
+      }
     }
   }
 
@@ -105,11 +110,26 @@ class _CreateDutyScreenState extends ConsumerState<CreateDutyScreen> {
   }
 
   bool _validateForm() {
-    if (_selectedOrgId == null) { _toast('Select an organization first.'); return false; }
-    if (_selectedFacility == null) { _toast('Add a facility to your organization first.'); return false; }
-    if (_departmentController.text.trim().isEmpty) { _toast('Department is required.'); return false; }
-    if ((int.tryParse(_headcountController.text.trim()) ?? 0) < 1) { _toast('Headcount must be at least 1.'); return false; }
-    if ((double.tryParse(_amountController.text.trim()) ?? 0) <= 0) { _toast('Compensation must be greater than zero.'); return false; }
+    if (_selectedOrgId == null) {
+      _toast('Select an organization first.');
+      return false;
+    }
+    if (_selectedFacility == null) {
+      _toast('Add a facility to your organization first.');
+      return false;
+    }
+    if (_departmentController.text.trim().isEmpty) {
+      _toast('Department is required.');
+      return false;
+    }
+    if ((int.tryParse(_headcountController.text.trim()) ?? 0) < 1) {
+      _toast('Headcount must be at least 1.');
+      return false;
+    }
+    if ((double.tryParse(_amountController.text.trim()) ?? 0) <= 0) {
+      _toast('Compensation must be greater than zero.');
+      return false;
+    }
     return true;
   }
 
@@ -137,7 +157,10 @@ class _CreateDutyScreenState extends ConsumerState<CreateDutyScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Duty Preview (Doctor View)', style: AppTypography.headingSmall(colors.textPrimary)),
+                Text(
+                  'Duty Preview (Doctor View)',
+                  style: AppTypography.headingSmall(colors.textPrimary),
+                ),
                 const StatusBadge(status: 'published'),
               ],
             ),
@@ -146,24 +169,39 @@ class _CreateDutyScreenState extends ConsumerState<CreateDutyScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(_selectedFacility!['name'] as String, style: AppTypography.headingSmall(colors.textPrimary)),
+                  Text(
+                    _selectedFacility!['name'] as String,
+                    style: AppTypography.headingSmall(colors.textPrimary),
+                  ),
                   const SizedBox(height: 2),
-                  Text('$_selectedSpecialty • ${_departmentController.text}', style: AppTypography.bodyMedium(colors.textSecondary)),
+                  Text(
+                    '$_selectedSpecialty • ${_departmentController.text}',
+                    style: AppTypography.bodyMedium(colors.textSecondary),
+                  ),
                   const SizedBox(height: AppSpacing.sm),
                   Text(
                     'Timing: ${_startTime.format(context)} - ${_endTime.format(context)}',
-                    style: AppTypography.labelBold(AppColors.primaryLight),
+                    style: AppTypography.labelBold(colors.textPrimary),
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('₹${_amountController.text} / shift', style: AppTypography.labelBold(AppColors.emerald)),
-                      Text('${_headcountController.text} positions', style: AppTypography.bodySmall(AppColors.amber)),
+                      Text(
+                        '₹${_amountController.text} / shift',
+                        style: AppTypography.labelBold(AppColors.emerald),
+                      ),
+                      Text(
+                        '${_headcountController.text} positions',
+                        style: AppTypography.bodySmall(AppColors.amber),
+                      ),
                     ],
                   ),
                   const Divider(),
-                  Text('Qualification: ${_qualificationController.text}', style: AppTypography.bodySmall(colors.textMuted)),
+                  Text(
+                    'Qualification: ${_qualificationController.text}',
+                    style: AppTypography.bodySmall(colors.textMuted),
+                  ),
                 ],
               ),
             ),
@@ -192,7 +230,10 @@ class _CreateDutyScreenState extends ConsumerState<CreateDutyScreen> {
       _toast('End time must be after start time.');
       return;
     }
-    setState(() { _isPublishing = true; _errorMessage = null; });
+    setState(() {
+      _isPublishing = true;
+      _errorMessage = null;
+    });
     try {
       await DutyRepository.createAndPublish(
         organizationId: _selectedOrgId!,
@@ -220,14 +261,23 @@ class _CreateDutyScreenState extends ConsumerState<CreateDutyScreen> {
       }
     } on FirebaseFunctionsException catch (e) {
       if (mounted) {
-        setState(() => _errorMessage = switch (e.domainCode) {
-          'HOSPITAL_NOT_VERIFIED' => 'Your organization must be verified before publishing duties.',
-          'CONSENT_REQUIRED' => 'Accept the current terms before publishing duties.',
-          _ => e.message ?? 'Could not publish duty. Try again.',
-        });
+        setState(
+          () => _errorMessage = switch (e.domainCode) {
+            'HOSPITAL_NOT_VERIFIED' =>
+              'Your organization must be verified before publishing duties.',
+            'CONSENT_REQUIRED' =>
+              'Accept the current terms before publishing duties.',
+            _ => e.message ?? 'Could not publish duty. Try again.',
+          },
+        );
       }
     } catch (_) {
-      if (mounted) setState(() => _errorMessage = 'Failed to publish duty. Check your connection.');
+      if (mounted) {
+        setState(
+          () =>
+              _errorMessage = 'Failed to publish duty. Check your connection.',
+        );
+      }
     } finally {
       if (mounted) setState(() => _isPublishing = false);
     }
@@ -256,9 +306,15 @@ class _CreateDutyScreenState extends ConsumerState<CreateDutyScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Post Clinical Duty Requirement', style: AppTypography.headingLarge(colors.textPrimary)),
+                Text(
+                  'Post Clinical Duty Requirement',
+                  style: AppTypography.headingLarge(colors.textPrimary),
+                ),
                 const SizedBox(height: AppSpacing.xs),
-                Text('Published requirements are matched with verified doctors.', style: AppTypography.bodyMedium(colors.textSecondary)),
+                Text(
+                  'Published requirements are matched with verified doctors.',
+                  style: AppTypography.bodyMedium(colors.textSecondary),
+                ),
                 if (_errorMessage != null) ...[
                   const SizedBox(height: AppSpacing.md),
                   Container(
@@ -266,103 +322,176 @@ class _CreateDutyScreenState extends ConsumerState<CreateDutyScreen> {
                     decoration: BoxDecoration(
                       color: AppColors.rose.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                      border: Border.all(color: AppColors.rose.withValues(alpha: 0.4)),
+                      border: Border.all(
+                        color: AppColors.rose.withValues(alpha: 0.4),
+                      ),
                     ),
-                    child: Text(_errorMessage!, style: AppTypography.bodySmall(AppColors.rose)),
+                    child: Text(
+                      _errorMessage!,
+                      style: AppTypography.bodySmall(AppColors.rose),
+                    ),
                   ),
                 ],
                 const SizedBox(height: AppSpacing.lg),
 
                 // Organization selector
-                Text('Organization', style: AppTypography.labelBold(colors.textSecondary)),
+                Text(
+                  'Organization',
+                  style: AppTypography.labelBold(colors.textSecondary),
+                ),
                 const SizedBox(height: 6),
                 if (_organizations.isEmpty)
-                  Text('No organization found. Create one from Hospital Profile.', style: AppTypography.bodySmall(colors.textMuted))
+                  Text(
+                    'No organization found. Create one from Hospital Profile.',
+                    style: AppTypography.bodySmall(colors.textMuted),
+                  )
                 else
                   DropdownButtonFormField<String>(
                     value: _selectedOrgId,
                     isExpanded: true,
                     dropdownColor: colors.surface,
-                                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                     style: AppTypography.bodyLarge(colors.textPrimary),
                     decoration: InputDecoration(
-                      filled: true, fillColor: colors.surface,
+                      filled: true,
+                      fillColor: colors.surface,
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                        borderRadius: BorderRadius.circular(
+                          AppSpacing.radiusSm,
+                        ),
                         borderSide: BorderSide(color: colors.border),
                       ),
                     ),
-                    items: _organizations.map((o) => DropdownMenuItem<String>(
-                      value: o['organizationId'] as String,
-                      child: Text(o['displayName'] as String? ?? o['legalName'] as String? ?? 'Org', overflow: TextOverflow.ellipsis),
-                    )).toList(),
+                    items: _organizations
+                        .map(
+                          (o) => DropdownMenuItem<String>(
+                            value: o['organizationId'] as String,
+                            child: Text(
+                              o['displayName'] as String? ??
+                                  o['legalName'] as String? ??
+                                  'Org',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        )
+                        .toList(),
                     onChanged: (v) {
-                      if (v != null) setState(() { _selectedOrgId = v; _loadFacilities(v); });
+                      if (v != null) {
+                        setState(() {
+                          _selectedOrgId = v;
+                          _loadFacilities(v);
+                        });
+                      }
                     },
                   ),
                 const SizedBox(height: AppSpacing.md),
 
                 // Facility selector
-                Text('Hospital facility', style: AppTypography.labelBold(colors.textSecondary)),
+                Text(
+                  'Hospital facility',
+                  style: AppTypography.labelBold(colors.textSecondary),
+                ),
                 const SizedBox(height: 6),
                 if (_facilities.isEmpty)
-                  Text('No facility found. Add one from Hospital Profile.', style: AppTypography.bodySmall(colors.textMuted))
+                  Text(
+                    'No facility found. Add one from Hospital Profile.',
+                    style: AppTypography.bodySmall(colors.textMuted),
+                  )
                 else
                   DropdownButtonFormField<String>(
                     value: _selectedFacility?['name'] as String?,
                     isExpanded: true,
                     dropdownColor: colors.surface,
-                                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                     style: AppTypography.bodyLarge(colors.textPrimary),
                     decoration: InputDecoration(
-                      filled: true, fillColor: colors.surface,
+                      filled: true,
+                      fillColor: colors.surface,
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                        borderRadius: BorderRadius.circular(
+                          AppSpacing.radiusSm,
+                        ),
                         borderSide: BorderSide(color: colors.border),
                       ),
                     ),
-                    items: _facilities.map((f) => DropdownMenuItem<String>(
-                      value: f['name'] as String,
-                      child: Text(f['name'] as String, overflow: TextOverflow.ellipsis),
-                    )).toList(),
+                    items: _facilities
+                        .map(
+                          (f) => DropdownMenuItem<String>(
+                            value: f['name'] as String,
+                            child: Text(
+                              f['name'] as String,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        )
+                        .toList(),
                     onChanged: (v) {
-                      final fac = _facilities.firstWhere((f) => f['name'] == v, orElse: () => {});
-                      if (fac.isNotEmpty) setState(() => _selectedFacility = fac);
+                      final fac = _facilities.firstWhere(
+                        (f) => f['name'] == v,
+                        orElse: () => {},
+                      );
+                      if (fac.isNotEmpty) {
+                        setState(() => _selectedFacility = fac);
+                      }
                     },
                   ),
                 const SizedBox(height: AppSpacing.md),
 
                 // Specialty
-                Text('Specialty required', style: AppTypography.labelBold(colors.textSecondary)),
+                Text(
+                  'Specialty required',
+                  style: AppTypography.labelBold(colors.textSecondary),
+                ),
                 const SizedBox(height: 6),
                 DropdownButtonFormField<String>(
                   value: _selectedSpecialty,
                   isExpanded: true,
                   dropdownColor: colors.surface,
-                                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                   style: AppTypography.bodyLarge(colors.textPrimary),
                   decoration: InputDecoration(
-                    filled: true, fillColor: colors.surface,
+                    filled: true,
+                    fillColor: colors.surface,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
                       borderSide: BorderSide(color: colors.border),
                     ),
                   ),
-                  items: AppConstants.specialties.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+                  items: AppConstants.specialties
+                      .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                      .toList(),
                   onChanged: (v) => setState(() => _selectedSpecialty = v!),
                 ),
                 const SizedBox(height: AppSpacing.md),
-                AppTextField(label: 'Department / ward', controller: _departmentController, hintText: 'e.g. ICU & Emergency'),
+                AppTextField(
+                  label: 'Department / ward',
+                  controller: _departmentController,
+                  hintText: 'e.g. ICU & Emergency',
+                ),
                 const SizedBox(height: AppSpacing.md),
-                AppTextField(label: 'Minimum qualification', controller: _qualificationController),
+                AppTextField(
+                  label: 'Minimum qualification',
+                  controller: _qualificationController,
+                ),
                 const SizedBox(height: AppSpacing.md),
-                AppTextField(label: 'Min. years experience', controller: _expController, keyboardType: TextInputType.number),
+                AppTextField(
+                  label: 'Min. years experience',
+                  controller: _expController,
+                  keyboardType: TextInputType.number,
+                ),
                 const SizedBox(height: AppSpacing.md),
-                AppTextField(label: 'Required headcount', controller: _headcountController, keyboardType: TextInputType.number),
+                AppTextField(
+                  label: 'Required headcount',
+                  controller: _headcountController,
+                  keyboardType: TextInputType.number,
+                ),
                 const SizedBox(height: AppSpacing.md),
 
                 // Schedule
-                Text('Shift schedule', style: AppTypography.labelBold(colors.textSecondary)),
+                Text(
+                  'Shift schedule',
+                  style: AppTypography.labelBold(colors.textSecondary),
+                ),
                 const SizedBox(height: 6),
                 AppCard(
                   child: Row(
@@ -371,32 +500,56 @@ class _CreateDutyScreenState extends ConsumerState<CreateDutyScreen> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Date', style: AppTypography.bodySmall(colors.textMuted)),
-                          Text('${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}', style: AppTypography.labelBold(colors.textPrimary)),
+                          Text(
+                            'Date',
+                            style: AppTypography.bodySmall(colors.textMuted),
+                          ),
+                          Text(
+                            '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
+                            style: AppTypography.labelBold(colors.textPrimary),
+                          ),
                         ],
                       ),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Hours', style: AppTypography.bodySmall(colors.textMuted)),
-                          Text('${_startTime.format(context)} – ${_endTime.format(context)}', style: AppTypography.labelBold(AppColors.primaryLight)),
+                          Text(
+                            'Hours',
+                            style: AppTypography.bodySmall(colors.textMuted),
+                          ),
+                          Text(
+                            '${_startTime.format(context)} – ${_endTime.format(context)}',
+                            style: AppTypography.labelBold(colors.textPrimary),
+                          ),
                         ],
                       ),
                       OutlinedButton(
-                        style: OutlinedButton.styleFrom(foregroundColor: AppColors.primaryLight),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: colors.textPrimary,
+                        ),
                         onPressed: () async {
                           final picked = await showDatePicker(
                             context: context,
                             initialDate: _selectedDate,
                             firstDate: DateTime.now(),
-                            lastDate: DateTime.now().add(const Duration(days: 90)),
+                            lastDate: DateTime.now().add(
+                              const Duration(days: 90),
+                            ),
                           );
-                          if (picked != null) setState(() => _selectedDate = picked);
+                          if (picked != null) {
+                            setState(() => _selectedDate = picked);
+                          }
                           if (!mounted) return;
-                          final start = await showTimePicker(context: context, initialTime: _startTime);
+                          final start = await showTimePicker(
+                            context: context,
+                            initialTime: _startTime,
+                          );
                           if (start != null) setState(() => _startTime = start);
                           if (!mounted) return;
-                          final end = await showTimePicker(context: context, initialTime: _endTime);
+                          final end = await showTimePicker(
+                            context: context,
+                            initialTime: _endTime,
+                          );
                           if (end != null) setState(() => _endTime = end);
                         },
                         child: const Text('Change'),
@@ -410,23 +563,39 @@ class _CreateDutyScreenState extends ConsumerState<CreateDutyScreen> {
                   controller: _amountController,
                   keyboardType: TextInputType.number,
                   prefixIcon: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                    child: Text('₹', style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.bold)),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 14,
+                    ),
+                    child: Text(
+                      '₹',
+                      style: TextStyle(
+                        color: colors.textPrimary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(height: AppSpacing.md),
-                AppTextField(label: 'Additional notes (optional)', controller: _notesController, maxLines: 3),
+                AppTextField(
+                  label: 'Additional notes (optional)',
+                  controller: _notesController,
+                  maxLines: 3,
+                ),
                 const SizedBox(height: AppSpacing.xl),
 
                 Row(
                   children: [
                     Expanded(
                       child: OutlinedButton.icon(
-                        icon: const Icon(Icons.remove_red_eye_outlined, size: 18),
+                        icon: const Icon(
+                          Icons.remove_red_eye_outlined,
+                          size: 18,
+                        ),
                         label: Text(loc.translate('previewDuty')),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.primaryLight,
-                          side: const BorderSide(color: AppColors.primary),
+                          foregroundColor: colors.textPrimary,
+                          side: BorderSide(color: colors.border),
                           padding: const EdgeInsets.symmetric(vertical: 14),
                         ),
                         onPressed: _previewDuty,

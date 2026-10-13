@@ -20,12 +20,12 @@ class LoadingView extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const SizedBox(
+          SizedBox(
             width: 28,
             height: 28,
             child: CircularProgressIndicator(
               strokeWidth: 2.5,
-              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+              valueColor: AlwaysStoppedAnimation<Color>(colors.accent),
             ),
           ),
           if (message != null) ...[
@@ -45,22 +45,24 @@ class ErrorView extends StatelessWidget {
   final String message;
   final VoidCallback? onRetry;
 
-  const ErrorView({
-    super.key,
-    required this.message,
-    this.onRetry,
-  });
+  const ErrorView({super.key, required this.message, this.onRetry});
 
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
     return Center(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl, vertical: AppSpacing.xl),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.xl,
+          vertical: AppSpacing.xl,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const _StateIcon(icon: Icons.error_outline_outlined, color: AppColors.rose),
+            const _StateIcon(
+              icon: Icons.error_outline_outlined,
+              color: AppColors.rose,
+            ),
             const SizedBox(height: AppSpacing.md),
             Text(
               'Something Went Wrong',
@@ -74,11 +76,7 @@ class ErrorView extends StatelessWidget {
             ),
             if (onRetry != null) ...[
               const SizedBox(height: AppSpacing.lg),
-              AppButton(
-                label: 'Retry',
-                isFullWidth: false,
-                onPressed: onRetry,
-              ),
+              AppButton(label: 'Retry', isFullWidth: false, onPressed: onRetry),
             ],
           ],
         ),
@@ -108,16 +106,16 @@ class EmptyStateView extends StatelessWidget {
     final colors = context.appColors;
     return Center(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl, vertical: AppSpacing.xl),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.xl,
+          vertical: AppSpacing.xl,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             _StateIcon(icon: icon, color: colors.textSecondary),
             const SizedBox(height: AppSpacing.md),
-            Text(
-              title,
-              style: AppTypography.headingSmall(colors.textPrimary),
-            ),
+            Text(title, style: AppTypography.headingSmall(colors.textPrimary)),
             const SizedBox(height: AppSpacing.xs),
             Text(
               description,
@@ -150,13 +148,11 @@ class _StateIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     return Container(
-      width: 76,
-      height: 76,
+      width: 64,
+      height: 64,
       decoration: BoxDecoration(
-        color: colors.surface,
+        color: colors.surfaceElevated,
         shape: BoxShape.circle,
-        border: Border.all(color: colors.border),
-        boxShadow: AppShadows.soft(colors),
       ),
       child: Icon(icon, color: color, size: 32),
     );

@@ -13,9 +13,11 @@ class DoctorRepository {
   static Stream<Map<String, dynamic>?> watchProfile() {
     final uid = _uid;
     if (uid == null) return const Stream.empty();
-    return _db.collection('doctors').doc(uid).snapshots().map(
-      (doc) => doc.exists ? doc.data() : null,
-    );
+    return _db
+        .collection('doctors')
+        .doc(uid)
+        .snapshots()
+        .map((doc) => doc.exists ? doc.data() : null);
   }
 
   static Future<Map<String, dynamic>?> getProfile() async {
@@ -35,17 +37,19 @@ class DoctorRepository {
     required int yearsOfExperience,
     String? bio,
   }) async {
-    await _functions.httpsCallable('submitDoctorProfile').call<Map<String, dynamic>>({
-      'fullName': fullName,
-      'council': council,
-      'registrationNo': registrationNo,
-      'qualification': qualification,
-      'specialties': [primarySpecialty],
-      'primarySpecialty': primarySpecialty,
-      'yearsOfExperience': yearsOfExperience,
-      'preferredCities': preferredCities,
-      if (bio != null && bio.isNotEmpty) 'bio': bio,
-    });
+    await _functions
+        .httpsCallable('submitDoctorProfile')
+        .call<Map<String, dynamic>>({
+          'fullName': fullName,
+          'council': council,
+          'registrationNo': registrationNo,
+          'qualification': qualification,
+          'specialties': [primarySpecialty],
+          'primarySpecialty': primarySpecialty,
+          'yearsOfExperience': yearsOfExperience,
+          'preferredCities': preferredCities,
+          if (bio != null && bio.isNotEmpty) 'bio': bio,
+        });
   }
 
   static Stream<List<Map<String, dynamic>>> watchReviews(String targetId) {
@@ -55,14 +59,16 @@ class DoctorRepository {
         .orderBy('createdAt', descending: true)
         .limit(20)
         .snapshots()
-        .map((snap) => snap.docs.map((doc) {
-              final d = doc.data();
-              return {
-                'reviewerName': d['reviewerName'] as String? ?? 'Anonymous',
-                'rating': (d['rating'] as num?)?.toInt() ?? 5,
-                'comment': d['comment'] as String? ?? '',
-              };
-            }).toList());
+        .map(
+          (snap) => snap.docs.map((doc) {
+            final d = doc.data();
+            return {
+              'reviewerName': d['reviewerName'] as String? ?? 'Anonymous',
+              'rating': (d['rating'] as num?)?.toInt() ?? 5,
+              'comment': d['comment'] as String? ?? '',
+            };
+          }).toList(),
+        );
   }
 
   static Stream<List<Map<String, dynamic>>> watchAssignments() {
@@ -74,44 +80,58 @@ class DoctorRepository {
         .orderBy('updatedAt', descending: true)
         .limit(30)
         .snapshots()
-        .map((snap) => snap.docs.map((doc) {
-              final d = doc.data();
-              final terms = d['termsSnapshot'] as Map<String, dynamic>? ?? {};
-              return {
-                'assignmentId': d['assignmentId'] ?? doc.id,
-                'dutyId': d['dutyId'] ?? '',
-                'facilityName': d['facilityName'] ?? 'Unknown Facility',
-                'department': d['department'] ?? '',
-                'specialtyName': d['specialtyName'] ?? '',
-                'status': d['status'] ?? 'selected',
-                'amount': (terms['amount'] as num?)?.toInt() ?? 0,
-                'startAt': _fmtIso(terms['startAt'] as String?),
-                'organizationId': d['organizationId'] ?? '',
-                'expiresAt': d['expiresAt'] as String? ?? '',
-                'updatedAt': _relTime(d['updatedAt']),
-              };
-            }).toList());
+        .map(
+          (snap) => snap.docs.map((doc) {
+            final d = doc.data();
+            final terms = d['termsSnapshot'] as Map<String, dynamic>? ?? {};
+            return {
+              'assignmentId': d['assignmentId'] ?? doc.id,
+              'dutyId': d['dutyId'] ?? '',
+              'facilityName': d['facilityName'] ?? 'Unknown Facility',
+              'department': d['department'] ?? '',
+              'specialtyName': d['specialtyName'] ?? '',
+              'status': d['status'] ?? 'selected',
+              'amount': (terms['amount'] as num?)?.toInt() ?? 0,
+              'startAt': _fmtIso(terms['startAt'] as String?),
+              'endAt': _fmtIso(terms['endAt'] as String?),
+              'startAtIso': terms['startAt'] as String?,
+              'endAtIso': terms['endAt'] as String?,
+              'basis': terms['basis'] ?? 'per_shift',
+              'paymentTiming': terms['expectedPaymentTiming'],
+              'organizationId': d['organizationId'] ?? '',
+              'expiresAt': d['expiresAt'] as String? ?? '',
+              'updatedAt': _relTime(d['updatedAt']),
+            };
+          }).toList(),
+        );
   }
 
   /// [idempotencyKey] must stay the same across retries of one confirmation
   /// so a double tap or network retry is recognised by the server as a replay.
-  static Future<void> confirmAssignment(String assignmentId, {required String idempotencyKey}) async {
-    await _functions.httpsCallable('confirmAssignment').call<Map<String, dynamic>>({
-      'assignmentId': assignmentId,
-      'idempotencyKey': idempotencyKey,
-    });
+  static Future<void> confirmAssignment(
+    String assignmentId, {
+    required String idempotencyKey,
+  }) async {
+    await _functions
+        .httpsCallable('confirmAssignment')
+        .call<Map<String, dynamic>>({
+          'assignmentId': assignmentId,
+          'idempotencyKey': idempotencyKey,
+        });
   }
 
   static Future<void> cancelAssignment(String assignmentId) async {
-    await _functions.httpsCallable('cancelAssignment').call<Map<String, dynamic>>({
-      'assignmentId': assignmentId,
-    });
+    await _functions
+        .httpsCallable('cancelAssignment')
+        .call<Map<String, dynamic>>({'assignmentId': assignmentId});
   }
 
-  static Future<Map<String, dynamic>> getAssignmentContact(String assignmentId) async {
-    final result = await _functions.httpsCallable('getAssignmentContact').call<Map<String, dynamic>>({
-      'assignmentId': assignmentId,
-    });
+  static Future<Map<String, dynamic>> getAssignmentContact(
+    String assignmentId,
+  ) async {
+    final result = await _functions
+        .httpsCallable('getAssignmentContact')
+        .call<Map<String, dynamic>>({'assignmentId': assignmentId});
     return Map<String, dynamic>.from(result.data['contact'] as Map);
   }
 
@@ -122,13 +142,15 @@ class DoctorRepository {
     required int rating,
     required String comment,
   }) async {
-    await _functions.httpsCallable('submitFeedback').call<Map<String, dynamic>>({
-      'targetId': targetId,
-      'targetType': targetType,
-      'assignmentId': assignmentId,
-      'rating': rating,
-      'comment': comment,
-    });
+    await _functions
+        .httpsCallable('submitFeedback')
+        .call<Map<String, dynamic>>({
+          'targetId': targetId,
+          'targetType': targetType,
+          'assignmentId': assignmentId,
+          'rating': rating,
+          'comment': comment,
+        });
   }
 
   static String _fmtIso(String? iso) {
@@ -145,7 +167,9 @@ class DoctorRepository {
     if (ts is Timestamp) dt = ts.toDate();
     if (ts is String) dt = DateTime.tryParse(ts);
     if (ts is Map && ts['_seconds'] is num) {
-      dt = DateTime.fromMillisecondsSinceEpoch(((ts['_seconds'] as num) * 1000).toInt());
+      dt = DateTime.fromMillisecondsSinceEpoch(
+        ((ts['_seconds'] as num) * 1000).toInt(),
+      );
     }
     if (dt == null) return '';
     final diff = DateTime.now().difference(dt.toLocal());

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import '../../../core/design_system/app_colors.dart';
 import '../../../core/design_system/app_typography.dart';
 import '../../../core/design_system/app_spacing.dart';
-import '../../../core/design_system/app_cards.dart';
-import '../../../core/widgets/duty_post_card.dart';
+import '../../../core/widgets/duty_row.dart';
 import '../../../core/widgets/state_views.dart';
 import '../../../core/widgets/ui_kit.dart';
 import '../../duty_marketplace/data/duty_repository.dart';
@@ -24,8 +24,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // Created once so rebuilds (e.g. changing the specialty chip) don't
   // re-subscribe to Firestore.
-  final Stream<Map<String, dynamic>?> _profileStream = DoctorRepository.watchProfile();
-  final Stream<List<Map<String, dynamic>>> _dutiesStream = DutyRepository.watchPublished();
+  final Stream<Map<String, dynamic>?> _profileStream =
+      DoctorRepository.watchProfile();
+  final Stream<List<Map<String, dynamic>>> _dutiesStream =
+      DutyRepository.watchPublished();
+  final Stream<List<Map<String, dynamic>>> _assignmentsStream =
+      DoctorRepository.watchAssignments();
 
   @override
   Widget build(BuildContext context) {
@@ -43,55 +47,97 @@ class _HomeScreenState extends State<HomeScreen> {
             final duties = snap.data ?? [];
             final specialties = <String>{
               for (final d in duties)
-                if ((d['specialtyName'] as String? ?? '').isNotEmpty) d['specialtyName'] as String,
-            }.toList()
-              ..sort();
-            final selected = specialties.contains(_specialty) ? _specialty : _all;
+                if ((d['specialtyName'] as String? ?? '').isNotEmpty)
+                  d['specialtyName'] as String,
+            }.toList()..sort();
+            final selected = specialties.contains(_specialty)
+                ? _specialty
+                : _all;
             final visible = selected == _all
                 ? duties
                 : duties.where((d) => d['specialtyName'] == selected).toList();
             final openSlots = duties.fold<int>(
               0,
-              (sum, d) => sum + ((d['remainingHeadcount'] as num?)?.toInt() ?? 0),
+              (sum, d) =>
+                  sum + ((d['remainingHeadcount'] as num?)?.toInt() ?? 0),
             );
 
             return CustomScrollView(
               slivers: [
-                // Greeting + notifications
+                // Avatar + notifications
                 SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(gutter, 16, gutter, 0),
+                  padding: const EdgeInsets.fromLTRB(gutter, 12, gutter, 0),
                   sliver: SliverToBoxAdapter(
                     child: StreamBuilder<Map<String, dynamic>?>(
                       stream: _profileStream,
                       builder: (context, profileSnap) {
-                        final name = profileSnap.data?['fullName'] as String? ?? 'Doctor';
-                        return Row(
+                        final name =
+                            profileSnap.data?['fullName'] as String? ?? '';
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _Avatar(name: name),
-                            const SizedBox(width: AppSpacing.sm),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    _greeting(),
-                                    style: AppTypography.bodySmall(colors.textSecondary),
+                            Row(
+                              children: [
+                                Semantics(
+                                  button: true,
+                                  label: 'Profile',
+                                  child: GestureDetector(
+                                    onTap: () => context.go('/profile'),
+                                    child: InitialsAvatar(name: name, size: 44),
                                   ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    'Hello, $name',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: AppTypography.headingLarge(colors.textPrimary).copyWith(fontSize: 20),
-                                  ),
-                                ],
-                              ),
+                                ),
+                                const Spacer(),
+                                const _NotificationBell(),
+                              ],
                             ),
-                            const SizedBox(width: AppSpacing.sm),
-                            const _NotificationBell(),
+                            const SizedBox(height: 20),
+                            Text(
+                              name.isEmpty
+                                  ? _greeting()
+                                  : '${_greeting()}, $name',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTypography.bodyMedium(
+                                colors.textSecondary,
+                              ).copyWith(fontSize: 14),
+                            ),
                           ],
                         );
                       },
+                    ),
+                  ),
+                ),
+
+                // Headline built from live counts
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(gutter, 4, gutter, 0),
+                  sliver: SliverToBoxAdapter(
+                    child: Text.rich(
+                      TextSpan(
+                        children: loading
+                            ? [const TextSpan(text: 'Finding open duties…')]
+                            : duties.isEmpty
+                            ? [
+                                const TextSpan(text: 'No open duties\n'),
+                                TextSpan(
+                                  text: 'right now',
+                                  style: TextStyle(color: colors.textMuted),
+                                ),
+                              ]
+                            : [
+                                TextSpan(
+                                  text:
+                                      '${duties.length} ${duties.length == 1 ? 'duty' : 'duties'} open\n',
+                                ),
+                                TextSpan(
+                                  text:
+                                      '$openSlots ${openSlots == 1 ? 'position' : 'positions'}'
+                                      ' · ${specialties.length} ${specialties.length == 1 ? 'specialty' : 'specialties'}',
+                                  style: TextStyle(color: colors.textMuted),
+                                ),
+                              ],
+                      ),
+                      style: AppTypography.display(colors.textPrimary),
                     ),
                   ),
                 ),
@@ -104,90 +150,66 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
 
-                // Live availability summary
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(gutter, 16, gutter, 0),
-                  sliver: SliverToBoxAdapter(
-                    child: AppCard(
-                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 14),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: _SummaryStat(
-                              icon: Icons.work_outline_outlined,
-                              value: loading ? '—' : '${duties.length}',
-                              label: 'Open duties',
-                            ),
-                          ),
-                          Container(width: 1, height: 36, color: colors.border),
-                          Expanded(
-                            child: _SummaryStat(
-                              icon: Icons.groups_outlined,
-                              value: loading ? '—' : '$openSlots',
-                              label: 'Positions',
-                            ),
-                          ),
-                          Container(width: 1, height: 36, color: colors.border),
-                          Expanded(
-                            child: _SummaryStat(
-                              icon: Icons.medical_services_outlined,
-                              value: loading ? '—' : '${specialties.length}',
-                              label: 'Specialties',
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                // Most relevant offer / next shift
+                SliverToBoxAdapter(
+                  child: StreamBuilder<List<Map<String, dynamic>>>(
+                    stream: _assignmentsStream,
+                    builder: (context, asgSnap) {
+                      final focus = _focusAssignment(asgSnap.data ?? const []);
+                      if (focus == null) return const SizedBox.shrink();
+                      return Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          gutter,
+                          20,
+                          gutter,
+                          0,
+                        ),
+                        child: _HeroCard(assignment: focus),
+                      );
+                    },
                   ),
                 ),
 
-                // Specialty categories
-                if (specialties.isNotEmpty)
-                  SliverPadding(
-                    padding: const EdgeInsets.only(top: AppSpacing.section),
-                    sliver: SliverToBoxAdapter(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const SectionHeader(
-                            title: 'Browse by specialty',
-                            padding: EdgeInsets.symmetric(horizontal: gutter),
-                          ),
-                          const SizedBox(height: AppSpacing.sm),
-                          SizedBox(
-                            height: 42,
-                            child: ListView.separated(
-                              scrollDirection: Axis.horizontal,
-                              padding: const EdgeInsets.symmetric(horizontal: gutter, vertical: 2),
-                              itemCount: specialties.length + 1,
-                              separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.xs),
-                              itemBuilder: (context, i) {
-                                final label = i == 0 ? _all : specialties[i - 1];
-                                return AppFilterChip(
-                                  label: label,
-                                  icon: i == 0 ? Icons.apps_outlined : null,
-                                  selected: label == selected,
-                                  onTap: () => setState(() => _specialty = label),
-                                );
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                // Recommended opportunities
+                // Open duties
                 SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(gutter, AppSpacing.section, gutter, AppSpacing.sm),
+                  padding: const EdgeInsets.fromLTRB(
+                    gutter,
+                    AppSpacing.section,
+                    gutter,
+                    AppSpacing.sm,
+                  ),
                   sliver: SliverToBoxAdapter(
                     child: SectionHeader(
-                      title: 'Recommended For You',
-                      actionLabel: 'View all',
+                      title: 'Open duties',
+                      actionLabel: 'See all',
                       onAction: () => context.go('/search'),
                     ),
                   ),
                 ),
+                if (specialties.isNotEmpty)
+                  SliverToBoxAdapter(
+                    child: SizedBox(
+                      height: 40,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: gutter,
+                          vertical: 2,
+                        ),
+                        itemCount: specialties.length + 1,
+                        separatorBuilder: (_, __) =>
+                            const SizedBox(width: AppSpacing.xs),
+                        itemBuilder: (context, i) {
+                          final label = i == 0 ? _all : specialties[i - 1];
+                          return AppFilterChip(
+                            label: label,
+                            selected: label == selected,
+                            onTap: () => setState(() => _specialty = label),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
                 if (loading)
                   const SliverToBoxAdapter(
                     child: Padding(
@@ -200,25 +222,61 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: EmptyStateView(
                       icon: Icons.work_outline_outlined,
                       title: 'No duties available',
-                      description: 'New duty opportunities will appear here when hospitals post them.',
+                      description:
+                          'New duty opportunities will appear here when hospitals post them.',
                     ),
                   )
                 else
                   SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(gutter, 0, gutter, 0),
-                    sliver: SliverList.separated(
-                      itemCount: visible.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.md),
-                      itemBuilder: (context, index) => DutyPostCard(duty: visible[index]),
+                    padding: const EdgeInsets.fromLTRB(gutter, 4, gutter, 0),
+                    sliver: SliverToBoxAdapter(
+                      child: DutyList(duties: visible),
                     ),
                   ),
-                const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.navBarClearance)),
+                const SliverToBoxAdapter(
+                  child: SizedBox(height: AppSpacing.navBarClearance),
+                ),
               ],
             );
           },
         ),
       ),
     );
+  }
+
+  /// The assignment that most needs attention: the pending offer expiring
+  /// soonest, otherwise the next confirmed or in-progress shift.
+  static Map<String, dynamic>? _focusAssignment(
+    List<Map<String, dynamic>> assignments,
+  ) {
+    final now = DateTime.now();
+    final offers =
+        assignments.where((a) {
+          if (a['status'] != 'selected') return false;
+          final expires = parseIsoLocal(a['expiresAt']);
+          return expires == null || expires.isAfter(now);
+        }).toList()..sort((a, b) {
+          final ea = parseIsoLocal(a['expiresAt']);
+          final eb = parseIsoLocal(b['expiresAt']);
+          if (ea == null || eb == null) return ea == null ? 1 : -1;
+          return ea.compareTo(eb);
+        });
+    if (offers.isNotEmpty) return offers.first;
+
+    final upcoming =
+        assignments.where((a) {
+          if (a['status'] == 'in_progress') return true;
+          if (a['status'] != 'confirmed') return false;
+          final end =
+              parseIsoLocal(a['endAtIso']) ?? parseIsoLocal(a['startAtIso']);
+          return end == null || end.isAfter(now);
+        }).toList()..sort((a, b) {
+          final sa = parseIsoLocal(a['startAtIso']);
+          final sb = parseIsoLocal(b['startAtIso']);
+          if (sa == null || sb == null) return sa == null ? 1 : -1;
+          return sa.compareTo(sb);
+        });
+    return upcoming.isEmpty ? null : upcoming.first;
   }
 
   static String _greeting() {
@@ -229,32 +287,164 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-class _Avatar extends StatelessWidget {
-  final String name;
+/// Dark hero surface for the one assignment that needs attention. Actions
+/// (accept / decline / contact) stay in My Duties, which this card opens.
+class _HeroCard extends StatelessWidget {
+  final Map<String, dynamic> assignment;
 
-  const _Avatar({required this.name});
+  const _HeroCard({required this.assignment});
+
+  String _expiryLabel() {
+    final expires = parseIsoLocal(assignment['expiresAt']);
+    if (expires == null) return 'Offer';
+    final diff = expires.difference(DateTime.now());
+    if (diff.inHours > 0) {
+      return 'Offer · expires in ${diff.inHours}h ${diff.inMinutes % 60}m';
+    }
+    return 'Offer · expires in ${diff.inMinutes.clamp(0, 59)}m';
+  }
 
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    final parts = name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
-    final initials = parts.isEmpty
-        ? 'D'
-        : (parts.length == 1 ? parts.first[0] : '${parts.first[0]}${parts.last[0]}').toUpperCase();
-    return GestureDetector(
-      onTap: () => context.go('/profile'),
-      child: Container(
-        width: 46,
-        height: 46,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: colors.accentSoft,
-          shape: BoxShape.circle,
-          border: Border.all(color: colors.surface, width: 2),
-          boxShadow: AppShadows.subtle(colors),
+    final isOffer = assignment['status'] == 'selected';
+    final isLive = assignment['status'] == 'in_progress';
+    final start = parseIsoLocal(assignment['startAtIso']);
+    final fg = colors.onAccent;
+    final fgMuted = colors.onAccent.withValues(alpha: 0.6);
+    final subtitle = [
+      assignment['specialtyName'] as String? ?? '',
+      assignment['department'] as String? ?? '',
+    ].where((s) => s.isNotEmpty).join(' · ');
+
+    return Material(
+      color: colors.accent,
+      borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => context.go('/messages'),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: isOffer
+                          ? HighlightTag(_expiryLabel())
+                          : Text(
+                              isLive ? 'Shift in progress' : 'Next shift',
+                              style: AppTypography.labelBold(fgMuted),
+                            ),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  if (start != null)
+                    Text(
+                      DateFormat('d MMM').format(start),
+                      style: AppTypography.bodySmall(
+                        fgMuted,
+                      ).copyWith(fontSize: 13),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Text(
+                assignment['facilityName'] as String? ?? '—',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: AppTypography.headingLarge(fg).copyWith(fontSize: 20),
+              ),
+              if (subtitle.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.bodySmall(
+                    fgMuted,
+                  ).copyWith(fontSize: 13),
+                ),
+              ],
+              const SizedBox(height: 16),
+              Divider(height: 1, color: fg.withValues(alpha: 0.12)),
+              const SizedBox(height: 14),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  _HeroFact(
+                    label: 'Pay',
+                    value: formatInr(assignment['amount']),
+                  ),
+                  const SizedBox(width: 24),
+                  if (start != null)
+                    Flexible(
+                      child: _HeroFact(
+                        label: 'Starts',
+                        value: formatTime(start),
+                      ),
+                    ),
+                  const Spacer(),
+                  Material(
+                    color: colors.surface,
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusPill),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(
+                        AppSpacing.radiusPill,
+                      ),
+                      onTap: () => context.go('/messages'),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
+                        child: Text(
+                          isOffer ? 'Review offer' : 'View duty',
+                          style: AppTypography.labelBold(colors.textPrimary),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
-        child: Text(initials, style: AppTypography.labelBold(colors.accent).copyWith(fontSize: 15)),
       ),
+    );
+  }
+}
+
+class _HeroFact extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _HeroFact({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = context.appColors.onAccent;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label,
+          style: AppTypography.bodySmall(
+            fg.withValues(alpha: 0.55),
+          ).copyWith(fontSize: 11),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: AppTypography.amount(fg, fontSize: 15),
+        ),
+      ],
     );
   }
 }
@@ -267,59 +457,34 @@ class _SearchShortcut extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    return Material(
-      color: colors.surface,
-      shape: RoundedRectangleBorder(
+    return Semantics(
+      button: true,
+      label: 'Search duties',
+      child: Material(
+        color: colors.surface,
         borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-        side: BorderSide(color: colors.border),
-      ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
-          child: Row(
-            children: [
-              Icon(Icons.search_outlined, size: 20, color: colors.textMuted),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'Search hospitals, specialties, cities',
-                  style: AppTypography.bodyMedium(colors.textMuted),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+            child: Row(
+              children: [
+                Icon(Icons.search_outlined, size: 20, color: colors.textMuted),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Hospital, specialty or city',
+                    style: AppTypography.bodyMedium(
+                      colors.textMuted,
+                    ).copyWith(fontSize: 14),
+                  ),
                 ),
-              ),
-              Icon(Icons.tune_outlined, size: 20, color: colors.textSecondary),
-            ],
+              ],
+            ),
           ),
         ),
       ),
-    );
-  }
-}
-
-class _SummaryStat extends StatelessWidget {
-  final IconData icon;
-  final String value;
-  final String label;
-
-  const _SummaryStat({required this.icon, required this.value, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.appColors;
-    return Column(
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 16, color: colors.accent),
-            const SizedBox(width: 6),
-            Text(value, style: AppTypography.headingMedium(colors.textPrimary).copyWith(fontSize: 17)),
-          ],
-        ),
-        const SizedBox(height: 2),
-        Text(label, style: AppTypography.bodySmall(colors.textSecondary)),
-      ],
     );
   }
 }
@@ -337,7 +502,9 @@ class _NotificationBell extends StatelessWidget {
           icon: Icons.notifications_none_outlined,
           tooltip: 'Notifications',
           onPressed: () => context.push('/notifications'),
-          badge: count > 0 ? CountBadge(count: count, color: AppColors.rose) : null,
+          badge: count > 0
+              ? CountBadge(count: count, color: AppColors.rose)
+              : null,
         );
       },
     );

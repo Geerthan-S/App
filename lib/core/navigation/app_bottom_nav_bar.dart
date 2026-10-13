@@ -1,14 +1,13 @@
 /**
- * Floating Frosted Bottom Navigation Bar
- * Home / Search / Add Post / Messages / Profile
+ * Floating Bottom Navigation Bar
+ * Home / Search / Post / Duties / Profile
  *
- * Controlled glassmorphism: a rounded, translucent white bar floating above
- * the content with a light blur, hairline border and a diffuse shadow. Every
- * item shows an outline icon with a label; the selected item sits in a soft
- * accent-tinted pill.
+ * A solid rounded surface floating above the content with a diffuse shadow.
+ * Inactive destinations are muted outline icons; the selected destination
+ * becomes a dark ink pill showing its icon and label. The "Duties" tab is the
+ * existing `/messages` branch, which hosts My Duties (offers, confirmed and
+ * completed assignments).
  */
-
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import '../design_system/app_colors.dart';
@@ -19,10 +18,7 @@ class _NavDestination {
   final IconData icon;
   final String label;
 
-  const _NavDestination({
-    required this.icon,
-    required this.label,
-  });
+  const _NavDestination({required this.icon, required this.label});
 }
 
 class AppBottomNavBar extends StatelessWidget {
@@ -35,11 +31,12 @@ class AppBottomNavBar extends StatelessWidget {
     required this.onTap,
   });
 
+  /// Order must match the shell branches in `app_router.dart`.
   static const List<_NavDestination> _destinations = [
     _NavDestination(icon: Icons.home_outlined, label: 'Home'),
     _NavDestination(icon: Icons.search_outlined, label: 'Search'),
-    _NavDestination(icon: Icons.add_box_outlined, label: 'Add Post'),
-    _NavDestination(icon: Icons.chat_bubble_outline_outlined, label: 'Messages'),
+    _NavDestination(icon: Icons.add_box_outlined, label: 'Post'),
+    _NavDestination(icon: Icons.event_note_outlined, label: 'Duties'),
     _NavDestination(icon: Icons.person_outline_outlined, label: 'Profile'),
   ];
 
@@ -47,39 +44,29 @@ class AppBottomNavBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final double bottomInset = MediaQuery.of(context).padding.bottom;
-    final radius = BorderRadius.circular(AppSpacing.radiusXl);
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(16, 0, 16, bottomInset > 0 ? bottomInset : 12),
-      child: DecoratedBox(
+      padding: EdgeInsets.fromLTRB(
+        16,
+        0,
+        16,
+        bottomInset > 0 ? bottomInset + 4 : 14,
+      ),
+      child: Container(
+        height: 64,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
         decoration: BoxDecoration(
-          borderRadius: radius,
-          boxShadow: [
-            BoxShadow(
-              color: colors.shadow.withValues(alpha: colors.shadow.a * 1.6),
-              blurRadius: 28,
-              offset: const Offset(0, 10),
-            ),
-          ],
+          color: colors.surface,
+          borderRadius: BorderRadius.circular(22),
+          boxShadow: AppShadows.soft(colors),
         ),
-        child: ClipRRect(
-          borderRadius: radius,
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-            child: Container(
-              height: 68,
-              padding: const EdgeInsets.symmetric(horizontal: 6),
-              decoration: BoxDecoration(
-                color: colors.surface.withValues(alpha: 0.86),
-                borderRadius: radius,
-                border: Border.all(color: colors.border.withValues(alpha: 0.9)),
-              ),
-              child: Row(
-                children: List.generate(
-                  _destinations.length,
-                  (index) => Expanded(child: _buildNavItem(colors, index)),
-                ),
-              ),
+        child: Row(
+          children: List.generate(
+            _destinations.length,
+            (index) => Expanded(
+              // The selected pill carries a label, so it gets more room.
+              flex: index == currentIndex ? 2 : 1,
+              child: _buildNavItem(colors, index),
             ),
           ),
         ),
@@ -90,12 +77,12 @@ class AppBottomNavBar extends StatelessWidget {
   Widget _buildNavItem(AppColorsExtension colors, int index) {
     final destination = _destinations[index];
     final bool isActive = index == currentIndex;
-    final Color fg = isActive ? colors.accent : colors.textMuted;
 
     return Semantics(
       selected: isActive,
       button: true,
       label: destination.label,
+      excludeSemantics: true,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () => onTap(index),
@@ -103,29 +90,34 @@ class AppBottomNavBar extends StatelessWidget {
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             curve: Curves.easeOut,
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+            height: 44,
+            padding: EdgeInsets.symmetric(horizontal: isActive ? 14 : 0),
             decoration: BoxDecoration(
-              color: isActive ? colors.accentSoft : Colors.transparent,
-              borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+              color: isActive ? colors.accent : Colors.transparent,
+              borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
             ),
-            child: Column(
+            child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(destination.icon, size: 22, color: fg),
-                const SizedBox(height: 3),
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    destination.label,
-                    maxLines: 1,
-                    softWrap: false,
-                    style: AppTypography.bodySmall(fg).copyWith(
-                      fontSize: 10.5,
-                      height: 1.1,
-                      fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+                Icon(
+                  destination.icon,
+                  size: isActive ? 19 : 22,
+                  color: isActive ? colors.onAccent : colors.textMuted,
+                ),
+                if (isActive) ...[
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      destination.label,
+                      maxLines: 1,
+                      softWrap: false,
+                      overflow: TextOverflow.fade,
+                      style: AppTypography.labelBold(
+                        colors.onAccent,
+                      ).copyWith(fontSize: 12.5),
                     ),
                   ),
-                ),
+                ],
               ],
             ),
           ),

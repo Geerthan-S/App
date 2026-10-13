@@ -7,7 +7,7 @@ import 'app_colors.dart';
 import 'app_typography.dart';
 import 'app_spacing.dart';
 
-/// Primary call-to-action. Solid accent blue, 52px tall, 14px radius.
+/// Primary call-to-action. Solid ink (theme accent), 52px tall, 14px radius.
 class AppButton extends StatelessWidget {
   final String label;
   final VoidCallback? onPressed;
@@ -30,19 +30,21 @@ class AppButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final bool enabled = onPressed != null && !isLoading;
-    final Color fg = enabled ? Colors.white : colors.textMuted;
+    final Color bg = backgroundColor ?? colors.accent;
+    final Color onBg = backgroundColor != null ? Colors.white : colors.onAccent;
+    final Color fg = enabled ? onBg : colors.textMuted;
 
     final buttonContent = Row(
       mainAxisSize: isFullWidth ? MainAxisSize.max : MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         if (isLoading)
-          const SizedBox(
+          SizedBox(
             width: 18,
             height: 18,
             child: CircularProgressIndicator(
               strokeWidth: 2,
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              valueColor: AlwaysStoppedAnimation<Color>(onBg),
             ),
           )
         else ...[
@@ -66,9 +68,9 @@ class AppButton extends StatelessWidget {
       height: 52,
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
-          backgroundColor: backgroundColor ?? AppColors.primary,
-          foregroundColor: Colors.white,
-          disabledBackgroundColor: isLoading ? (backgroundColor ?? AppColors.primary) : colors.surfaceElevated,
+          backgroundColor: bg,
+          foregroundColor: onBg,
+          disabledBackgroundColor: isLoading ? bg : colors.surfaceElevated,
           padding: const EdgeInsets.symmetric(horizontal: 20),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
@@ -82,7 +84,7 @@ class AppButton extends StatelessWidget {
   }
 }
 
-/// Secondary action. White surface with a subtle border and charcoal label.
+/// Secondary action. Surface fill with a hairline border and ink label.
 class AppSecondaryButton extends StatelessWidget {
   final String label;
   final VoidCallback? onPressed;
@@ -126,7 +128,7 @@ class AppSecondaryButton extends StatelessWidget {
               SizedBox(
                 width: 18,
                 height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2, color: colors.accent),
+                child: CircularProgressIndicator(strokeWidth: 2, color: fg),
               ),
               const SizedBox(width: AppSpacing.xs),
             ] else if (icon != null) ...[

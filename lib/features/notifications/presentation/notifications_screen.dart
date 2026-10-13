@@ -4,9 +4,8 @@ import 'package:go_router/go_router.dart';
 import '../../../core/design_system/app_colors.dart';
 import '../../../core/design_system/app_typography.dart';
 import '../../../core/design_system/app_spacing.dart';
-import '../../../core/design_system/app_cards.dart';
 import '../../../core/widgets/state_views.dart';
-import '../../../core/widgets/ui_kit.dart';
+import '../../duty_marketplace/data/duty_repository.dart';
 import '../data/notification_repository.dart';
 
 class NotificationsScreen extends StatelessWidget {
@@ -15,7 +14,7 @@ class NotificationsScreen extends StatelessWidget {
   static const Map<String, IconData> _icons = {
     'message': Icons.chat_bubble_outline_outlined,
     'confirmed': Icons.check_circle_outline_outlined,
-    'new_duty': Icons.local_hospital_outlined,
+    'new_duty': Icons.work_outline,
     'verification': Icons.shield_outlined,
     'info': Icons.info_outline,
   };
@@ -26,9 +25,7 @@ class NotificationsScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: colors.bg,
-      appBar: AppBar(
-        title: const Text('Notifications'),
-      ),
+      appBar: AppBar(title: const Text('Notifications')),
       body: SafeArea(
         child: StreamBuilder<List<Map<String, dynamic>>>(
           stream: NotificationRepository.watchAll(),
@@ -41,13 +38,20 @@ class NotificationsScreen extends StatelessWidget {
               return const EmptyStateView(
                 icon: Icons.notifications_none_outlined,
                 title: 'No notifications yet',
-                description: 'Updates about your duties and verifications will appear here.',
+                description:
+                    'Updates about your duties and verifications will appear here.',
               );
             }
             return ListView.separated(
-              padding: const EdgeInsets.fromLTRB(AppSpacing.gutter, 8, AppSpacing.gutter, AppSpacing.lg),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.gutter,
+                4,
+                AppSpacing.gutter,
+                AppSpacing.lg,
+              ),
               itemCount: notifications.length,
-              separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
+              separatorBuilder: (_, __) =>
+                  Divider(height: 1, color: colors.border),
               itemBuilder: (context, index) =>
                   _NotificationCard(notification: notifications[index]),
             );
@@ -69,9 +73,15 @@ class _NotificationCard extends StatelessWidget {
     final dutyId = notification['dutyId'] as String?;
     if (dutyId != null && dutyId.isNotEmpty) {
       try {
-        final doc = await FirebaseFirestore.instance.collection('duties').doc(dutyId).get();
+        final doc = await FirebaseFirestore.instance
+            .collection('duties')
+            .doc(dutyId)
+            .get();
         if (doc.exists && context.mounted) {
-          context.push('/duty-details', extra: Map<String, dynamic>.from(doc.data()!));
+          context.push(
+            '/duty-details',
+            extra: DutyRepository.toUiMap(doc.id, doc.data()!),
+          );
           return;
         }
       } catch (_) {}
@@ -83,49 +93,81 @@ class _NotificationCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final isUnread = notification['isRead'] == false;
-    final icon = NotificationsScreen._icons[notification['type']] ??
+    final icon =
+        NotificationsScreen._icons[notification['type']] ??
         Icons.notifications_none_outlined;
 
-    return AppCard(
+    return InkWell(
       onTap: () => _open(context),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          IconTile(
-            icon: icon,
-            size: 42,
-            background: isUnread ? colors.accentSoft : colors.surfaceElevated,
-            iconColor: isUnread ? colors.accent : colors.textSecondary,
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(notification['title'] as String,
-                    style: AppTypography.headingSmall(colors.textPrimary).copyWith(fontSize: 14)),
-                const SizedBox(height: 2),
-                Text(notification['body'] as String,
-                    style: AppTypography.bodyMedium(colors.textSecondary)),
-                const SizedBox(height: 4),
-                Text(notification['time'] as String,
-                    style: AppTypography.bodySmall(colors.textMuted)),
-              ],
-            ),
-          ),
-          if (isUnread) ...[
-            const SizedBox(width: AppSpacing.xs),
-            Container(
-              width: 8,
-              height: 8,
-              margin: const EdgeInsets.only(top: 4),
-              decoration: const BoxDecoration(
-                color: AppColors.primary,
-                shape: BoxShape.circle,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 1),
+              child: Icon(
+                icon,
+                size: 20,
+                color: isUnread ? colors.textPrimary : colors.textMuted,
               ),
             ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          notification['title'] as String,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTypography.headingSmall(colors.textPrimary)
+                              .copyWith(
+                                fontSize: 14,
+                                fontWeight: isUnread
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                              ),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.xs),
+                      Text(
+                        notification['time'] as String,
+                        style: AppTypography.bodySmall(colors.textMuted),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    notification['body'] as String,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTypography.bodyMedium(colors.textSecondary),
+                  ),
+                ],
+              ),
+            ),
+            if (isUnread) ...[
+              const SizedBox(width: AppSpacing.sm),
+              Semantics(
+                label: 'Unread',
+                child: Container(
+                  width: 8,
+                  height: 8,
+                  margin: const EdgeInsets.only(top: 6),
+                  decoration: BoxDecoration(
+                    color: colors.accent,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

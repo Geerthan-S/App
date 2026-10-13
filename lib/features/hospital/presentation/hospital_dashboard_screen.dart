@@ -19,10 +19,12 @@ class HospitalDashboardScreen extends ConsumerStatefulWidget {
   const HospitalDashboardScreen({super.key});
 
   @override
-  ConsumerState<HospitalDashboardScreen> createState() => _HospitalDashboardScreenState();
+  ConsumerState<HospitalDashboardScreen> createState() =>
+      _HospitalDashboardScreenState();
 }
 
-class _HospitalDashboardScreenState extends ConsumerState<HospitalDashboardScreen> {
+class _HospitalDashboardScreenState
+    extends ConsumerState<HospitalDashboardScreen> {
   List<Map<String, dynamic>> _organizations = [];
   String? _selectedOrgId;
   String _selectedOrgName = '';
@@ -47,8 +49,10 @@ class _HospitalDashboardScreenState extends ConsumerState<HospitalDashboardScree
           _organizations = orgs;
           if (orgs.isNotEmpty) {
             _selectedOrgId = orgs.first['organizationId'] as String?;
-            _selectedOrgName = orgs.first['displayName'] as String? ??
-                orgs.first['legalName'] as String? ?? 'My Organization';
+            _selectedOrgName =
+                orgs.first['displayName'] as String? ??
+                orgs.first['legalName'] as String? ??
+                'My Organization';
           }
           _loadingOrgs = false;
         });
@@ -69,50 +73,66 @@ class _HospitalDashboardScreenState extends ConsumerState<HospitalDashboardScree
       context: context,
       isScrollControlled: true,
       builder: (ctx) {
-        return StatefulBuilder(builder: (context, setSheet) {
-          if (loading && !requested) {
-            requested = true;
-            HospitalRepository.getApplicationsForDuty(dutyId).then((apps) {
-              setSheet(() {
-                applicants = apps;
-                loading = false;
-              });
-            }).catchError((Object _) {
-              setSheet(() {
-                loadFailed = true;
-                loading = false;
-              });
-            });
-          }
-          return Padding(
-            padding: AppSpacing.paddingScreen,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Review Applicants', style: AppTypography.headingSmall(colors.textPrimary)),
-                    IconButton(
-                      icon: Icon(Icons.close_outlined, color: colors.textMuted),
-                      onPressed: () => Navigator.pop(ctx),
-                    ),
-                  ],
-                ),
-                Text(
-                  'Selecting a candidate atomically reserves a seat and sends a time-limited offer.',
-                  style: AppTypography.bodySmall(colors.textMuted),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                if (loading)
-                  const Center(child: CircularProgressIndicator())
-                else if (loadFailed)
-                  Text('Could not load applicants. Close and try again.', style: AppTypography.bodyMedium(AppColors.rose))
-                else if (applicants.isEmpty)
-                  Text('No applicants yet.', style: AppTypography.bodyMedium(colors.textMuted))
-                else
-                  ...applicants.map((app) => AppCard(
+        return StatefulBuilder(
+          builder: (context, setSheet) {
+            if (loading && !requested) {
+              requested = true;
+              HospitalRepository.getApplicationsForDuty(dutyId)
+                  .then((apps) {
+                    setSheet(() {
+                      applicants = apps;
+                      loading = false;
+                    });
+                  })
+                  .catchError((Object _) {
+                    setSheet(() {
+                      loadFailed = true;
+                      loading = false;
+                    });
+                  });
+            }
+            return Padding(
+              padding: AppSpacing.paddingScreen,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Review Applicants',
+                        style: AppTypography.headingSmall(colors.textPrimary),
+                      ),
+                      IconButton(
+                        icon: Icon(
+                          Icons.close_outlined,
+                          color: colors.textMuted,
+                        ),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
+                  Text(
+                    'Selecting a candidate atomically reserves a seat and sends a time-limited offer.',
+                    style: AppTypography.bodySmall(colors.textMuted),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  if (loading)
+                    const Center(child: CircularProgressIndicator())
+                  else if (loadFailed)
+                    Text(
+                      'Could not load applicants. Close and try again.',
+                      style: AppTypography.bodyMedium(AppColors.rose),
+                    )
+                  else if (applicants.isEmpty)
+                    Text(
+                      'No applicants yet.',
+                      style: AppTypography.bodyMedium(colors.textMuted),
+                    )
+                  else
+                    ...applicants.map(
+                      (app) => AppCard(
                         margin: const EdgeInsets.only(bottom: 12),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -121,25 +141,46 @@ class _HospitalDashboardScreenState extends ConsumerState<HospitalDashboardScree
                               children: [
                                 CircleAvatar(
                                   radius: 22,
-                                  backgroundColor: colors.accentSoft,
+                                  backgroundColor: colors.surfaceElevated,
                                   child: Text(
-                                    (app['name'] as String).split(' ').last.substring(0, 1),
-                                    style: AppTypography.labelBold(colors.accent).copyWith(fontSize: 15),
+                                    (app['name'] as String)
+                                        .split(' ')
+                                        .last
+                                        .substring(0, 1),
+                                    style: AppTypography.labelBold(
+                                      colors.textPrimary,
+                                    ).copyWith(fontSize: 15),
                                   ),
                                 ),
                                 const SizedBox(width: AppSpacing.sm),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
-                                      Row(children: [
-                                        Text(app['name'] as String, style: AppTypography.labelBold(colors.textPrimary)),
-                                        const SizedBox(width: 4),
-                                        if (app['isVerified'] == true)
-                                          const Icon(Icons.verified_outlined, color: AppColors.emerald, size: 14),
-                                      ]),
-                                      Text('${app['regNo']} • ${app['qualification']}',
-                                          style: AppTypography.bodySmall(colors.textMuted)),
+                                      Row(
+                                        children: [
+                                          Text(
+                                            app['name'] as String,
+                                            style: AppTypography.labelBold(
+                                              colors.textPrimary,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          if (app['isVerified'] == true)
+                                            const Icon(
+                                              Icons.verified_outlined,
+                                              color: AppColors.emerald,
+                                              size: 14,
+                                            ),
+                                        ],
+                                      ),
+                                      Text(
+                                        '${app['regNo']} • ${app['qualification']}',
+                                        style: AppTypography.bodySmall(
+                                          colors.textMuted,
+                                        ),
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -147,7 +188,12 @@ class _HospitalDashboardScreenState extends ConsumerState<HospitalDashboardScree
                             ),
                             if ((app['note'] as String).isNotEmpty) ...[
                               const SizedBox(height: AppSpacing.sm),
-                              Text('"${app['note']}"', style: AppTypography.bodySmall(colors.textSecondary)),
+                              Text(
+                                '"${app['note']}"',
+                                style: AppTypography.bodySmall(
+                                  colors.textSecondary,
+                                ),
+                              ),
                             ],
                             const SizedBox(height: AppSpacing.sm),
                             Row(
@@ -160,7 +206,11 @@ class _HospitalDashboardScreenState extends ConsumerState<HospitalDashboardScree
                                   ),
                                   onPressed: () async {
                                     Navigator.pop(ctx);
-                                    await _selectDoctor(dutyId, app['doctorId'] as String, app['name'] as String);
+                                    await _selectDoctor(
+                                      dutyId,
+                                      app['doctorId'] as String,
+                                      app['name'] as String,
+                                    );
                                   },
                                   child: const Text('Select Candidate'),
                                 ),
@@ -168,24 +218,32 @@ class _HospitalDashboardScreenState extends ConsumerState<HospitalDashboardScree
                             ),
                           ],
                         ),
-                      )),
-                const SizedBox(height: AppSpacing.md),
-              ],
-            ),
-          );
-        });
+                      ),
+                    ),
+                  const SizedBox(height: AppSpacing.md),
+                ],
+              ),
+            );
+          },
+        );
       },
     );
   }
 
-  Future<void> _selectDoctor(String dutyId, String doctorId, String doctorName) async {
+  Future<void> _selectDoctor(
+    String dutyId,
+    String doctorId,
+    String doctorName,
+  ) async {
     try {
       await HospitalRepository.selectDoctor(dutyId, doctorId);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: AppColors.emerald,
-            content: Text('Offer sent to $doctorName. It expires if not confirmed in time.'),
+            content: Text(
+              'Offer sent to $doctorName. It expires if not confirmed in time.',
+            ),
           ),
         );
       }
@@ -210,90 +268,112 @@ class _HospitalDashboardScreenState extends ConsumerState<HospitalDashboardScree
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      builder: (ctx) => StatefulBuilder(builder: (context, setSheet) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 16, right: 16, top: 20,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Review Doctor', style: AppTypography.headingSmall(colors.textPrimary)),
-                const SizedBox(height: 4),
-                Text(
-                  'Rate ${assignment['doctorName']} for their duty at ${assignment['facilityName']}',
-                  style: AppTypography.bodySmall(colors.textMuted),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(5, (i) => IconButton(
-                    icon: Icon(
-                      i < selectedRating ? Icons.star_rounded : Icons.star_border_rounded,
-                      color: AppColors.amber,
-                      size: 36,
-                    ),
-                    onPressed: () => setSheet(() => selectedRating = i + 1),
-                  )),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                TextField(
-                  controller: commentCtrl,
-                  maxLines: 3,
-                  maxLength: 500,
-                  decoration: InputDecoration(
-                    hintText: 'Share your experience with this doctor...',
-                    hintStyle: AppTypography.bodyMedium(colors.textMuted),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppSpacing.radiusSm)),
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setSheet) {
+          return Padding(
+            padding: EdgeInsets.only(
+              left: 16,
+              right: 16,
+              top: 20,
+              bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Review Doctor',
+                    style: AppTypography.headingSmall(colors.textPrimary),
                   ),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                AppButton(
-                  label: 'Submit Review',
-                  isLoading: submitting,
-                  onPressed: selectedRating > 0
-                      ? () async {
-                          if (commentCtrl.text.trim().isEmpty) return;
-                          setSheet(() => submitting = true);
-                          try {
-                            await BackendConfig.functions.httpsCallable('submitFeedback').call({
-                              'targetId': assignment['doctorId'],
-                              'targetType': 'doctor',
-                              'assignmentId': assignment['assignmentId'],
-                              'rating': selectedRating,
-                              'comment': commentCtrl.text.trim(),
-                            });
-                            if (ctx.mounted) Navigator.pop(ctx);
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  backgroundColor: AppColors.emerald,
-                                  content: Text('Review submitted successfully.'),
-                                ),
-                              );
-                            }
-                          } catch (_) {
-                            setSheet(() => submitting = false);
-                            if (ctx.mounted) {
-                              ScaffoldMessenger.of(ctx).showSnackBar(
-                                const SnackBar(
-                                  backgroundColor: AppColors.rose,
-                                  content: Text('Could not submit review. Try again.'),
-                                ),
-                              );
+                  const SizedBox(height: 4),
+                  Text(
+                    'Rate ${assignment['doctorName']} for their duty at ${assignment['facilityName']}',
+                    style: AppTypography.bodySmall(colors.textMuted),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(
+                      5,
+                      (i) => IconButton(
+                        icon: Icon(
+                          i < selectedRating
+                              ? Icons.star_rounded
+                              : Icons.star_border_rounded,
+                          color: AppColors.amber,
+                          size: 36,
+                        ),
+                        onPressed: () => setSheet(() => selectedRating = i + 1),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  TextField(
+                    controller: commentCtrl,
+                    maxLines: 3,
+                    maxLength: 500,
+                    decoration: InputDecoration(
+                      hintText: 'Share your experience with this doctor...',
+                      hintStyle: AppTypography.bodyMedium(colors.textMuted),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(
+                          AppSpacing.radiusSm,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  AppButton(
+                    label: 'Submit Review',
+                    isLoading: submitting,
+                    onPressed: selectedRating > 0
+                        ? () async {
+                            if (commentCtrl.text.trim().isEmpty) return;
+                            setSheet(() => submitting = true);
+                            try {
+                              await BackendConfig.functions
+                                  .httpsCallable('submitFeedback')
+                                  .call({
+                                    'targetId': assignment['doctorId'],
+                                    'targetType': 'doctor',
+                                    'assignmentId': assignment['assignmentId'],
+                                    'rating': selectedRating,
+                                    'comment': commentCtrl.text.trim(),
+                                  });
+                              if (ctx.mounted) Navigator.pop(ctx);
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    backgroundColor: AppColors.emerald,
+                                    content: Text(
+                                      'Review submitted successfully.',
+                                    ),
+                                  ),
+                                );
+                              }
+                            } catch (_) {
+                              setSheet(() => submitting = false);
+                              if (ctx.mounted) {
+                                ScaffoldMessenger.of(ctx).showSnackBar(
+                                  const SnackBar(
+                                    backgroundColor: AppColors.rose,
+                                    content: Text(
+                                      'Could not submit review. Try again.',
+                                    ),
+                                  ),
+                                );
+                              }
                             }
                           }
-                        }
-                      : null,
-                ),
-              ],
+                        : null,
+                  ),
+                ],
+              ),
             ),
-          ),
-        );
-      }),
+          );
+        },
+      ),
     );
   }
 
@@ -312,7 +392,8 @@ class _HospitalDashboardScreenState extends ConsumerState<HospitalDashboardScree
         body: const EmptyStateView(
           icon: Icons.apartment_outlined,
           title: 'No organization found',
-          description: 'Set up your hospital organization to start posting duties.',
+          description:
+              'Set up your hospital organization to start posting duties.',
         ),
       );
     }
@@ -348,19 +429,36 @@ class _HospitalDashboardScreenState extends ConsumerState<HospitalDashboardScree
                   value: _selectedOrgId,
                   decoration: InputDecoration(
                     labelText: 'Organization',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppSpacing.radiusSm)),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
                   ),
                   items: _organizations
-                      .map((o) => DropdownMenuItem<String>(
-                            value: o['organizationId'] as String,
-                            child: Text(o['displayName'] as String? ?? o['legalName'] as String? ?? ''),
-                          ))
+                      .map(
+                        (o) => DropdownMenuItem<String>(
+                          value: o['organizationId'] as String,
+                          child: Text(
+                            o['displayName'] as String? ??
+                                o['legalName'] as String? ??
+                                '',
+                          ),
+                        ),
+                      )
                       .toList(),
                   onChanged: (v) => setState(() {
                     _selectedOrgId = v;
-                    final org = _organizations.firstWhere((o) => o['organizationId'] == v, orElse: () => {});
-                    _selectedOrgName = org['displayName'] as String? ?? org['legalName'] as String? ?? '';
+                    final org = _organizations.firstWhere(
+                      (o) => o['organizationId'] == v,
+                      orElse: () => {},
+                    );
+                    _selectedOrgName =
+                        org['displayName'] as String? ??
+                        org['legalName'] as String? ??
+                        '';
                   }),
                 )
               else
@@ -372,8 +470,16 @@ class _HospitalDashboardScreenState extends ConsumerState<HospitalDashboardScree
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(_selectedOrgName, style: AppTypography.headingSmall(colors.textPrimary)),
-                            Text('Verified Organization', style: AppTypography.bodySmall(colors.textMuted)),
+                            Text(
+                              _selectedOrgName,
+                              style: AppTypography.headingSmall(
+                                colors.textPrimary,
+                              ),
+                            ),
+                            Text(
+                              'Verified Organization',
+                              style: AppTypography.bodySmall(colors.textMuted),
+                            ),
                           ],
                         ),
                       ),
@@ -398,7 +504,10 @@ class _HospitalDashboardScreenState extends ConsumerState<HospitalDashboardScree
               const SizedBox(height: AppSpacing.lg),
 
               // Active duties
-              Text(loc.translate('activeDuties'), style: AppTypography.headingSmall(colors.textPrimary)),
+              Text(
+                loc.translate('activeDuties'),
+                style: AppTypography.headingSmall(colors.textPrimary),
+              ),
               const SizedBox(height: AppSpacing.sm),
               StreamBuilder<List<Map<String, dynamic>>>(
                 stream: HospitalRepository.watchOrgDuties(_selectedOrgId!),
@@ -409,14 +518,18 @@ class _HospitalDashboardScreenState extends ConsumerState<HospitalDashboardScree
                   final duties = snap.data ?? [];
                   if (duties.isEmpty) {
                     return AppCard(
-                      child: Text('No duties posted yet.', style: AppTypography.bodyMedium(colors.textMuted)),
+                      child: Text(
+                        'No duties posted yet.',
+                        style: AppTypography.bodyMedium(colors.textMuted),
+                      ),
                     );
                   }
                   return ListView.separated(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     itemCount: duties.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
+                    separatorBuilder: (_, __) =>
+                        const SizedBox(height: AppSpacing.sm),
                     itemBuilder: (context, i) {
                       final duty = duties[i];
                       return AppCard(
@@ -427,30 +540,53 @@ class _HospitalDashboardScreenState extends ConsumerState<HospitalDashboardScree
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Expanded(
-                                  child: Text(duty['specialtyName'] as String,
-                                      style: AppTypography.headingSmall(colors.textPrimary)),
+                                  child: Text(
+                                    duty['specialtyName'] as String,
+                                    style: AppTypography.headingSmall(
+                                      colors.textPrimary,
+                                    ),
+                                  ),
                                 ),
                                 StatusBadge(status: duty['status'] as String),
                               ],
                             ),
                             const SizedBox(height: 2),
-                            Text(duty['department'] as String, style: AppTypography.bodySmall(colors.textMuted)),
+                            Text(
+                              duty['department'] as String,
+                              style: AppTypography.bodySmall(colors.textMuted),
+                            ),
                             const SizedBox(height: AppSpacing.xs),
-                            Text(duty['timing'] as String, style: AppTypography.bodyMedium(colors.textSecondary)),
+                            Text(
+                              duty['timing'] as String,
+                              style: AppTypography.bodyMedium(
+                                colors.textSecondary,
+                              ),
+                            ),
                             const SizedBox(height: AppSpacing.sm),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Text('${duty['remainingHeadcount']} slot open',
-                                    style: AppTypography.bodySmall(AppColors.amber)),
+                                Text(
+                                  '${duty['remainingHeadcount']} slot open',
+                                  style: AppTypography.bodySmall(
+                                    AppColors.amber,
+                                  ),
+                                ),
                                 OutlinedButton.icon(
-                                  icon: const Icon(Icons.people_outline_outlined, size: 16),
-                                  label: Text(loc.translate('reviewApplicants')),
+                                  icon: const Icon(
+                                    Icons.people_outline_outlined,
+                                    size: 16,
+                                  ),
+                                  label: Text(
+                                    loc.translate('reviewApplicants'),
+                                  ),
                                   style: OutlinedButton.styleFrom(
                                     side: BorderSide(color: colors.border),
-                                    foregroundColor: AppColors.primaryLight,
+                                    foregroundColor: colors.textPrimary,
                                   ),
-                                  onPressed: () => _showApplicantsSheet(duty['dutyId'] as String),
+                                  onPressed: () => _showApplicantsSheet(
+                                    duty['dutyId'] as String,
+                                  ),
                                 ),
                               ],
                             ),
@@ -464,43 +600,68 @@ class _HospitalDashboardScreenState extends ConsumerState<HospitalDashboardScree
               const SizedBox(height: AppSpacing.lg),
 
               // Completed assignments — review doctors
-              Text('Completed Assignments', style: AppTypography.headingSmall(colors.textPrimary)),
+              Text(
+                'Completed Assignments',
+                style: AppTypography.headingSmall(colors.textPrimary),
+              ),
               const SizedBox(height: AppSpacing.xs),
-              Text('Leave a review for doctors after their shift ends.',
-                  style: AppTypography.bodySmall(colors.textMuted)),
+              Text(
+                'Leave a review for doctors after their shift ends.',
+                style: AppTypography.bodySmall(colors.textMuted),
+              ),
               const SizedBox(height: AppSpacing.sm),
               StreamBuilder<List<Map<String, dynamic>>>(
                 stream: HospitalRepository.watchOrgAssignments(_selectedOrgId!),
                 builder: (context, snap) {
                   final all = snap.data ?? [];
-                  final completed = all.where((a) => a['status'] == 'completed').toList();
+                  final completed = all
+                      .where((a) => a['status'] == 'completed')
+                      .toList();
                   if (completed.isEmpty) {
                     return AppCard(
-                      child: Text('No completed assignments yet.', style: AppTypography.bodyMedium(colors.textMuted)),
+                      child: Text(
+                        'No completed assignments yet.',
+                        style: AppTypography.bodyMedium(colors.textMuted),
+                      ),
                     );
                   }
                   return ListView.separated(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     itemCount: completed.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
+                    separatorBuilder: (_, __) =>
+                        const SizedBox(height: AppSpacing.sm),
                     itemBuilder: (context, i) {
                       final asg = completed[i];
                       return AppCard(
                         child: Row(
                           children: [
                             CircleAvatar(
-                              backgroundColor: AppColors.emerald.withValues(alpha: 0.1),
-                              child: const Icon(Icons.check_circle_outlined, color: AppColors.emerald),
+                              backgroundColor: AppColors.emerald.withValues(
+                                alpha: 0.1,
+                              ),
+                              child: const Icon(
+                                Icons.check_circle_outlined,
+                                color: AppColors.emerald,
+                              ),
                             ),
                             const SizedBox(width: AppSpacing.sm),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(asg['doctorName'] as String, style: AppTypography.labelBold(colors.textPrimary)),
-                                  Text('${asg['specialtyName']} • ${asg['startAt']}',
-                                      style: AppTypography.bodySmall(colors.textMuted)),
+                                  Text(
+                                    asg['doctorName'] as String,
+                                    style: AppTypography.labelBold(
+                                      colors.textPrimary,
+                                    ),
+                                  ),
+                                  Text(
+                                    '${asg['specialtyName']} • ${asg['startAt']}',
+                                    style: AppTypography.bodySmall(
+                                      colors.textMuted,
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
