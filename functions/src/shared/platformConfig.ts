@@ -18,6 +18,16 @@ export const PLATFORM_DEFAULTS = {
   CURRENT_CONSENT_VERSION: 'v1.0_2026',
 };
 
+/** Bounds an administrator may set for the offer expiry window. */
+export const OFFER_EXPIRY_HOURS_RANGE = { min: 1, max: 72 };
+
+/** Feature flags the admin portal may toggle. Phase 2 handlers read these keys. */
+export const FEATURE_FLAG_KEYS = [
+  'phase2_availability_enabled',
+  'phase2_replacement_enabled',
+  'phase2_disputes_enabled',
+] as const;
+
 /**
  * Retrieves the configured offer expiry duration in hours.
  * Reads from protected 'configuration/offer_policy' document in Firestore,

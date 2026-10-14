@@ -49,7 +49,15 @@ export { processNotificationOutbox, retryNotificationOutbox } from './notificati
 export { registerDeviceToken, unregisterDeviceToken } from './notifications/deviceTokenFunctions';
 
 // Admin & Moderation
-export { getAdminQueues, submitModerationAction, updatePlatformConfig } from './admin/adminFunctions';
+export {
+  getAdminDashboard,
+  getAdminQueues,
+  submitModerationAction,
+  getAuditLogs,
+  getPlatformConfig,
+  updatePlatformConfig,
+  setFeatureFlag,
+} from './admin/adminFunctions';
 
 // Feedback & Reviews
 export { submitFeedback } from './feedback/feedbackFunctions';

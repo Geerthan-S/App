@@ -13,8 +13,18 @@ const toLoginEmail = username =>
   (username.includes('@') ? username : `${username}@${ADMIN_LOGIN_DOMAIN}`).toLowerCase();
 
 // The portal accepts only email/password sessions holding a staff claim.
-const hasPortalAccess = token =>
-  token.signInProvider === 'password' && Boolean(token.claims.isVerifier || token.claims.isSuperAdmin);
+const isStaff = claims => Boolean(claims.isVerifier || claims.isSupportAdmin || claims.isSuperAdmin);
+const hasPortalAccess = token => token.signInProvider === 'password' && isStaff(token.claims);
+
+// Which parts of the portal each claim opens. The server enforces the same rules.
+let claims = {};
+const ACCESS = {
+  staff:    () => isStaff(claims),
+  verifier: () => Boolean(claims.isVerifier || claims.isSuperAdmin),
+  admin:    () => Boolean(claims.isSupportAdmin || claims.isSuperAdmin),
+};
+const roleLabel = () =>
+  claims.isSuperAdmin ? 'Super Admin' : claims.isSupportAdmin ? 'Support Admin' : 'Credential Verifier';
 
 const SIGN_IN_ERRORS = {
   'auth/invalid-credential':     'Invalid username or password.',
@@ -37,6 +47,7 @@ const setStatus = msg      => setTxt('status', msg);
 // Whitelist untrusted strings used as CSS class suffixes
 const SAFE_CASE_STATUSES = new Set(['submitted','under_review','needs_information','approved','rejected']);
 const SAFE_SCAN_STATUSES = new Set(['clean','pending','infected','rejected']);
+const SAFE_AUDIT_RESULTS = new Set(['SUCCESS','FAILED','DENIED']);
 const safeClass = (whitelist, value, fallback = '') =>
   whitelist.has(value) ? value : fallback;
 
@@ -104,83 +115,477 @@ async function submitReauth(event) {
   }
 }
 
+const toDate = ts => (ts && ts._seconds ? new Date(ts._seconds * 1000) : new Date(ts));
+
 function fmtDate(ts) {
   if (!ts) return '—';
-  try {
-    const d = ts._seconds ? new Date(ts._seconds * 1000) : new Date(ts);
-    return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' });
-  } catch { return '—'; }
+  const d = toDate(ts);
+  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' });
 }
 
-// ── Queue & Table ─────────────────────────────────────────
-async function refreshQueue() {
+function fmtDateTime(ts) {
+  if (!ts) return '—';
+  const d = toDate(ts);
+  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString('en-IN', {
+    day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit',
+  });
+}
+
+const fmtCount = n => (Number.isFinite(n) ? n.toLocaleString('en-IN') : '—');
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+function fillDetails(gridId, fields) {
+  const grid = el(gridId);
+  grid.replaceChildren();
+  for (const [label, value] of fields) {
+    const card = mk('div', 'detail-item');
+    card.append(div('label', label), div('value', value ?? '—'));
+    grid.append(card);
+  }
+}
+
+function td(...children) {
+  const cell = mk('td');
+  cell.append(...children);
+  return cell;
+}
+
+// ── Views & Navigation ────────────────────────────────────
+const VIEWS = {
+  dashboard: {
+    section: 'view-dashboard', title: 'Dashboard',
+    subtitle: 'Live platform totals and work waiting for review',
+    load: () => loadDashboard(),
+  },
+  doctors: {
+    section: 'view-verification', title: 'Doctor Verification',
+    subtitle: 'Review submitted doctor credentials against official registries',
+    load: () => loadQueue('doctors', 'doctor'),
+  },
+  hospitals: {
+    section: 'view-verification', title: 'Hospital Verification',
+    subtitle: 'Review hospital registrations against official records',
+    load: () => loadQueue('hospitals', 'organization'),
+  },
+  moderation: {
+    section: 'view-moderation', title: 'Duty Moderation',
+    subtitle: 'Act on duties and users reported by the community',
+    load: () => loadReports(),
+  },
+  audit: {
+    section: 'view-audit', title: 'Audit & Compliance',
+    subtitle: 'Immutable record of every privileged action',
+    load: () => loadAudit(),
+  },
+  config: {
+    section: 'view-config', title: 'Master Config',
+    subtitle: 'Platform settings and feature flags',
+    load: () => loadConfig(),
+  },
+};
+const VIEW_ACCESS = {
+  dashboard: 'staff', doctors: 'verifier', hospitals: 'verifier', moderation: 'admin', audit: 'admin', config: 'admin',
+};
+
+let currentView = null;
+const canOpen = name => Boolean(VIEWS[name]) && ACCESS[VIEW_ACCESS[name]]();
+
+function applyAccess() {
+  document.querySelectorAll('[data-access]').forEach(node => {
+    node.hidden = !ACCESS[node.dataset.access]();
+  });
+}
+
+async function showView(name) {
+  if (!canOpen(name)) return;
+  const view = VIEWS[name];
+  currentView = name;
+  document.querySelectorAll('.nav-item[data-view]').forEach(item =>
+    item.classList.toggle('active', item.dataset.view === name));
+  document.querySelectorAll('.view').forEach(section => { section.hidden = section.id !== view.section; });
+  setTxt('page-title', view.title);
+  setTxt('page-subtitle', view.subtitle);
+  setStatus('');
+  await view.load();
+}
+
+const reloadView = () => (currentView ? VIEWS[currentView].load() : Promise.resolve())
+  .catch(e => setStatus(e.message));
+
+// ── Dashboard ─────────────────────────────────────────────
+async function loadDashboard() {
+  setStatus('Loading dashboard…');
+  const d = await invoke('getAdminDashboard');
+  if (currentView !== 'dashboard') return;
+
+  setTxt('dash-doctor-cases', fmtCount(d.pending.doctorCases));
+  setTxt('dash-org-cases',    fmtCount(d.pending.organizationCases));
+  setTxt('dash-reports',      fmtCount(d.pending.openReports));
+  setTxt('doctor-badge',      d.pending.doctorCases);
+  setTxt('hospital-badge',    d.pending.organizationCases);
+  setTxt('report-badge',      d.pending.openReports);
+
+  setTxt('dash-doctors',      fmtCount(d.doctors.total));
+  setTxt('dash-doctors-sub',  `${fmtCount(d.doctors.verified)} verified`);
+  setTxt('dash-orgs',         fmtCount(d.organizations.total));
+  setTxt('dash-orgs-sub',     `${fmtCount(d.organizations.approved)} approved`);
+  setTxt('dash-duties',       fmtCount(d.duties.published));
+  setTxt('dash-duties-sub',   `${fmtCount(d.duties.filled)} filled`);
+  setTxt('dash-applications', fmtCount(d.applications.total));
+  setTxt('dash-assignments-sub', `${fmtCount(d.assignments.open)} assignments in progress`);
+  setTxt('dash-generated',    `Updated ${fmtDateTime(d.generatedAt)}`);
+  setStatus('');
+}
+
+// ── Verification Queue ────────────────────────────────────
+// Doctor and hospital cases arrive in one queue; each tab shows its own type.
+async function loadQueue(viewName, subjectType) {
   setStatus('Refreshing queue…');
+  const { cases: allCases = [] } = await invoke('getVerificationQueue');
+  if (currentView !== viewName) return;
+
+  const ofType = type => allCases.filter(c => (c.subjectType || 'doctor') === type);
+  setTxt('doctor-badge',   ofType('doctor').length);
+  setTxt('hospital-badge', ofType('organization').length);
+
+  const cases = ofType(subjectType);
+  const by = s => cases.filter(c => c.status === s).length;
+  setTxt('count-pending',  by('submitted'));
+  setTxt('count-inreview', by('under_review'));
+  setTxt('count-info',     by('needs_information'));
+  setTxt('count-total',    cases.length);
+  setTxt('table-count',    plural(cases.length, 'case'));
+
+  const tbody = el('case-list');
+  tbody.replaceChildren();
+
+  if (!cases.length) {
+    el('cases-table').hidden = true;
+    el('empty-queue').hidden = false;
+    setStatus('Queue is clear.');
+    return;
+  }
+  el('cases-table').hidden = false;
+  el('empty-queue').hidden = true;
+
+  for (const record of cases) {
+    const statusKey = safeClass(SAFE_CASE_STATUSES, record.status);
+
+    const tdId = td();
+    tdId.className = 'case-id-cell';
+    tdId.textContent = (record.caseId || '').slice(0, 14) + '…';
+
+    const tdDate = td();
+    tdDate.style.color = 'var(--text-secondary)';
+    tdDate.textContent = fmtDate(record.createdAt);
+
+    const btn = mk('button', 'btn-action');
+    btn.textContent = 'Review';
+    btn.addEventListener('click', () =>
+      openCase(record.caseId).catch(e => setStatus(e.message))
+    );
+
+    const tr = mk('tr');
+    tr.append(
+      td(div('subject-name', record.subjectName || 'Unknown'),
+         div('subject-id', (record.subjectId || record.caseId || '').slice(0, 18))),
+      td(span('type-badge', subjectType === 'organization' ? 'hospital' : 'doctor')),
+      tdId,
+      tdDate,
+      td(span(`status-badge ${statusKey}`, (record.status || '').replace(/_/g, ' '))),
+      td(btn),
+    );
+    tbody.append(tr);
+  }
+  setStatus(`${plural(cases.length, 'case')} in queue.`);
+}
+
+// ── Duty Moderation ───────────────────────────────────────
+const MODERATION_ACTIONS = {
+  duty: [
+    ['hide_duty', 'Hide duty', 'Pauses the listing so doctors can no longer see or apply to it.'],
+    ['dismiss',   'Dismiss report', 'Closes the report with no change to the duty.'],
+  ],
+  user: [
+    ['warn_user',    'Record warning', 'Records a warning on the audit trail. The user is not notified automatically.'],
+    ['suspend_user', 'Suspend account', 'Blocks every platform action and signs the user out of all devices.'],
+    ['dismiss',      'Dismiss report', 'Closes the report with no change to the account.'],
+  ],
+};
+let currentReport = null;
+
+async function loadReports() {
+  setStatus('Loading reports…');
+  const { moderationQueue: reports = [] } = await invoke('getAdminQueues');
+  if (currentView !== 'moderation') return;
+
+  setTxt('report-badge', reports.length);
+  setTxt('report-count', plural(reports.length, 'report'));
+  const tbody = el('report-list');
+  tbody.replaceChildren();
+  el('reports-table').hidden = !reports.length;
+  el('empty-reports').hidden = Boolean(reports.length);
+
+  for (const report of reports) {
+    const actionable = Boolean(MODERATION_ACTIONS[report.targetType]);
+    const btn = mk('button', 'btn-action');
+    btn.textContent = 'Resolve';
+    btn.disabled = !actionable;
+    btn.title = actionable ? '' : 'Unknown target type';
+    btn.addEventListener('click', () => openReport(report));
+
+    const tdDate = td();
+    tdDate.style.color = 'var(--text-secondary)';
+    tdDate.textContent = fmtDate(report.createdAt);
+
+    const tr = mk('tr');
+    tr.append(
+      td(div('subject-id', report.targetId || '—')),
+      td(span('type-badge', report.targetType || 'unknown')),
+      td(div('', report.reason || report.reasonCode || report.category || '—')),
+      td(div('subject-id', report.reporterId || '—')),
+      tdDate,
+      td(btn),
+    );
+    tbody.append(tr);
+  }
+  setStatus(reports.length ? `${plural(reports.length, 'open report')}.` : 'No open reports.');
+}
+
+function openReport(report) {
+  currentReport = report;
+  setTxt('moderation-title',    report.targetType === 'duty' ? 'Reported Duty' : 'Reported User');
+  setTxt('moderation-subtitle', `Report · ${report.reportId}`);
+  fillDetails('moderation-details', [
+    ['Target',      report.targetId],
+    ['Target Type', report.targetType],
+    ['Reason',      report.reason || report.reasonCode || report.category],
+    ['Reported By', report.reporterId],
+    ['Reported',    fmtDateTime(report.createdAt)],
+    ['Details',     report.details || report.description || report.notes],
+  ]);
+
+  const select = el('moderation-action');
+  select.replaceChildren();
+  for (const [value, label] of MODERATION_ACTIONS[report.targetType]) {
+    const option = mk('option');
+    option.value = value;
+    option.textContent = label;
+    select.append(option);
+  }
+  el('moderation-form').reset();
+  updateModerationHint();
+  el('moderation-submit').disabled = false;
+  el('moderation-modal').classList.remove('hidden');
+}
+
+function updateModerationHint() {
+  if (!currentReport) return;
+  const chosen = MODERATION_ACTIONS[currentReport.targetType]
+    .find(([value]) => value === el('moderation-action').value);
+  setTxt('moderation-hint', chosen ? chosen[2] : '');
+}
+
+function hideReport() {
+  el('moderation-modal').classList.add('hidden');
+  currentReport = null;
+}
+
+async function submitModeration(event) {
+  event.preventDefault();
+  if (!currentReport) return;
+  const action = el('moderation-action').value;
+  const label  = el('moderation-action').selectedOptions[0]?.textContent || action;
+  const payload = {
+    reportId:   currentReport.reportId,
+    action,
+    reasonCode: el('moderation-reason').value.trim(),
+    notes:      el('moderation-notes').value.trim() || undefined,
+  };
+  if (payload.reasonCode.length < 2) { setStatus('Enter a reason code.'); return; }
+  if (!window.confirm(`${label} for ${currentReport.targetType} ${currentReport.targetId}?`)) return;
+
+  const btn = el('moderation-submit');
+  btn.disabled = true;
   try {
-    const { cases = [] } = await invoke('getVerificationQueue');
-
-    const by = s => cases.filter(c => c.status === s).length;
-    setTxt('count-pending',  by('submitted'));
-    setTxt('count-inreview', by('under_review'));
-    setTxt('count-info',     by('needs_information'));
-    setTxt('count-total',    cases.length);
-    setTxt('queue-badge',    cases.length);
-    setTxt('table-count',    `${cases.length} case${cases.length === 1 ? '' : 's'}`);
-
-    const tbody = el('case-list');
-    tbody.replaceChildren();
-
-    if (!cases.length) {
-      el('cases-table').hidden = true;
-      el('empty-queue').hidden = false;
-      setStatus('Queue is clear.');
-      return;
-    }
-    el('cases-table').hidden = false;
-    el('empty-queue').hidden = true;
-
-    for (const record of cases) {
-      const statusKey = safeClass(SAFE_CASE_STATUSES, record.status);
-
-      // Subject cell
-      const tdSubject = mk('td');
-      tdSubject.append(
-        div('subject-name', record.subjectName || 'Unknown'),
-        div('subject-id',   (record.subjectId || record.caseId || '').slice(0, 18)),
-      );
-
-      // Type cell
-      const tdType = mk('td');
-      tdType.append(span('type-badge', record.subjectType || 'doctor'));
-
-      // Case ID cell
-      const tdId = mk('td', 'case-id-cell');
-      tdId.textContent = (record.caseId || '').slice(0, 14) + '…';
-
-      // Date cell
-      const tdDate = mk('td');
-      tdDate.style.color = 'var(--text-secondary)';
-      tdDate.textContent = fmtDate(record.createdAt);
-
-      // Status cell
-      const statusBadge = span(`status-badge ${statusKey}`, (record.status || '').replace(/_/g, ' '));
-      const tdStatus = mk('td');
-      tdStatus.append(statusBadge);
-
-      // Action cell
-      const btn = mk('button', 'btn-action');
-      btn.textContent = 'Review';
-      btn.addEventListener('click', () =>
-        openCase(record.caseId).catch(e => setStatus(e.message))
-      );
-      const tdAction = mk('td');
-      tdAction.append(btn);
-
-      const tr = mk('tr');
-      tr.append(tdSubject, tdType, tdId, tdDate, tdStatus, tdAction);
-      tbody.append(tr);
-    }
-    setStatus(`${cases.length} case${cases.length === 1 ? '' : 's'} in queue.`);
+    await ensureRecentSignIn();
+    setStatus('Applying action…');
+    await invoke('submitModerationAction', payload);
+    hideReport();
+    await reloadView();
+    setStatus('Action applied and recorded in the audit trail.');
   } catch (e) {
+    setStatus(e.message);
+    btn.disabled = false;
+  }
+}
+
+// ── Audit & Compliance ────────────────────────────────────
+let auditFilter = {};
+let auditCursor = null;
+
+async function loadAudit(append = false) {
+  setStatus('Loading audit trail…');
+  const query = { ...auditFilter, limit: 25 };
+  if (append && auditCursor) query.cursor = auditCursor;
+  const { entries = [], nextCursor = null } = await invoke('getAuditLogs', query);
+  if (currentView !== 'audit') return;
+
+  const tbody = el('audit-list');
+  if (!append) tbody.replaceChildren();
+  auditCursor = nextCursor;
+  el('audit-more').hidden = !nextCursor;
+
+  for (const entry of entries) {
+    const resultKey = safeClass(SAFE_AUDIT_RESULTS, entry.result);
+    const tr = mk('tr');
+    tr.append(
+      td(div('mono', fmtDateTime(entry.createdAt))),
+      td(div('mono', entry.action || '—')),
+      td(div('', entry.actorRole || '—'), div('cell-sub mono', entry.actorId || '')),
+      td(div('', entry.targetType || '—'), div('cell-sub mono', entry.targetId || '')),
+      td(span(`result-badge ${resultKey}`, entry.result || '—')),
+    );
+    tr.addEventListener('click', () => openAuditEntry(entry));
+    tbody.append(tr);
+  }
+
+  const shown = tbody.children.length;
+  el('audit-table').hidden = !shown;
+  el('empty-audit').hidden = Boolean(shown);
+  setTxt('audit-count', `${shown}${nextCursor ? '+' : ''} ${shown === 1 ? 'entry' : 'entries'}`);
+  setStatus('');
+}
+
+function applyAuditFilter(event) {
+  event.preventDefault();
+  const field = el('audit-filter-field').value;
+  const value = el('audit-filter-value').value.trim();
+  if (field && !value) { setStatus('Enter a value to filter by.'); return; }
+  auditFilter = field ? { [field]: field === 'action' ? value.toUpperCase() : value } : {};
+  auditCursor = null;
+  loadAudit().catch(e => setStatus(e.message));
+}
+
+function openAuditEntry(entry) {
+  setTxt('audit-title', entry.action || 'Audit Entry');
+  setTxt('audit-subtitle', `Entry · ${entry.auditId}`);
+  fillDetails('audit-details', [
+    ['Time',           fmtDateTime(entry.createdAt)],
+    ['Result',         entry.result],
+    ['Actor',          `${entry.actorRole || '—'} · ${entry.actorId || '—'}`],
+    ['Target',         `${entry.targetType || '—'} · ${entry.targetId || '—'}`],
+    ['Reason Code',    entry.reasonCode],
+    ['Correlation ID', entry.correlationId],
+  ]);
+  setTxt('audit-before', entry.beforeSummary ? JSON.stringify(entry.beforeSummary, null, 2) : '—');
+  setTxt('audit-after',  entry.afterSummary  ? JSON.stringify(entry.afterSummary,  null, 2) : '—');
+  el('audit-modal').classList.remove('hidden');
+}
+
+// ── Master Config ─────────────────────────────────────────
+const FLAG_LABELS = {
+  phase2_availability_enabled: 'Doctor availability rules',
+  phase2_replacement_enabled:  'Duty replacement requests',
+  phase2_disputes_enabled:     'Assignment disputes',
+};
+let configCanEdit = false;
+
+const versionMeta = item => (item.version
+  ? `v${item.version} · updated ${fmtDateTime(item.updatedAt)}`
+  : 'Default (never changed)');
+
+async function loadConfig() {
+  setStatus('Loading configuration…');
+  const config = await invoke('getPlatformConfig');
+  if (currentView !== 'config') return;
+
+  configCanEdit = Boolean(config.canEdit);
+  el('config-readonly').hidden = configCanEdit;
+
+  const { offerPolicy } = config;
+  const hours = el('offer-hours');
+  hours.value    = offerPolicy.offerExpiryHours;
+  hours.min      = offerPolicy.range.min;
+  hours.max      = offerPolicy.range.max;
+  hours.disabled = !configCanEdit;
+  el('offer-save').disabled = !configCanEdit;
+  setTxt('offer-hint', `How long a doctor has to confirm a selection. Allowed ${offerPolicy.range.min}–${offerPolicy.range.max} hours.`);
+  setTxt('offer-meta', versionMeta(offerPolicy));
+
+  const list = el('flag-list');
+  list.replaceChildren();
+  for (const flag of config.featureFlags) {
+    const info = mk('div');
+    info.append(div('flag-name', FLAG_LABELS[flag.key] || flag.key), div('flag-key', `${flag.key} · ${versionMeta(flag)}`));
+
+    const toggle = mk('label', 'switch');
+    const input  = mk('input');
+    input.type     = 'checkbox';
+    input.checked  = flag.enabled;
+    input.disabled = !configCanEdit;
+    input.setAttribute('aria-label', FLAG_LABELS[flag.key] || flag.key);
+    input.addEventListener('change', () => toggleFlag(flag.key, input));
+    toggle.append(input, mk('span', 'track'));
+
+    const row = mk('div', 'flag-row');
+    row.append(info, toggle);
+    list.append(row);
+  }
+
+  const { fixed } = config;
+  fillDetails('fixed-settings', [
+    ['Re-authentication window', `${fixed.stepUpAuthMaxAgeSeconds / 60} minutes`],
+    ['Max evidence file size',   `${fixed.maxEvidenceFileSizeBytes / (1024 * 1024)} MB`],
+    ['Evidence link lifetime',   `${fixed.signedUrlExpirySeconds / 60} minutes`],
+    ['Consent version',          fixed.consentVersion],
+  ]);
+  setStatus('');
+}
+
+async function saveOfferPolicy(event) {
+  event.preventDefault();
+  if (!configCanEdit) return;
+  const input = el('offer-hours');
+  const offerExpiryHours = Number(input.value);
+  if (!Number.isInteger(offerExpiryHours) || offerExpiryHours < Number(input.min) || offerExpiryHours > Number(input.max)) {
+    setStatus(`Offer expiry must be a whole number from ${input.min} to ${input.max}.`);
+    return;
+  }
+  if (!window.confirm(`Set offer expiry to ${offerExpiryHours} hours? New offers will use this immediately.`)) return;
+
+  const btn = el('offer-save');
+  btn.disabled = true;
+  try {
+    await ensureRecentSignIn();
+    setStatus('Saving…');
+    await invoke('updatePlatformConfig', { configKey: 'offer_policy', configValue: { offerExpiryHours } });
+    await reloadView();
+    setStatus('Offer policy saved and recorded in the audit trail.');
+  } catch (e) {
+    setStatus(e.message);
+  } finally {
+    btn.disabled = !configCanEdit;
+  }
+}
+
+async function toggleFlag(flagKey, input) {
+  const enabled = input.checked;
+  const label   = FLAG_LABELS[flagKey] || flagKey;
+  if (!window.confirm(`${enabled ? 'Enable' : 'Disable'} "${label}" for every user?`)) {
+    input.checked = !enabled;
+    return;
+  }
+  input.disabled = true;
+  try {
+    await ensureRecentSignIn();
+    setStatus('Saving…');
+    await invoke('setFeatureFlag', { flagKey, enabled });
+    await reloadView();
+    setStatus(`"${label}" ${enabled ? 'enabled' : 'disabled'} and recorded in the audit trail.`);
+  } catch (e) {
+    input.checked  = !enabled;
+    input.disabled = !configCanEdit;
     setStatus(e.message);
   }
 }
@@ -193,16 +598,15 @@ async function openCase(caseId) {
   currentCase    = details.case;
   currentDetails = details;
 
-  setTxt('modal-title',    `${currentCase.subjectType || 'Doctor'} Verification`);
+  setTxt('modal-title',    currentCase.subjectType === 'organization' ? 'Hospital Verification' : 'Doctor Verification');
   setTxt('modal-subtitle', `Case · ${currentCase.caseId}`);
 
   // Subject detail grid — all text content, no innerHTML
-  const grid = el('modal-details');
-  grid.replaceChildren();
-  const fields = [
-    ['Full Name',        details.subject?.fullName || details.subject?.legalName],
+  fillDetails('modal-details', [
+    ['Name',             details.subject?.fullName || details.subject?.legalName],
     ['Council',          details.subject?.council],
     ['Registration No.', details.subject?.registrationNo || details.subject?.registrationNumber],
+    ['Organization Type', details.subject?.organizationType],
     ['Qualification',    details.subject?.qualification],
     ['Primary Specialty', details.subject?.primarySpecialty],
     ['Experience (yrs)', details.subject?.yearsOfExperience],
@@ -212,12 +616,7 @@ async function openCase(caseId) {
     ['Profile Revision', details.isStale
       ? `STALE — case reviews r${currentCase.subjectRevision ?? 1}, profile is r${details.subject?.profileRevision ?? '?'}`
       : `r${details.subject?.profileRevision ?? 1}`],
-  ];
-  for (const [label, value] of fields) {
-    const card = mk('div', 'detail-item');
-    card.append(div('label', label), div('value', value ?? '—'));
-    grid.append(card);
-  }
+  ]);
 
   // Evidence list — all safe DOM methods
   const evEl = el('modal-evidence');
@@ -323,7 +722,7 @@ async function submitDecision(event) {
     setStatus('Recording decision…');
     await invoke('recordVerificationDecision', payload);
     hideModal();
-    await refreshQueue();
+    await reloadView();
     setStatus('Decision recorded with a full audit entry.');
   } catch (e) {
     setStatus(e.message);
@@ -333,18 +732,25 @@ async function submitDecision(event) {
 }
 
 // ── Auth & Boot ───────────────────────────────────────────
-function showWorkspace(name) {
-  const display = name || 'Doctor';
+function showWorkspace(name, tokenClaims) {
+  claims = tokenClaims || {};
+  const display = name || 'Staff';
   setTxt('user-name',   display);
   setTxt('user-avatar', display[0].toUpperCase());
+  setTxt('user-role',   roleLabel());
+  applyAccess();
   el('login-screen').hidden = true;
   el('admin-shell').hidden  = false;
-  refreshQueue().catch(e => setStatus(e.message));
+  showView('dashboard').catch(e => setStatus(e.message));
 }
 
 function showLogin(msg = '') {
   closeReauth(new Error('Signed out.'));
   hideModal();
+  hideReport();
+  el('audit-modal').classList.add('hidden');
+  claims = {};
+  currentView = null;
   el('admin-shell').hidden  = true;
   el('login-screen').hidden = false;
   el('tf-password').value   = '';
@@ -369,7 +775,7 @@ async function boot() {
     try {
       const token = await user.getIdTokenResult(true);
       if (hasPortalAccess(token)) {
-        showWorkspace(user.displayName || user.email.split('@')[0]);
+        showWorkspace(user.displayName || user.email.split('@')[0], token.claims);
         return;
       }
     } catch (_) {}
@@ -422,7 +828,37 @@ el('sign-out').addEventListener('click', async () => {
   if (auth && auth.currentUser) await signOut(auth).catch(() => {});
   showLogin();
 });
-el('refresh').addEventListener('click',  () => refreshQueue().catch(e => setStatus(e.message)));
+el('refresh').addEventListener('click', reloadView);
+
+document.querySelectorAll('.nav-item[data-view]').forEach(item =>
+  item.addEventListener('click', () => showView(item.dataset.view).catch(e => setStatus(e.message))));
+document.querySelectorAll('.metric-link[data-goto]').forEach(card =>
+  card.addEventListener('click', () => showView(card.dataset.goto).catch(e => setStatus(e.message))));
+
+el('moderation-form').addEventListener('submit', submitModeration);
+el('moderation-action').addEventListener('change', updateModerationHint);
+el('moderation-close').addEventListener('click', hideReport);
+el('moderation-cancel').addEventListener('click', hideReport);
+
+el('audit-filter').addEventListener('submit', applyAuditFilter);
+el('audit-filter-field').addEventListener('change', () => {
+  const field = el('audit-filter-field').value;
+  const input = el('audit-filter-value');
+  input.disabled    = !field;
+  input.placeholder = field === 'targetId' ? 'e.g. doctor or duty ID' : 'e.g. MODERATION_SUSPEND_USER';
+  if (!field) input.value = '';
+});
+el('audit-more').addEventListener('click', () => loadAudit(true).catch(e => setStatus(e.message)));
+el('audit-close').addEventListener('click', () => el('audit-modal').classList.add('hidden'));
+
+el('offer-form').addEventListener('submit', saveOfferPolicy);
+
+el('moderation-modal').addEventListener('click', e => {
+  if (e.target === el('moderation-modal')) hideReport();
+});
+el('audit-modal').addEventListener('click', e => {
+  if (e.target === el('audit-modal')) el('audit-modal').classList.add('hidden');
+});
 
 el('decision').addEventListener('change', () => {
   el('source-fields').hidden = el('decision').value !== 'approved';

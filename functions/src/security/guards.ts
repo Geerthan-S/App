@@ -66,6 +66,16 @@ export const requireAdmin = (request: CallableRequest, correlationId: string): s
   return uid;
 };
 
+/** Any portal staff role: verifier, support admin or super admin. */
+export const requireStaff = (request: CallableRequest, correlationId: string): string => {
+  const uid = requireAuth(request);
+  const token = request.auth?.token;
+  if (!token?.isVerifier && !token?.isSupportAdmin && !token?.isSuperAdmin) {
+    throw new DomainError('PERMISSION_DENIED', 'Staff privileges required', correlationId);
+  }
+  return uid;
+};
+
 export const requireSuperAdmin = (request: CallableRequest, correlationId: string): string => {
   const uid = requireAuth(request);
   const token = request.auth?.token;

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>HealthForce · Verifier Workspace</title>
+  <title>HealthForce Admin</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
@@ -68,7 +68,7 @@
   <!-- ── Admin Shell ───────────────────────────────────── -->
   <div id="admin-shell" class="admin-layout" hidden>
 
-    <!-- Sidebar -->
+    <!-- Sidebar: items are shown per role in app.js (data-access) -->
     <aside class="sidebar">
       <div>
         <div class="brand">
@@ -79,14 +79,32 @@
           </div>
         </div>
         <nav class="nav-menu">
-          <a class="nav-item active" id="nav-queue">
-            <span class="nav-icon">📋</span>
-            Verification Queue
-            <span class="badge" id="queue-badge">0</span>
+          <a class="nav-item" data-view="dashboard" data-access="staff" hidden>
+            <span class="nav-icon">📊</span>
+            Dashboard
           </a>
-          <a class="nav-item" id="nav-audit">
-            <span class="nav-icon">🔍</span>
-            Audit Trail
+          <a class="nav-item" data-view="doctors" data-access="verifier" hidden>
+            <span class="nav-icon">👨‍⚕️</span>
+            Doctor Verification
+            <span class="badge" id="doctor-badge">0</span>
+          </a>
+          <a class="nav-item" data-view="hospitals" data-access="verifier" hidden>
+            <span class="nav-icon">🏥</span>
+            Hospital Verification
+            <span class="badge" id="hospital-badge">0</span>
+          </a>
+          <a class="nav-item" data-view="moderation" data-access="admin" hidden>
+            <span class="nav-icon">🛡️</span>
+            Duty Moderation
+            <span class="badge" id="report-badge">0</span>
+          </a>
+          <a class="nav-item" data-view="audit" data-access="admin" hidden>
+            <span class="nav-icon">📜</span>
+            Audit &amp; Compliance
+          </a>
+          <a class="nav-item" data-view="config" data-access="admin" hidden>
+            <span class="nav-icon">⚙️</span>
+            Master Config
           </a>
         </nav>
       </div>
@@ -95,7 +113,7 @@
           <div class="avatar" id="user-avatar">V</div>
           <div class="admin-details">
             <span class="name" id="user-name">Verifier</span>
-            <span class="role">Credential Verifier</span>
+            <span class="role" id="user-role">Credential Verifier</span>
           </div>
         </div>
         <button id="sign-out" class="btn-logout">Sign out</button>
@@ -108,8 +126,8 @@
       <!-- Top Header -->
       <header class="top-header">
         <div class="header-title">
-          <h1>Verification Queue</h1>
-          <p>Review submitted doctor credentials against official registries</p>
+          <h1 id="page-title">Dashboard</h1>
+          <p id="page-subtitle"></p>
         </div>
         <div class="header-actions">
           <p id="status" role="status" aria-live="polite" class="status-text"></p>
@@ -118,57 +136,205 @@
         </div>
       </header>
 
-      <!-- Content Body -->
       <div class="content-body">
 
-        <!-- Metrics -->
-        <div class="metrics-grid">
-          <div class="metric-card">
-            <div class="title">Awaiting Review</div>
-            <div class="value" id="count-pending">—</div>
-            <div class="subtitle">Submitted cases</div>
+        <!-- ── Dashboard ── -->
+        <section id="view-dashboard" class="view" hidden>
+          <div class="section-heading">Needs attention</div>
+          <div class="metrics-grid">
+            <button type="button" class="metric-card metric-link" data-goto="doctors" data-access="verifier">
+              <div class="title">Doctor Cases</div>
+              <div class="value" id="dash-doctor-cases">—</div>
+              <div class="subtitle">Awaiting a verification decision →</div>
+            </button>
+            <button type="button" class="metric-card metric-link" data-goto="hospitals" data-access="verifier">
+              <div class="title">Hospital Cases</div>
+              <div class="value" id="dash-org-cases">—</div>
+              <div class="subtitle">Awaiting a verification decision →</div>
+            </button>
+            <button type="button" class="metric-card metric-link" data-goto="moderation" data-access="admin">
+              <div class="title">Open Reports</div>
+              <div class="value" id="dash-reports">—</div>
+              <div class="subtitle">Duties and users flagged for review →</div>
+            </button>
           </div>
-          <div class="metric-card">
-            <div class="title">Under Review</div>
-            <div class="value" id="count-inreview">—</div>
-            <div class="subtitle">Claimed by verifiers</div>
-          </div>
-          <div class="metric-card">
-            <div class="title">Needs Info</div>
-            <div class="value" id="count-info">—</div>
-            <div class="subtitle">Awaiting resubmission</div>
-          </div>
-          <div class="metric-card">
-            <div class="title">Total in Queue</div>
-            <div class="value" id="count-total">—</div>
-            <div class="subtitle">All open cases</div>
-          </div>
-        </div>
 
-        <!-- Cases Table -->
-        <div class="table-card">
-          <div class="table-header">
-            <h3>Open Cases</h3>
-            <span id="table-count" class="table-count"></span>
+          <div class="section-heading">Platform</div>
+          <div class="metrics-grid">
+            <div class="metric-card">
+              <div class="title">Doctors</div>
+              <div class="value" id="dash-doctors">—</div>
+              <div class="subtitle" id="dash-doctors-sub">— verified</div>
+            </div>
+            <div class="metric-card">
+              <div class="title">Hospitals</div>
+              <div class="value" id="dash-orgs">—</div>
+              <div class="subtitle" id="dash-orgs-sub">— approved</div>
+            </div>
+            <div class="metric-card">
+              <div class="title">Open Duties</div>
+              <div class="value" id="dash-duties">—</div>
+              <div class="subtitle" id="dash-duties-sub">— filled</div>
+            </div>
+            <div class="metric-card">
+              <div class="title">Applications</div>
+              <div class="value" id="dash-applications">—</div>
+              <div class="subtitle" id="dash-assignments-sub">— assignments in progress</div>
+            </div>
           </div>
-          <div id="empty-queue" class="empty-state" hidden>
-            <div class="empty-icon">✅</div>
-            <p>No cases awaiting review</p>
+          <p class="footnote" id="dash-generated"></p>
+        </section>
+
+        <!-- ── Verification (doctors and hospitals share this view) ── -->
+        <section id="view-verification" class="view" hidden>
+          <div class="metrics-grid">
+            <div class="metric-card">
+              <div class="title">Awaiting Review</div>
+              <div class="value" id="count-pending">—</div>
+              <div class="subtitle">Submitted cases</div>
+            </div>
+            <div class="metric-card">
+              <div class="title">Under Review</div>
+              <div class="value" id="count-inreview">—</div>
+              <div class="subtitle">Claimed by verifiers</div>
+            </div>
+            <div class="metric-card">
+              <div class="title">Needs Info</div>
+              <div class="value" id="count-info">—</div>
+              <div class="subtitle">Awaiting resubmission</div>
+            </div>
+            <div class="metric-card">
+              <div class="title">Total in Queue</div>
+              <div class="value" id="count-total">—</div>
+              <div class="subtitle">All open cases</div>
+            </div>
           </div>
-          <table class="data-table" id="cases-table">
-            <thead>
-              <tr>
-                <th>Subject</th>
-                <th>Type</th>
-                <th>Case ID</th>
-                <th>Submitted</th>
-                <th>Status</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody id="case-list"></tbody>
-          </table>
-        </div>
+
+          <div class="table-card">
+            <div class="table-header">
+              <h3>Open Cases</h3>
+              <span id="table-count" class="table-count"></span>
+            </div>
+            <div id="empty-queue" class="empty-state" hidden>
+              <div class="empty-icon">✅</div>
+              <p>No cases awaiting review</p>
+            </div>
+            <table class="data-table" id="cases-table">
+              <thead>
+                <tr>
+                  <th>Subject</th>
+                  <th>Type</th>
+                  <th>Case ID</th>
+                  <th>Submitted</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="case-list"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ── Duty Moderation ── -->
+        <section id="view-moderation" class="view" hidden>
+          <div class="table-card">
+            <div class="table-header">
+              <h3>Open Reports</h3>
+              <span id="report-count" class="table-count"></span>
+            </div>
+            <div id="empty-reports" class="empty-state" hidden>
+              <div class="empty-icon">🛡️</div>
+              <p>No open reports</p>
+            </div>
+            <table class="data-table" id="reports-table">
+              <thead>
+                <tr>
+                  <th>Target</th>
+                  <th>Type</th>
+                  <th>Reason</th>
+                  <th>Reported By</th>
+                  <th>Reported</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="report-list"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ── Audit & Compliance ── -->
+        <section id="view-audit" class="view" hidden>
+          <form id="audit-filter" class="filter-bar">
+            <select id="audit-filter-field" aria-label="Filter by">
+              <option value="">All events</option>
+              <option value="action">Action is</option>
+              <option value="targetId">Target ID is</option>
+            </select>
+            <input id="audit-filter-value" placeholder="e.g. MODERATION_SUSPEND_USER" disabled>
+            <button type="submit" class="btn-secondary">Apply</button>
+          </form>
+          <div class="table-card">
+            <div class="table-header">
+              <h3>Audit Trail</h3>
+              <span id="audit-count" class="table-count"></span>
+            </div>
+            <div id="empty-audit" class="empty-state" hidden>
+              <div class="empty-icon">📜</div>
+              <p>No audit entries match</p>
+            </div>
+            <table class="data-table" id="audit-table">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Action</th>
+                  <th>Actor</th>
+                  <th>Target</th>
+                  <th>Result</th>
+                </tr>
+              </thead>
+              <tbody id="audit-list"></tbody>
+            </table>
+            <div class="table-footer">
+              <button type="button" id="audit-more" class="btn-secondary" hidden>Load older entries</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── Master Config ── -->
+        <section id="view-config" class="view" hidden>
+          <p id="config-readonly" class="notice" hidden>Only a Super Admin can change these settings.</p>
+
+          <div class="config-card">
+            <div class="config-head">
+              <h3>Offer Policy</h3>
+              <span class="config-meta" id="offer-meta"></span>
+            </div>
+            <form id="offer-form" class="config-row">
+              <div class="form-group">
+                <label for="offer-hours">Offer expiry (hours)</label>
+                <input id="offer-hours" type="number" step="1" required>
+                <span class="hint" id="offer-hint"></span>
+              </div>
+              <button type="submit" id="offer-save" class="btn-decision">Save</button>
+            </form>
+          </div>
+
+          <div class="config-card">
+            <div class="config-head">
+              <h3>Feature Flags</h3>
+              <span class="config-meta">Phase 2 modules stay off until enabled here</span>
+            </div>
+            <div id="flag-list" class="flag-list"></div>
+          </div>
+
+          <div class="config-card">
+            <div class="config-head">
+              <h3>Security Settings</h3>
+              <span class="config-meta">Fixed in code; shown for reference</span>
+            </div>
+            <div class="detail-grid" id="fixed-settings"></div>
+          </div>
+        </section>
 
       </div>
     </div>
@@ -258,6 +424,76 @@
           </form>
         </div>
 
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Moderation Action Modal ───────────────────────── -->
+  <div id="moderation-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="moderation-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title" id="moderation-title">Resolve Report</h2>
+          <p class="modal-subtitle" id="moderation-subtitle"></p>
+        </div>
+        <button id="moderation-close" class="btn-close" aria-label="Close">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-section">
+          <div class="section-label">Report</div>
+          <div class="detail-grid" id="moderation-details"></div>
+        </div>
+        <div class="modal-section">
+          <div class="section-label">Action</div>
+          <form id="moderation-form">
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="moderation-action">Action</label>
+                <select id="moderation-action" required></select>
+              </div>
+              <div class="form-group">
+                <label for="moderation-reason">Reason Code</label>
+                <input id="moderation-reason" placeholder="e.g. MISLEADING_PAY" minlength="2" required>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="moderation-notes">Notes</label>
+              <textarea id="moderation-notes" rows="3" maxlength="1000" placeholder="Internal notes for audit trail…"></textarea>
+            </div>
+            <p class="hint" id="moderation-hint"></p>
+            <div class="modal-actions">
+              <button type="button" id="moderation-cancel" class="btn-secondary">Cancel</button>
+              <button type="submit" id="moderation-submit" class="btn-decision">Apply Action</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Audit Entry Modal ─────────────────────────────── -->
+  <div id="audit-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="audit-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title" id="audit-title">Audit Entry</h2>
+          <p class="modal-subtitle" id="audit-subtitle"></p>
+        </div>
+        <button id="audit-close" class="btn-close" aria-label="Close">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-section">
+          <div class="section-label">Event</div>
+          <div class="detail-grid" id="audit-details"></div>
+        </div>
+        <div class="modal-section">
+          <div class="section-label">Before</div>
+          <pre class="json-block" id="audit-before"></pre>
+        </div>
+        <div class="modal-section">
+          <div class="section-label">After</div>
+          <pre class="json-block" id="audit-after"></pre>
+        </div>
       </div>
     </div>
   </div>
