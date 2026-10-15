@@ -389,11 +389,17 @@ class _HospitalDashboardScreenState
     if (_selectedOrgId == null) {
       return Scaffold(
         appBar: AppBar(title: Text(loc.translate('hospitalOperations'))),
-        body: const EmptyStateView(
+        body: EmptyStateView(
           icon: Icons.apartment_outlined,
           title: 'No organization found',
           description:
               'Set up your hospital organization to start posting duties.',
+          actionLabel: 'Set up hospital',
+          // Reload on return so the new organization appears straight away.
+          onAction: () async {
+            await context.push('/hospital-profile');
+            if (mounted) _loadOrgs();
+          },
         ),
       );
     }

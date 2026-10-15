@@ -37,6 +37,8 @@ describeWithEmulator('admin portal', () => {
       await db().doc('organizations/o1').set({ verificationState: 'approved' });
       await db().doc('duties/u1').set({ status: 'published' });
       await db().doc('duties/u2').set({ status: 'filled' });
+      await db().doc('duties/u1/applications/d1').set({ doctorId: 'd1', status: 'submitted' });
+      await db().doc('duties/u2/applications/d2').set({ doctorId: 'd2', status: 'selected' });
       await db().doc('assignments/a1').set({ status: 'confirmed' });
       await db().doc('assignments/a2').set({ status: 'cancelled' });
       await db().doc('verificationCases/c1').set({ subjectType: 'doctor', status: 'submitted' });
@@ -50,6 +52,7 @@ describeWithEmulator('admin portal', () => {
       expect(result.organizations).toEqual({ total: 1, approved: 1 });
       expect(result.duties).toEqual({ published: 1, filled: 1 });
       expect(result.assignments).toEqual({ open: 1 });
+      expect(result.applications).toEqual({ total: 2 });
       expect(result.pending).toEqual({ doctorCases: 1, organizationCases: 1, openReports: 1 });
     });
 

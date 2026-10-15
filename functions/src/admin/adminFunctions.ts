@@ -69,7 +69,8 @@ export const getAdminDashboard = domainCall(async (request: CallableRequest) => 
     countOf(db().collection('organizations').where('verificationState', '==', 'approved')),
     countOf(db().collection('duties').where('status', '==', 'published')),
     countOf(db().collection('duties').where('status', '==', 'filled')),
-    countOf(db().collection('applications')),
+    // Applications live under each duty (duties/{dutyId}/applications).
+    countOf(db().collectionGroup('applications')),
     countOf(db().collection('assignments').where('status', 'in', OPEN_ASSIGNMENT_STATUSES)),
     countOf(cases.where('subjectType', '==', 'doctor')),
     countOf(cases.where('subjectType', '==', 'organization')),
