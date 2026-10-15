@@ -7,7 +7,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
-const PORT = 5000;
+const PORT = Number(process.env.PORT) || 5000;
 const PUBLIC_DIR = path.join(__dirname, 'admin');
 
 const MIME_TYPES = {

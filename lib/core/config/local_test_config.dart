@@ -9,5 +9,7 @@ class LocalTestConfig {
   static const email = 'tester@healthforce.example';
   // Disposable emulator fixture, never a credential for the live project.
   static const password = 'local-emulator-fixture-only';
-  static const host = '10.0.2.2';
+  /// The Android emulator reaches the host machine at 10.0.2.2; a browser
+  /// build runs on the host itself.
+  static const host = kIsWeb ? '127.0.0.1' : '10.0.2.2';
 }

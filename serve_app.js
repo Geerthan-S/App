@@ -2,7 +2,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const PORT = 8088;
+const PORT = Number(process.env.PORT) || 8088;
 const PUBLIC_DIR = path.join(__dirname, 'build', 'web');
 
 const MIME_TYPES = {
@@ -38,7 +38,8 @@ const server = http.createServer((req, res) => {
       res.writeHead(404, { 'Content-Type': 'text/plain' });
       res.end('Not Found');
     } else {
-      res.writeHead(200, { 'Content-Type': contentType });
+      // Always revalidate so a fresh `flutter build web` shows up on reload.
+      res.writeHead(200, { 'Content-Type': contentType, 'Cache-Control': 'no-cache' });
       res.end(data);
     }
   });

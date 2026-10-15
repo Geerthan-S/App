@@ -1,10 +1,12 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
 import {
-  getAuth, EmailAuthProvider, onAuthStateChanged,
+  getAuth, connectAuthEmulator, EmailAuthProvider, onAuthStateChanged,
   reauthenticateWithCredential, signOut,
   signInWithEmailAndPassword,
 } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
-import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-functions.js';
+import {
+  getFunctions, connectFunctionsEmulator, httpsCallable,
+} from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-functions.js';
 
 // A bare username maps to an internal Firebase email/password account.
 // Must match scripts/set-admin-login.mjs.
@@ -758,14 +760,27 @@ function showLogin(msg = '') {
   showLoginErr(msg);
 }
 
+// Local development only: ?emulator talks to the Firebase Emulator Suite on
+// this machine (demo-healthforce project) instead of the live project.
+const EMULATOR_CONFIG = { apiKey: 'demo-key', projectId: 'demo-healthforce', authDomain: 'demo-healthforce.firebaseapp.com' };
+
 async function boot() {
-  const local      = ['localhost', '127.0.0.1'].includes(window.location.hostname);
-  const configPath = local ? '/firebase-config.json' : '/__/firebase/init.json';
-  const res        = await fetch(configPath, { cache: 'no-store' });
-  if (!res.ok) throw new Error('Firebase config unavailable for this portal.');
-  const app = initializeApp(await res.json());
+  const local       = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+  const useEmulator = local && new URLSearchParams(window.location.search).has('emulator');
+  let config = EMULATOR_CONFIG;
+  if (!useEmulator) {
+    const res = await fetch(local ? '/firebase-config.json' : '/__/firebase/init.json', { cache: 'no-store' });
+    if (!res.ok) throw new Error('Firebase config unavailable for this portal.');
+    config = await res.json();
+  }
+  const app = initializeApp(config);
   auth      = getAuth(app);
   functions = getFunctions(app, 'asia-south1');  // must match setGlobalOptions in functions/src/index.ts
+  if (useEmulator) {
+    connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
+    connectFunctionsEmulator(functions, '127.0.0.1', 5001);
+    document.querySelector('.env-badge').textContent = 'EMULATOR';
+  }
   _booted   = true;
 
   // Single entry point into the workspace, for fresh and persisted sessions alike.

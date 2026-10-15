@@ -5,6 +5,7 @@
 import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'main_scaffold.dart';
@@ -53,16 +54,20 @@ class GoRouterRefreshStream extends ChangeNotifier {
   }
 }
 
+/// Firebase may have failed to start (offline preview, bad config). Touching
+/// FirebaseAuth.instance then throws, so routing treats the user as signed out.
+bool get _firebaseReady => Firebase.apps.isNotEmpty;
+
 final appRouter = GoRouter(
   navigatorKey: _rootNavigatorKey,
   initialLocation: '/login',
   refreshListenable: GoRouterRefreshStream(
-    FirebaseAuth.instance.authStateChanges(),
+    _firebaseReady ? FirebaseAuth.instance.authStateChanges() : const Stream<User?>.empty(),
   ),
   errorBuilder: (context, state) =>
       NotFoundScreen(attemptedPath: state.uri.toString()),
   redirect: (context, state) async {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = _firebaseReady ? FirebaseAuth.instance.currentUser : null;
     final location = state.matchedLocation;
     final isLoggingIn = location == '/login';
     // '/otp' is reached mid phone-verification, before Firebase has signed
@@ -101,6 +106,10 @@ final appRouter = GoRouter(
     GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
     GoRoute(
       path: '/otp',
+      // Arguments only exist in memory; a browser refresh or direct link has
+      // none, so send the user back to request a new code.
+      redirect: (context, state) =>
+          state.extra is Map<String, String> ? null : '/login',
       builder: (context, state) {
         final extra = state.extra as Map<String, String>;
         return OtpScreen(
@@ -209,7 +218,12 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/reviews',
       builder: (context, state) {
-        final extra = state.extra as Map<String, dynamic>;
+        final extra = state.extra;
+        if (extra is! Map<String, dynamic> ||
+            extra['title'] is! String ||
+            extra['reviews'] is! List<Map<String, dynamic>>) {
+          return NotFoundScreen(attemptedPath: state.uri.toString());
+        }
         return ReviewsScreen(
           title: extra['title'] as String,
           reviews: extra['reviews'] as List<Map<String, dynamic>>,
