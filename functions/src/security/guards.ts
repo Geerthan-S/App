@@ -7,6 +7,7 @@ import type { DocumentData, Transaction } from 'firebase-admin/firestore';
 import { DomainError } from '../shared/errors';
 import { db } from '../shared/firestoreHelpers';
 import { PLATFORM_DEFAULTS } from '../shared/platformConfig';
+import { isEmulator } from '../shared/runtime';
 
 export const requireAuth = (request: CallableRequest): string => {
   if (!request.auth || !request.auth.uid) {
@@ -48,41 +49,58 @@ export const assertAccountActiveInTx = async (tx: Transaction, uid: string, corr
   }
 };
 
-export const requireVerifier = (request: CallableRequest, correlationId: string): string => {
+/** The second factor the session signed in with (e.g. `totp`), or undefined for a single-factor session. */
+export const secondFactorOf = (request: CallableRequest): string | undefined => {
+  const firebaseClaims = request.auth?.token?.firebase as { sign_in_second_factor?: unknown } | undefined;
+  return typeof firebaseClaims?.sign_in_second_factor === 'string' ? firebaseClaims.sign_in_second_factor : undefined;
+};
+
+/**
+ * Staff privileges only count in a session that completed a second factor.
+ * The Functions emulator is exempt so the portal can run locally without
+ * Identity Platform; production always requires it.
+ */
+const requireSecondFactor = (request: CallableRequest, correlationId: string): void => {
+  if (!isEmulator() && !secondFactorOf(request)) {
+    throw new DomainError('MFA_REQUIRED', 'Sign in with your authenticator app to use staff tools', correlationId);
+  }
+};
+
+const requireStaffClaim = (
+  request: CallableRequest,
+  correlationId: string,
+  claims: ('isVerifier' | 'isSupportAdmin' | 'isSuperAdmin')[],
+  message: string
+): string => {
   const uid = requireAuth(request);
   const token = request.auth?.token;
-  if (!token?.isVerifier && !token?.isSuperAdmin) {
-    throw new DomainError('PERMISSION_DENIED', 'Verifier or Admin privileges required', correlationId);
+  if (!claims.some(claim => token?.[claim] === true)) {
+    throw new DomainError('PERMISSION_DENIED', message, correlationId);
   }
+  requireSecondFactor(request, correlationId);
   return uid;
 };
 
-export const requireAdmin = (request: CallableRequest, correlationId: string): string => {
-  const uid = requireAuth(request);
-  const token = request.auth?.token;
-  if (!token?.isSupportAdmin && !token?.isSuperAdmin) {
-    throw new DomainError('PERMISSION_DENIED', 'Administrative privileges required', correlationId);
-  }
-  return uid;
-};
+export const requireVerifier = (request: CallableRequest, correlationId: string): string =>
+  requireStaffClaim(request, correlationId, ['isVerifier', 'isSuperAdmin'], 'Verifier or Admin privileges required');
+
+export const requireAdmin = (request: CallableRequest, correlationId: string): string =>
+  requireStaffClaim(request, correlationId, ['isSupportAdmin', 'isSuperAdmin'], 'Administrative privileges required');
 
 /** Any portal staff role: verifier, support admin or super admin. */
-export const requireStaff = (request: CallableRequest, correlationId: string): string => {
-  const uid = requireAuth(request);
-  const token = request.auth?.token;
-  if (!token?.isVerifier && !token?.isSupportAdmin && !token?.isSuperAdmin) {
-    throw new DomainError('PERMISSION_DENIED', 'Staff privileges required', correlationId);
-  }
-  return uid;
-};
+export const requireStaff = (request: CallableRequest, correlationId: string): string =>
+  requireStaffClaim(request, correlationId, ['isVerifier', 'isSupportAdmin', 'isSuperAdmin'], 'Staff privileges required');
 
-export const requireSuperAdmin = (request: CallableRequest, correlationId: string): string => {
-  const uid = requireAuth(request);
+export const requireSuperAdmin = (request: CallableRequest, correlationId: string): string =>
+  requireStaffClaim(request, correlationId, ['isSuperAdmin'], 'Super Admin privileges required');
+
+/** The highest staff role on the caller's token, for audit records. */
+export const staffRoleOf = (request: CallableRequest): string => {
   const token = request.auth?.token;
-  if (!token?.isSuperAdmin) {
-    throw new DomainError('PERMISSION_DENIED', 'Super Admin privileges required', correlationId);
-  }
-  return uid;
+  if (token?.isSuperAdmin) return 'super_admin';
+  if (token?.isSupportAdmin) return 'support_admin';
+  if (token?.isVerifier) return 'verifier';
+  return 'unknown';
 };
 
 /**

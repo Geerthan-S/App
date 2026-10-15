@@ -31,7 +31,7 @@ export const credentialFingerprint = (profile: DocumentData): string => {
   return createHash('sha256').update(JSON.stringify(material)).digest('hex');
 };
 
-export const submitDoctorProfile = domainCall(async (request: CallableRequest) => {
+export const submitDoctorProfile = domainCall('submitDoctorProfile', async (request: CallableRequest) => {
   const uid = requireAuth(request);
   const correlationId = sanitizeCorrelationId(request.data?.correlationId);
 

@@ -14,8 +14,10 @@ import { DomainError } from '../shared/errors';
 import { stageAudit } from '../audit/auditLogger';
 import { REVIEWABLE_CASE_STATUSES } from '../verification/verificationStates';
 import {
-  FEATURE_FLAG_KEYS, OFFER_EXPIRY_HOURS_RANGE, PLATFORM_DEFAULTS, getOfferExpiryHours,
+  FEATURE_FLAG_KEYS, OFFER_EXPIRY_HOURS_RANGE, PLATFORM_DEFAULTS, REVERIFY_MONTHS_RANGE, VERIFICATION_SLA_HOURS_RANGE,
+  getOfferExpiryHours, getVerificationPolicy,
 } from '../shared/platformConfig';
+import { dashboardInsights } from './dashboardInsights';
 
 /** Assignment states that still hold a seat on a duty. */
 const OPEN_ASSIGNMENT_STATUSES = ['selected', 'confirmed', 'active'];
@@ -42,14 +44,28 @@ const CONFIG_SCHEMAS: Record<string, z.ZodTypeAny> = {
     value: z.array(z.string().regex(HOSTNAME_PATTERN)).min(1).max(50)
       .refine(domains => new Set(domains).size === domains.length, 'Duplicate domain'),
   }).strict(),
+  // Review turnaround target and re-verification interval (read by getVerificationPolicy).
+  verification_policy: z.object({
+    slaHours: z.number().int().min(VERIFICATION_SLA_HOURS_RANGE.min).max(VERIFICATION_SLA_HOURS_RANGE.max),
+    reverifyAfterMonths: z.number().int().min(REVERIFY_MONTHS_RANGE.min).max(REVERIFY_MONTHS_RANGE.max),
+  }).strict(),
 };
+
+/** Audit actor roles that belong to portal staff (the Admin Activity view). */
+const STAFF_ACTOR_ROLES = ['verifier', 'support_admin', 'super_admin', 'admin'];
 
 const AuditLogQuerySchema = z.object({
   limit: z.number().int().min(1).max(50).default(25),
   action: z.string().regex(/^[A-Z0-9_]{2,64}$/).optional(),
   targetId: DocIdSchema.optional(),
+  actorId: z.string().regex(/^[A-Za-z0-9_-]{1,128}$/).optional(),
+  result: z.enum(['SUCCESS', 'FAILED', 'DENIED']).optional(),
+  /** `staff`: only actions taken by portal staff. */
+  scope: z.enum(['all', 'staff']).default('all'),
   cursor: DocIdSchema.optional(),
-}).refine(q => !(q.action && q.targetId), { message: 'Filter by action or target, not both' });
+  correlationId: z.string().optional(),
+}).refine(q => [q.action, q.targetId, q.actorId, q.result, q.scope === 'staff' ? 'staff' : undefined]
+  .filter(Boolean).length <= 1, { message: 'Use one filter at a time' });
 
 const FeatureFlagSchema = z.object({
   flagKey: z.enum(FEATURE_FLAG_KEYS),
@@ -62,7 +78,7 @@ const toIso = (value: unknown): string | null =>
 const countOf = async (query: Query): Promise<number> => (await query.count().get()).data().count;
 
 /** Live platform totals for the portal dashboard. Counts only; no personal data. */
-export const getAdminDashboard = domainCall(async (request: CallableRequest) => {
+export const getAdminDashboard = domainCall('getAdminDashboard', async (request: CallableRequest) => {
   const correlationId = sanitizeCorrelationId(request.data?.correlationId);
   requireStaff(request, correlationId);
 
@@ -93,11 +109,12 @@ export const getAdminDashboard = domainCall(async (request: CallableRequest) => 
     applications: { total: applications },
     assignments: { open: openAssignments },
     pending: { doctorCases, organizationCases, openReports },
+    insights: await dashboardInsights(),
     generatedAt: new Date().toISOString(),
   };
-});
+}, { audience: 'staff' });
 
-export const getAdminQueues = domainCall(async (request: CallableRequest) => {
+export const getAdminQueues = domainCall('getAdminQueues', async (request: CallableRequest) => {
   const correlationId = sanitizeCorrelationId(request.data?.correlationId);
   requireAdmin(request, correlationId);
 
@@ -117,7 +134,7 @@ export const getAdminQueues = domainCall(async (request: CallableRequest) => {
     verificationQueue: pendingCasesSnap.docs.map(d => d.data()),
     moderationQueue: reportsSnap.docs.map(d => ({ ...d.data(), reportId: d.id, createdAt: toIso(d.data().createdAt) })),
   };
-});
+}, { audience: 'staff' });
 
 /**
  * Suspension is enforced at every trusted boundary: the shared callable guard
@@ -125,7 +142,7 @@ export const getAdminQueues = domainCall(async (request: CallableRequest) => {
  * counterparty, and refresh tokens are revoked so client sessions (and
  * therefore Firestore rule access) end within the ID-token lifetime.
  */
-export const submitModerationAction = domainCall(async (request: CallableRequest) => {
+export const submitModerationAction = domainCall('submitModerationAction', async (request: CallableRequest) => {
   const correlationId = sanitizeCorrelationId(request.data?.correlationId);
   const adminUid = requireAdmin(request, correlationId);
   requireStepUpAuth(request, correlationId, 600);
@@ -156,6 +173,8 @@ export const submitModerationAction = domainCall(async (request: CallableRequest
     if (action === 'suspend_user' && data.targetId === adminUid) {
       throw new DomainError('PERMISSION_DENIED', 'Administrators cannot suspend themselves', correlationId);
     }
+    // Read before any write: Duty Moderation needs the pre-hide status to restore the duty.
+    const dutySnap = action === 'hide_duty' ? await tx.get(db().collection('duties').doc(data.targetId)) : null;
 
     tx.update(reportRef, {
       status: 'resolved',
@@ -167,6 +186,11 @@ export const submitModerationAction = domainCall(async (request: CallableRequest
     if (action === 'hide_duty' && data.targetType === 'duty') {
       tx.update(db().collection('duties').doc(data.targetId), {
         status: 'paused',
+        moderationHidden: true,
+        statusBeforeHide: dutySnap?.data()?.status ?? null,
+        hiddenBy: adminUid,
+        hiddenAt: nowTimestamp(),
+        hiddenReason: reasonCode,
         updatedAt: nowTimestamp(),
       });
     } else if (action === 'suspend_user' && data.targetType === 'user') {
@@ -201,10 +225,10 @@ export const submitModerationAction = domainCall(async (request: CallableRequest
   }
 
   return { success: true, reportId, action };
-});
+}, { audience: 'staff' });
 
 /** Immutable audit trail, newest first, with a cursor for older pages. */
-export const getAuditLogs = domainCall(async (request: CallableRequest) => {
+export const getAuditLogs = domainCall('getAuditLogs', async (request: CallableRequest) => {
   const correlationId = sanitizeCorrelationId(request.data?.correlationId);
   requireAdmin(request, correlationId);
 
@@ -212,11 +236,14 @@ export const getAuditLogs = domainCall(async (request: CallableRequest) => {
   if (!parsed.success) {
     throw new DomainError('VALIDATION_FAILED', 'Invalid audit log query', correlationId);
   }
-  const { limit, action, targetId, cursor } = parsed.data;
+  const { limit, action, targetId, actorId, result, scope, cursor } = parsed.data;
 
   let query: Query = db().collection('auditLogs');
   if (action) query = query.where('action', '==', action);
   if (targetId) query = query.where('targetId', '==', targetId);
+  if (actorId) query = query.where('actorId', '==', actorId);
+  if (result) query = query.where('result', '==', result);
+  if (scope === 'staff') query = query.where('actorRole', 'in', STAFF_ACTOR_ROLES);
   query = query.orderBy('createdAt', 'desc');
   if (cursor) {
     const cursorSnap = await db().collection('auditLogs').doc(cursor).get();
@@ -243,23 +270,26 @@ export const getAuditLogs = domainCall(async (request: CallableRequest) => {
         result: data.result,
         beforeSummary: data.beforeSummary ?? null,
         afterSummary: data.afterSummary ?? null,
+        securityMetadata: data.securityMetadata ?? null,
         createdAt: toIso(data.createdAt),
       };
     }),
     nextCursor: snap.docs.length > limit ? page[page.length - 1].id : null,
   };
-});
+}, { audience: 'staff' });
 
 /** Current editable settings, feature flags, and the fixed security settings for reference. */
-export const getPlatformConfig = domainCall(async (request: CallableRequest) => {
+export const getPlatformConfig = domainCall('getPlatformConfig', async (request: CallableRequest) => {
   const correlationId = sanitizeCorrelationId(request.data?.correlationId);
   requireAdmin(request, correlationId);
 
-  const [offerSnap, registrySnap, flagSnaps, offerExpiryHours] = await Promise.all([
+  const [offerSnap, registrySnap, policySnap, flagSnaps, offerExpiryHours, verificationPolicy] = await Promise.all([
     db().collection('configuration').doc('offer_policy').get(),
     db().collection('configuration').doc('approved_registry_domains').get(),
+    db().collection('configuration').doc('verification_policy').get(),
     Promise.all(FEATURE_FLAG_KEYS.map(key => db().collection('featureFlags').doc(key).get())),
     getOfferExpiryHours(),
+    getVerificationPolicy(),
   ]);
 
   const meta = (data: DocumentData | undefined) => ({
@@ -274,6 +304,11 @@ export const getPlatformConfig = domainCall(async (request: CallableRequest) => 
       value: Array.isArray(registrySnap.data()?.value) ? registrySnap.data()!.value : [],
       ...meta(registrySnap.data()),
     },
+    verificationPolicy: {
+      ...verificationPolicy,
+      ranges: { slaHours: VERIFICATION_SLA_HOURS_RANGE, reverifyAfterMonths: REVERIFY_MONTHS_RANGE },
+      ...meta(policySnap.data()),
+    },
     featureFlags: flagSnaps.map(snap => ({ key: snap.id, enabled: Boolean(snap.data()?.enabled), ...meta(snap.data()) })),
     fixed: {
       stepUpAuthMaxAgeSeconds: PLATFORM_DEFAULTS.STEP_UP_AUTH_MAX_AGE_SECONDS,
@@ -283,13 +318,13 @@ export const getPlatformConfig = domainCall(async (request: CallableRequest) => 
     },
     canEdit: Boolean(request.auth?.token?.isSuperAdmin),
   };
-});
+}, { audience: 'staff' });
 
 /**
  * Only allow-listed configuration documents can be written, each validated
  * against its schema and stored in the shape the platform reads back.
  */
-export const updatePlatformConfig = domainCall(async (request: CallableRequest) => {
+export const updatePlatformConfig = domainCall('updatePlatformConfig', async (request: CallableRequest) => {
   const correlationId = sanitizeCorrelationId(request.data?.correlationId);
   const superAdminUid = requireSuperAdmin(request, correlationId);
   requireStepUpAuth(request, correlationId, 600);
@@ -330,9 +365,9 @@ export const updatePlatformConfig = domainCall(async (request: CallableRequest) 
   });
 
   return { success: true, configKey };
-});
+}, { audience: 'staff' });
 
-export const setFeatureFlag = domainCall(async (request: CallableRequest) => {
+export const setFeatureFlag = domainCall('setFeatureFlag', async (request: CallableRequest) => {
   const correlationId = sanitizeCorrelationId(request.data?.correlationId);
   const superAdminUid = requireSuperAdmin(request, correlationId);
   requireStepUpAuth(request, correlationId, 600);
@@ -367,4 +402,4 @@ export const setFeatureFlag = domainCall(async (request: CallableRequest) => {
   });
 
   return { success: true, flagKey, enabled };
-});
+}, { audience: 'staff' });

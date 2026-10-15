@@ -3,539 +3,147 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#F4F4F1" id="theme-color">
   <title>HealthForce Admin</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/admin.css">
 </head>
 <body>
 
-  <!-- ── Login ─────────────────────────────────────────── -->
-  <div id="login-screen">
-    <div class="login-card">
-
-      <!-- Brand -->
-      <div class="login-brand">
-        <div class="login-logo-wrap">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 2v20M2 12h20"/>
-          </svg>
+  <!-- Sign in -->
+  <main id="screen-login" class="auth-screen" hidden>
+    <div class="auth-card">
+      <div class="brand">
+        <div class="brand-mark" data-icon="cross"></div>
+        <div>
+          <div class="brand-name">HealthForce</div>
+          <div class="brand-sub">Staff workspace</div>
         </div>
-        <h1 class="login-heading">HealthForce</h1>
-        <p class="login-sub">Verifier Workspace · Admin</p>
       </div>
-
-      <!-- Username / Password Form -->
+      <h1 class="auth-title">Sign in</h1>
+      <p class="auth-lead">Verifiers and administrators only. Every action is recorded.</p>
+      <div id="login-error" class="alert alert-error" role="alert" hidden></div>
       <form id="login-form" novalidate>
-
-        <div class="field-wrap">
-          <span class="field-icon">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
-            </svg>
-          </span>
-          <input id="tf-username" class="field-input" type="text" placeholder="Username" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+        <div class="field">
+          <label for="login-username">Username</label>
+          <input id="login-username" class="input" autocomplete="username" autocapitalize="none" spellcheck="false" required>
         </div>
-
-        <div class="field-wrap">
-          <span class="field-icon">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-            </svg>
-          </span>
-          <input id="tf-password" class="field-input" type="password" placeholder="Password" autocomplete="current-password" required>
-          <button type="button" id="toggle-pass" class="field-toggle" aria-label="Show password">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
-            </svg>
-          </button>
+        <div class="field">
+          <label for="login-password">Password</label>
+          <input id="login-password" class="input" type="password" autocomplete="current-password" required>
         </div>
-
-        <div id="login-status" class="login-err" hidden></div>
-
-        <button type="submit" id="btn-signin" class="btn-signin">
-          Sign In
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
-          </svg>
-        </button>
-
+        <button id="login-submit" class="btn btn-primary btn-block" type="submit">Continue</button>
       </form>
+      <p class="auth-foot" id="env-note">Protected by two-step verification.</p>
     </div>
-  </div>
+  </main>
 
-  <!-- ── Admin Shell ───────────────────────────────────── -->
-  <div id="admin-shell" class="admin-layout" hidden>
+  <!-- Second factor at sign-in -->
+  <main id="screen-mfa" class="auth-screen" hidden>
+    <div class="auth-card">
+      <div class="brand">
+        <div class="brand-mark" data-icon="shield"></div>
+        <div>
+          <div class="brand-name">Two-step verification</div>
+          <div class="brand-sub">Authenticator app</div>
+        </div>
+      </div>
+      <p class="auth-lead">Enter the 6-digit code from your authenticator app.</p>
+      <div id="mfa-error" class="alert alert-error" role="alert" hidden></div>
+      <form id="mfa-form" novalidate>
+        <div class="field">
+          <label for="mfa-code">Code</label>
+          <input id="mfa-code" class="input code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" required>
+        </div>
+        <button id="mfa-submit" class="btn btn-primary btn-block" type="submit">Verify</button>
+      </form>
+      <p class="auth-foot"><button type="button" class="link-btn" id="mfa-cancel">Use a different account</button></p>
+    </div>
+  </main>
 
-    <!-- Sidebar: items are shown per role in app.js (data-access) -->
-    <aside class="sidebar">
-      <div>
-        <div class="brand">
-          <div class="brand-badge">⚕</div>
-          <div class="brand-info">
-            <h2>HealthForce</h2>
-            <span class="env-badge">LIVE</span>
-          </div>
+  <!-- Authenticator enrollment (required before staff tools work) -->
+  <main id="screen-enroll" class="auth-screen" hidden>
+    <div class="auth-card">
+      <div class="brand">
+        <div class="brand-mark" data-icon="shield"></div>
+        <div>
+          <div class="brand-name">Set up two-step verification</div>
+          <div class="brand-sub">Required for all staff accounts</div>
         </div>
-        <nav class="nav-menu">
-          <a class="nav-item" data-view="dashboard" data-access="staff" hidden>
-            <span class="nav-icon">📊</span>
-            Dashboard
-          </a>
-          <a class="nav-item" data-view="doctors" data-access="verifier" hidden>
-            <span class="nav-icon">👨‍⚕️</span>
-            Doctor Verification
-            <span class="badge" id="doctor-badge">0</span>
-          </a>
-          <a class="nav-item" data-view="hospitals" data-access="verifier" hidden>
-            <span class="nav-icon">🏥</span>
-            Hospital Verification
-            <span class="badge" id="hospital-badge">0</span>
-          </a>
-          <a class="nav-item" data-view="moderation" data-access="admin" hidden>
-            <span class="nav-icon">🛡️</span>
-            Duty Moderation
-            <span class="badge" id="report-badge">0</span>
-          </a>
-          <a class="nav-item" data-view="audit" data-access="admin" hidden>
-            <span class="nav-icon">📜</span>
-            Audit &amp; Compliance
-          </a>
-          <a class="nav-item" data-view="config" data-access="admin" hidden>
-            <span class="nav-icon">⚙️</span>
-            Master Config
-          </a>
-        </nav>
       </div>
-      <div class="sidebar-footer">
-        <div class="admin-user-card">
-          <div class="avatar" id="user-avatar">V</div>
-          <div class="admin-details">
-            <span class="name" id="user-name">Verifier</span>
-            <span class="role" id="user-role">Credential Verifier</span>
-          </div>
+      <p class="auth-lead">Scan this code with Google Authenticator, Microsoft Authenticator or 1Password, then enter the 6-digit code it shows.</p>
+      <div id="enroll-error" class="alert alert-error" role="alert" hidden></div>
+      <div class="qr-box"><img id="enroll-qr" alt="Authenticator QR code"></div>
+      <div class="label">Can't scan? Enter this key</div>
+      <div class="secret" id="enroll-secret"></div>
+      <form id="enroll-form" novalidate>
+        <div class="field">
+          <label for="enroll-code">Code from the app</label>
+          <input id="enroll-code" class="input code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" required>
         </div>
-        <button id="sign-out" class="btn-logout">Sign out</button>
+        <button id="enroll-submit" class="btn btn-primary btn-block" type="submit">Turn on</button>
+      </form>
+      <p class="auth-foot"><button type="button" class="link-btn" id="enroll-cancel">Sign out</button></p>
+    </div>
+  </main>
+
+  <!-- Workspace -->
+  <div id="screen-app" class="shell" hidden>
+    <button class="skip-link" id="skip-link" type="button">Skip to content</button>
+    <div class="scrim" id="scrim" hidden></div>
+    <aside class="sidebar" id="sidebar" aria-label="Sections">
+      <div class="brand">
+        <div class="brand-mark" data-icon="cross"></div>
+        <div>
+          <div class="brand-name">HealthForce</div>
+          <div class="brand-sub">Trusted healthcare workforce</div>
+        </div>
       </div>
+      <nav id="nav"></nav>
+      <div class="sidebar-foot" id="env-badge">Live · asia-south1</div>
     </aside>
 
-    <!-- Main Content -->
-    <div class="main-content">
-
-      <!-- Top Header -->
-      <header class="top-header">
-        <div class="header-title">
-          <h1 id="page-title">Dashboard</h1>
-          <p id="page-subtitle"></p>
+    <div class="main">
+      <header class="topbar">
+        <button class="btn btn-ghost btn-icon menu-btn" id="menu-btn" type="button" aria-label="Open menu" aria-controls="sidebar" aria-expanded="false" data-icon="menu"></button>
+        <button class="search-trigger" id="search-btn" type="button">
+          <span data-icon="search"></span>
+          <span>Search doctors, hospitals, duties, cases</span>
+          <span class="kbd">Ctrl K</span>
+        </button>
+        <div class="topbar-right">
+          <span class="clock" id="clock"></span>
+          <span class="chip" id="mfa-chip"><span class="dot"></span><span id="mfa-chip-label">MFA</span></span>
+          <button class="btn btn-ghost btn-icon bell" id="bell-btn" type="button" aria-label="Attention items">
+            <span data-icon="bell"></span>
+            <span class="badge-dot" id="bell-count" hidden></span>
+          </button>
+          <button class="profile-btn" id="profile-btn" type="button" aria-haspopup="menu" aria-expanded="false">
+            <span class="avatar" id="profile-avatar"></span>
+            <span class="profile-meta">
+              <span class="profile-name" id="profile-name"></span><br>
+              <span class="profile-role" id="profile-role"></span>
+            </span>
+          </button>
         </div>
-        <div class="header-actions">
-          <p id="status" role="status" aria-live="polite" class="status-text"></p>
-          <div class="mfa-status-pill"><span class="dot"></span> MFA Active</div>
-          <button id="refresh" class="btn-secondary">↻ Refresh</button>
+        <div class="menu" id="profile-menu" role="menu" hidden>
+          <button type="button" role="menuitem" data-action="account"><span data-icon="user"></span>My account &amp; security</button>
+          <button type="button" role="menuitem" data-action="theme"><span data-icon="moon"></span><span id="theme-label">Dark theme</span></button>
+          <hr>
+          <button type="button" role="menuitem" data-action="signout"><span data-icon="logout"></span>Sign out</button>
         </div>
       </header>
-
-      <div class="content-body">
-
-        <!-- ── Dashboard ── -->
-        <section id="view-dashboard" class="view" hidden>
-          <div class="section-heading">Needs attention</div>
-          <div class="metrics-grid">
-            <button type="button" class="metric-card metric-link" data-goto="doctors" data-access="verifier">
-              <div class="title">Doctor Cases</div>
-              <div class="value" id="dash-doctor-cases">—</div>
-              <div class="subtitle">Awaiting a verification decision →</div>
-            </button>
-            <button type="button" class="metric-card metric-link" data-goto="hospitals" data-access="verifier">
-              <div class="title">Hospital Cases</div>
-              <div class="value" id="dash-org-cases">—</div>
-              <div class="subtitle">Awaiting a verification decision →</div>
-            </button>
-            <button type="button" class="metric-card metric-link" data-goto="moderation" data-access="admin">
-              <div class="title">Open Reports</div>
-              <div class="value" id="dash-reports">—</div>
-              <div class="subtitle">Duties and users flagged for review →</div>
-            </button>
-          </div>
-
-          <div class="section-heading">Platform</div>
-          <div class="metrics-grid">
-            <div class="metric-card">
-              <div class="title">Doctors</div>
-              <div class="value" id="dash-doctors">—</div>
-              <div class="subtitle" id="dash-doctors-sub">— verified</div>
-            </div>
-            <div class="metric-card">
-              <div class="title">Hospitals</div>
-              <div class="value" id="dash-orgs">—</div>
-              <div class="subtitle" id="dash-orgs-sub">— approved</div>
-            </div>
-            <div class="metric-card">
-              <div class="title">Open Duties</div>
-              <div class="value" id="dash-duties">—</div>
-              <div class="subtitle" id="dash-duties-sub">— filled</div>
-            </div>
-            <div class="metric-card">
-              <div class="title">Applications</div>
-              <div class="value" id="dash-applications">—</div>
-              <div class="subtitle" id="dash-assignments-sub">— assignments in progress</div>
-            </div>
-          </div>
-          <p class="footnote" id="dash-generated"></p>
-        </section>
-
-        <!-- ── Verification (doctors and hospitals share this view) ── -->
-        <section id="view-verification" class="view" hidden>
-          <div class="metrics-grid">
-            <div class="metric-card">
-              <div class="title">Awaiting Review</div>
-              <div class="value" id="count-pending">—</div>
-              <div class="subtitle">Submitted cases</div>
-            </div>
-            <div class="metric-card">
-              <div class="title">Under Review</div>
-              <div class="value" id="count-inreview">—</div>
-              <div class="subtitle">Claimed by verifiers</div>
-            </div>
-            <div class="metric-card">
-              <div class="title">Needs Info</div>
-              <div class="value" id="count-info">—</div>
-              <div class="subtitle">Awaiting resubmission</div>
-            </div>
-            <div class="metric-card">
-              <div class="title">Total in Queue</div>
-              <div class="value" id="count-total">—</div>
-              <div class="subtitle">All open cases</div>
-            </div>
-          </div>
-
-          <div class="table-card">
-            <div class="table-header">
-              <h3>Open Cases</h3>
-              <span id="table-count" class="table-count"></span>
-            </div>
-            <div id="empty-queue" class="empty-state" hidden>
-              <div class="empty-icon">✅</div>
-              <p>No cases awaiting review</p>
-            </div>
-            <table class="data-table" id="cases-table">
-              <thead>
-                <tr>
-                  <th>Subject</th>
-                  <th>Type</th>
-                  <th>Case ID</th>
-                  <th>Submitted</th>
-                  <th>Status</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody id="case-list"></tbody>
-            </table>
-          </div>
-        </section>
-
-        <!-- ── Duty Moderation ── -->
-        <section id="view-moderation" class="view" hidden>
-          <div class="table-card">
-            <div class="table-header">
-              <h3>Open Reports</h3>
-              <span id="report-count" class="table-count"></span>
-            </div>
-            <div id="empty-reports" class="empty-state" hidden>
-              <div class="empty-icon">🛡️</div>
-              <p>No open reports</p>
-            </div>
-            <table class="data-table" id="reports-table">
-              <thead>
-                <tr>
-                  <th>Target</th>
-                  <th>Type</th>
-                  <th>Reason</th>
-                  <th>Reported By</th>
-                  <th>Reported</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody id="report-list"></tbody>
-            </table>
-          </div>
-        </section>
-
-        <!-- ── Audit & Compliance ── -->
-        <section id="view-audit" class="view" hidden>
-          <form id="audit-filter" class="filter-bar">
-            <select id="audit-filter-field" aria-label="Filter by">
-              <option value="">All events</option>
-              <option value="action">Action is</option>
-              <option value="targetId">Target ID is</option>
-            </select>
-            <input id="audit-filter-value" placeholder="e.g. MODERATION_SUSPEND_USER" disabled>
-            <button type="submit" class="btn-secondary">Apply</button>
-          </form>
-          <div class="table-card">
-            <div class="table-header">
-              <h3>Audit Trail</h3>
-              <span id="audit-count" class="table-count"></span>
-            </div>
-            <div id="empty-audit" class="empty-state" hidden>
-              <div class="empty-icon">📜</div>
-              <p>No audit entries match</p>
-            </div>
-            <table class="data-table" id="audit-table">
-              <thead>
-                <tr>
-                  <th>Time</th>
-                  <th>Action</th>
-                  <th>Actor</th>
-                  <th>Target</th>
-                  <th>Result</th>
-                </tr>
-              </thead>
-              <tbody id="audit-list"></tbody>
-            </table>
-            <div class="table-footer">
-              <button type="button" id="audit-more" class="btn-secondary" hidden>Load older entries</button>
-            </div>
-          </div>
-        </section>
-
-        <!-- ── Master Config ── -->
-        <section id="view-config" class="view" hidden>
-          <p id="config-readonly" class="notice" hidden>Only a Super Admin can change these settings.</p>
-
-          <div class="config-card">
-            <div class="config-head">
-              <h3>Offer Policy</h3>
-              <span class="config-meta" id="offer-meta"></span>
-            </div>
-            <form id="offer-form" class="config-row">
-              <div class="form-group">
-                <label for="offer-hours">Offer expiry (hours)</label>
-                <input id="offer-hours" type="number" step="1" required>
-                <span class="hint" id="offer-hint"></span>
-              </div>
-              <button type="submit" id="offer-save" class="btn-decision">Save</button>
-            </form>
-          </div>
-
-          <div class="config-card">
-            <div class="config-head">
-              <h3>Trusted Registries</h3>
-              <span class="config-meta" id="registry-meta"></span>
-            </div>
-            <form id="registry-form">
-              <div class="form-group">
-                <label for="registry-domains">Official registry domains, one per line</label>
-                <textarea id="registry-domains" rows="4" spellcheck="false" placeholder="registry.nmc.org.in"></textarea>
-                <span class="hint">Verifiers can only approve a case using a source URL on one of these sites.</span>
-              </div>
-              <button type="submit" id="registry-save" class="btn-decision">Save</button>
-            </form>
-          </div>
-
-          <div class="config-card">
-            <div class="config-head">
-              <h3>Feature Flags</h3>
-              <span class="config-meta">Phase 2 modules stay off until enabled here</span>
-            </div>
-            <div id="flag-list" class="flag-list"></div>
-          </div>
-
-          <div class="config-card">
-            <div class="config-head">
-              <h3>Security Settings</h3>
-              <span class="config-meta">Fixed in code; shown for reference</span>
-            </div>
-            <div class="detail-grid" id="fixed-settings"></div>
-          </div>
-        </section>
-
-      </div>
+      <main class="content" id="content" tabindex="-1"></main>
     </div>
   </div>
 
-  <!-- ── Case Review Modal ─────────────────────────────── -->
-  <div id="review-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
-    <div class="modal-card">
-      <div class="modal-header">
-        <div>
-          <h2 class="modal-title" id="modal-title">Review Case</h2>
-          <p class="modal-subtitle" id="modal-subtitle">Verify against official registry before recording decision</p>
-        </div>
-        <button id="modal-close" class="btn-close" aria-label="Close">✕</button>
-      </div>
-      <div class="modal-body">
+  <div id="modal-root"></div>
+  <div class="toasts" id="toasts" aria-live="polite"></div>
 
-        <!-- Subject Details -->
-        <div class="modal-section">
-          <div class="section-label">Subject Details</div>
-          <div class="detail-grid" id="modal-details"></div>
-        </div>
-
-        <!-- Evidence -->
-        <div class="modal-section">
-          <div class="section-label">Submitted Evidence</div>
-          <div id="modal-evidence"></div>
-        </div>
-
-        <!-- Decision Form -->
-        <div class="modal-section">
-          <div class="section-label">Record Decision</div>
-          <form id="decision-form">
-            <div class="form-grid">
-              <div class="form-group">
-                <label for="decision">Decision</label>
-                <select id="decision" required>
-                  <option value="needs_information">Request more information</option>
-                  <option value="rejected">Reject application</option>
-                  <option value="approved">Approve — official source verified</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label for="reason-code">Reason Code</label>
-                <input id="reason-code" placeholder="e.g. DOCS_VERIFIED" minlength="2" required>
-              </div>
-            </div>
-            <div class="form-group">
-              <label for="notes">Reviewer Notes</label>
-              <textarea id="notes" rows="3" maxlength="1000" placeholder="Internal notes for audit trail…"></textarea>
-            </div>
-
-            <!-- Official Source (approve only) -->
-            <fieldset id="source-fields" hidden class="source-fieldset">
-              <legend>Official Registry Verification</legend>
-              <div class="form-grid">
-                <div class="form-group">
-                  <label for="source-url">Official Source HTTPS URL</label>
-                  <input id="source-url" type="url" placeholder="https://registry.nmc.org.in/…">
-                </div>
-                <div class="form-group">
-                  <label for="checked-at">Checked At</label>
-                  <input id="checked-at" type="datetime-local">
-                </div>
-              </div>
-              <div class="form-group">
-                <label for="official-status">Official Status</label>
-                <select id="official-status">
-                  <option value="">Select status</option>
-                  <option value="ACTIVE">Active</option>
-                  <option value="SUSPENDED">Suspended</option>
-                  <option value="EXPIRED">Expired</option>
-                </select>
-              </div>
-              <div class="checkbox-grid">
-                <label class="checkbox-label"><input id="registration-match" type="checkbox"> Registration number matches</label>
-                <label class="checkbox-label"><input id="name-match" type="checkbox"> Name matches</label>
-                <label class="checkbox-label"><input id="council-match" type="checkbox"> Council matches</label>
-                <label class="checkbox-label"><input id="qualification-match" type="checkbox"> Qualification matches</label>
-              </div>
-            </fieldset>
-
-            <div class="modal-actions">
-              <button type="button" id="modal-cancel" class="btn-secondary">Cancel</button>
-              <button type="submit" id="decision-submit" class="btn-decision">Record Decision</button>
-            </div>
-          </form>
-        </div>
-
-      </div>
-    </div>
-  </div>
-
-  <!-- ── Moderation Action Modal ───────────────────────── -->
-  <div id="moderation-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="moderation-title">
-    <div class="modal-card">
-      <div class="modal-header">
-        <div>
-          <h2 class="modal-title" id="moderation-title">Resolve Report</h2>
-          <p class="modal-subtitle" id="moderation-subtitle"></p>
-        </div>
-        <button id="moderation-close" class="btn-close" aria-label="Close">✕</button>
-      </div>
-      <div class="modal-body">
-        <div class="modal-section">
-          <div class="section-label">Report</div>
-          <div class="detail-grid" id="moderation-details"></div>
-        </div>
-        <div class="modal-section">
-          <div class="section-label">Action</div>
-          <form id="moderation-form">
-            <div class="form-grid">
-              <div class="form-group">
-                <label for="moderation-action">Action</label>
-                <select id="moderation-action" required></select>
-              </div>
-              <div class="form-group">
-                <label for="moderation-reason">Reason Code</label>
-                <input id="moderation-reason" placeholder="e.g. MISLEADING_PAY" minlength="2" required>
-              </div>
-            </div>
-            <div class="form-group">
-              <label for="moderation-notes">Notes</label>
-              <textarea id="moderation-notes" rows="3" maxlength="1000" placeholder="Internal notes for audit trail…"></textarea>
-            </div>
-            <p class="hint" id="moderation-hint"></p>
-            <div class="modal-actions">
-              <button type="button" id="moderation-cancel" class="btn-secondary">Cancel</button>
-              <button type="submit" id="moderation-submit" class="btn-decision">Apply Action</button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── Audit Entry Modal ─────────────────────────────── -->
-  <div id="audit-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="audit-title">
-    <div class="modal-card">
-      <div class="modal-header">
-        <div>
-          <h2 class="modal-title" id="audit-title">Audit Entry</h2>
-          <p class="modal-subtitle" id="audit-subtitle"></p>
-        </div>
-        <button id="audit-close" class="btn-close" aria-label="Close">✕</button>
-      </div>
-      <div class="modal-body">
-        <div class="modal-section">
-          <div class="section-label">Event</div>
-          <div class="detail-grid" id="audit-details"></div>
-        </div>
-        <div class="modal-section">
-          <div class="section-label">Before</div>
-          <pre class="json-block" id="audit-before"></pre>
-        </div>
-        <div class="modal-section">
-          <div class="section-label">After</div>
-          <pre class="json-block" id="audit-after"></pre>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── Re-authentication Modal (step-up before sensitive actions) ── -->
-  <div id="reauth-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="reauth-title">
-    <div class="modal-card reauth-card">
-      <div class="modal-header">
-        <div>
-          <h2 class="modal-title" id="reauth-title">Confirm it's you</h2>
-          <p class="modal-subtitle">Re-enter your password to continue with this action.</p>
-        </div>
-      </div>
-      <form id="reauth-form" class="modal-body" novalidate>
-        <div class="form-group">
-          <label for="reauth-password">Password</label>
-          <input id="reauth-password" type="password" autocomplete="current-password" required>
-        </div>
-        <div id="reauth-status" class="login-err" hidden></div>
-        <div class="modal-actions">
-          <button type="button" id="reauth-cancel" class="btn-secondary">Cancel</button>
-          <button type="submit" id="reauth-submit" class="btn-decision">Confirm</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
+  <script src="js/vendor/qrcode.js"></script>
   <script type="module" src="js/app.js"></script>
 </body>
 </html>

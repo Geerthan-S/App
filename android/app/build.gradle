@@ -76,8 +76,11 @@ android {
             if (releasePropertiesFile.exists()) {
                 signingConfig signingConfigs.release
             }
-            minifyEnabled false
-            shrinkResources false
+            // R8 shrinks and obfuscates release builds (Flutter's default). Plugins ship
+            // their own keep rules; app-specific ones go in proguard-rules.pro.
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
 }

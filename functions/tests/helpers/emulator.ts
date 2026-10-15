@@ -49,7 +49,10 @@ export const expectDomainError = async (promise: Promise<unknown>, domainCode: s
   if (transportCode) expect(caught!.code).toBe(transportCode);
 };
 
-export const verifierToken = () => ({ isVerifier: true, auth_time: Math.floor(Date.now() / 1000) });
+/** Claims of a staff session that completed TOTP sign-in, as production requires. */
+export const MFA = { firebase: { sign_in_second_factor: 'totp' } };
+
+export const verifierToken = () => ({ isVerifier: true, auth_time: Math.floor(Date.now() / 1000), ...MFA });
 
 export const CONSENT = { consentVersion: 'v1.0_2026', status: 'active' };
 

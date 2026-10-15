@@ -13,9 +13,33 @@ const doctorEvidencePath = new RegExp(`^verification/doctor/([^/]+)/([^/]+)/${uu
 const organizationEvidencePath = new RegExp(`^verification/organization/([^/]+)/([^/]+)/${uuidFile}$`);
 const maxBytes = 10 * 1024 * 1024;
 
+const brandingPath = /^public\/branding\/[^/]+\/[^/]+$/;
+
+/** The slice of a Storage file the branding screen uses (a seam for tests). */
+export interface ScreenableFile {
+  download(options: { start: number; end: number }): Promise<[Buffer]>;
+  delete(options: { ignoreNotFound: boolean }): Promise<unknown>;
+}
+
+/**
+ * Public logos are readable by anyone, so a file whose bytes do not match its
+ * declared image type is deleted rather than served.
+ */
+export const screenBrandingUpload = async (file: ScreenableFile, objectKey: string, contentType: string): Promise<boolean> => {
+  const [bytes] = await file.download({ start: 0, end: 15 });
+  if (matchesFileSignature(bytes, contentType)) return true;
+  await file.delete({ ignoreNotFound: true });
+  console.warn('Deleted branding upload whose content does not match its type', { objectKey, contentType });
+  return false;
+};
+
 export const indexVerificationEvidence = onObjectFinalized(async event => {
   const object = event.data;
   const objectKey = object.name || '';
+  if (brandingPath.test(objectKey) && object.bucket) {
+    await screenBrandingUpload(getStorage().bucket(object.bucket).file(objectKey), objectKey, object.contentType || '');
+    return;
+  }
   const doctorMatch = doctorEvidencePath.exec(objectKey);
   const organizationMatch = organizationEvidencePath.exec(objectKey);
   const match = doctorMatch || organizationMatch;
@@ -28,7 +52,9 @@ export const indexVerificationEvidence = onObjectFinalized(async event => {
   if (!caseSnap.exists || caseSnap.data()?.subjectType !== subjectType || caseSnap.data()?.subjectId !== subjectId) return;
   if (organizationMatch) {
     const member = await db().collection('organizations').doc(subjectId).collection('members').doc(uploadedBy).get();
-    if (!member.exists || !['owner', 'admin'].includes(member.data()?.role)) return;
+    // Same rule as Storage's isOrgAdmin: a removed or suspended admin's upload is never indexed.
+    const memberStatus = member.data()?.status ?? 'active';
+    if (!member.exists || !['owner', 'admin'].includes(member.data()?.role) || memberStatus !== 'active') return;
   }
 
   const documentId = createHash('sha256').update(`${object.bucket}/${objectKey}`).digest('hex');

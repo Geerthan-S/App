@@ -40,7 +40,7 @@ const BLOCKING_INTERVAL_STATUSES = ['selected', 'confirmed', 'in_progress'];
  * verification and account status, duty capacity, application state and the
  * doctor's schedule before reserving a seat and a schedule lock.
  */
-export const atomicSelectDoctor = domainCall(async (request: CallableRequest) => {
+export const atomicSelectDoctor = domainCall('atomicSelectDoctor', async (request: CallableRequest) => {
   const hospitalUid = requireAuth(request);
   const correlationId = sanitizeCorrelationId(request.data?.correlationId);
 
@@ -236,7 +236,7 @@ export const atomicSelectDoctor = domainCall(async (request: CallableRequest) =>
  * Transitions assignment to 'confirmed' and issues the contact grant.
  * Races safely with offer expiry: both transitions require status 'selected'.
  */
-export const confirmAssignment = domainCall(async (request: CallableRequest) => {
+export const confirmAssignment = domainCall('confirmAssignment', async (request: CallableRequest) => {
   const doctorUid = requireAuth(request);
   const correlationId = sanitizeCorrelationId(request.data?.correlationId);
 
@@ -323,7 +323,7 @@ export const confirmAssignment = domainCall(async (request: CallableRequest) => 
  * CONTACT RESOLUTION FUNCTION
  * Replaces insecure phone duplication with audited, authenticated server resolution.
  */
-export const getAssignmentContact = domainCall(async (request: CallableRequest) => {
+export const getAssignmentContact = domainCall('getAssignmentContact', async (request: CallableRequest) => {
   const callerUid = requireAuth(request);
   const correlationId = sanitizeCorrelationId(request.data?.correlationId);
 
@@ -394,7 +394,7 @@ export const getAssignmentContact = domainCall(async (request: CallableRequest) 
   return { success: true, contact: contactPayload };
 });
 
-export const completeAssignment = domainCall(async (request: CallableRequest) => {
+export const completeAssignment = domainCall('completeAssignment', async (request: CallableRequest) => {
   const uid = requireAuth(request);
   const correlationId = sanitizeCorrelationId(request.data?.correlationId);
 
@@ -481,7 +481,7 @@ export const completeAssignment = domainCall(async (request: CallableRequest) =>
  * Either party may cancel a selected or confirmed assignment. All reads happen
  * before any write; the status transition guards against restoring capacity twice.
  */
-export const cancelAssignment = domainCall(async (request: CallableRequest) => {
+export const cancelAssignment = domainCall('cancelAssignment', async (request: CallableRequest) => {
   const uid = requireAuth(request);
   const correlationId = sanitizeCorrelationId(request.data?.correlationId);
 

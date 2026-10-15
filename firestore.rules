@@ -233,25 +233,31 @@ service cloud.firestore {
       allow create: if false;
     }
 
-    // Reports start open with a bounded payload; only the audited
-    // submitModerationAction callable may resolve them.
-    function isValidNewReport(data) {
-      return data.keys().hasOnly(['reporterId', 'targetType', 'targetId', 'reason', 'details', 'status', 'createdAt']) &&
-        data.keys().hasAll(['reporterId', 'targetType', 'targetId', 'reason', 'status', 'createdAt']) &&
-        data.reporterId == request.auth.uid &&
-        data.status == 'open' &&
-        data.targetType in ['duty', 'user'] &&
-        data.targetId is string && data.targetId.matches('^[A-Za-z0-9_-]{1,128}$') &&
-        data.targetId != request.auth.uid &&
-        data.reason is string && data.reason.size() >= 2 && data.reason.size() <= 200 &&
-        (!data.keys().hasAny(['details']) || (data.details is string && data.details.size() <= 2000)) &&
-        data.createdAt == request.time;
-    }
-
+    // Reports are filed through the rate-limited submitModerationReport callable
+    // (target must exist, one open report per target) and resolved only by the
+    // audited submitModerationAction callable.
     match /moderationReports/{reportId} {
       allow read: if isAuthenticated() && (resource.data.reporterId == request.auth.uid || isSupportAdmin());
-      allow create: if isAuthenticated() && isValidNewReport(request.resource.data);
-      allow update, delete: if false;
+      allow write: if false;
+    }
+
+    // Server-only operational collections: rate-limit counters, report dedupe
+    // locks, the staff role index and internal support tickets. Staff read them
+    // through guarded callables, never directly.
+    match /rateLimits/{counterId} {
+      allow read, write: if false;
+    }
+
+    match /moderationReportLocks/{lockId} {
+      allow read, write: if false;
+    }
+
+    match /staffDirectory/{uid} {
+      allow read, write: if false;
+    }
+
+    match /supportCases/{caseId} {
+      allow read, write: if false;
     }
 
     match /auditLogs/{auditId} {

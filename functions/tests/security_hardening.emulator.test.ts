@@ -58,8 +58,21 @@ runWithEmulator('security hardening', () => {
       ...overrides,
     });
 
-    test('a well-formed open report can be filed', async () => {
-      await assertSucceeds(fs('doctorA').doc('moderationReports/new').set(report({ details: 'Pay listed twice' })));
+    test('even a well-formed report cannot be written directly (it must go through the rate-limited callable)', async () => {
+      await assertFails(fs('doctorA').doc('moderationReports/new').set(report({ details: 'Pay listed twice' })));
+    });
+
+    test('the reporter can still read their own report', async () => {
+      await assertSucceeds(fs('doctorA').doc('moderationReports/r1').get());
+      await assertFails(fs('doctorB').doc('moderationReports/r1').get());
+    });
+
+    test('server-only operational collections are closed to every client', async () => {
+      const support = fs('supportA', { isSupportAdmin: true, isSuperAdmin: true });
+      for (const path of ['rateLimits/x', 'moderationReportLocks/x', 'staffDirectory/x', 'supportCases/x']) {
+        await assertFails(support.doc(path).get());
+        await assertFails(support.doc(path).set({ forged: true }));
+      }
     });
 
     test('forged status, admin fields, oversized text and bad targets are refused', async () => {

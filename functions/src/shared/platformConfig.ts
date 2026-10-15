@@ -47,3 +47,32 @@ export async function getOfferExpiryHours(): Promise<number> {
   }
   return PLATFORM_DEFAULTS.OFFER_EXPIRY_HOURS;
 }
+
+/** Verification turnaround and re-verification policy, editable by super admins. */
+export interface VerificationPolicy {
+  /** Hours from submission within which a case should be decided. */
+  slaHours: number;
+  /** Months after approval when a doctor is due for re-verification. */
+  reverifyAfterMonths: number;
+}
+
+export const VERIFICATION_POLICY_DEFAULTS: VerificationPolicy = { slaHours: 48, reverifyAfterMonths: 12 };
+export const VERIFICATION_SLA_HOURS_RANGE = { min: 4, max: 168 };
+export const REVERIFY_MONTHS_RANGE = { min: 3, max: 60 };
+
+/** Reads `configuration/verification_policy`, falling back to the defaults field by field. */
+export async function getVerificationPolicy(): Promise<VerificationPolicy> {
+  try {
+    const data = (await db().collection('configuration').doc('verification_policy').get()).data();
+    const inRange = (value: unknown, range: { min: number; max: number }) =>
+      typeof value === 'number' && Number.isInteger(value) && value >= range.min && value <= range.max;
+    return {
+      slaHours: inRange(data?.slaHours, VERIFICATION_SLA_HOURS_RANGE) ?
+        data!.slaHours : VERIFICATION_POLICY_DEFAULTS.slaHours,
+      reverifyAfterMonths: inRange(data?.reverifyAfterMonths, REVERIFY_MONTHS_RANGE) ?
+        data!.reverifyAfterMonths : VERIFICATION_POLICY_DEFAULTS.reverifyAfterMonths,
+    };
+  } catch (_) {
+    return { ...VERIFICATION_POLICY_DEFAULTS };
+  }
+}

@@ -8,13 +8,19 @@ import { setGlobalOptions } from 'firebase-functions/v2';
 
 // Run every function in Mumbai, next to the Firestore database and the app's users.
 // Clients must call the same region (lib/core/config/backend_config.dart, admin/js/app.js).
-setGlobalOptions({ region: 'asia-south1' });
+// maxInstances caps how far a traffic flood can scale (and bill) any single function.
+setGlobalOptions({ region: 'asia-south1', maxInstances: 20 });
 
 // Initialize Firebase Admin SDK
 initializeApp();
 
 // Auth & Identity
-export { recordConsent, setCustomClaims } from './auth/authFunctions';
+export { recordConsent } from './auth/authFunctions';
+export { setCustomClaims, listStaff, createStaffAccount } from './auth/staffFunctions';
+export { restrictSignUpProviders } from './auth/blockingFunctions';
+
+// Community reports (rate limited)
+export { submitModerationReport } from './moderation/reportFunctions';
 
 // Doctors
 export { submitDoctorProfile } from './doctors/doctorFunctions';
@@ -42,6 +48,7 @@ export {
   recordVerificationDecision,
   verifyDoctorRegistration,
 } from './verification/verificationFunctions';
+export { claimVerificationCase, releaseVerificationCase, escalateVerificationCase } from './verification/caseWorkflowFunctions';
 export { indexVerificationEvidence, ingestEvidenceScanResult } from './verification/evidenceIngest';
 
 // Notifications: outbox delivery, retry recovery and device registration
@@ -58,6 +65,14 @@ export {
   updatePlatformConfig,
   setFeatureFlag,
 } from './admin/adminFunctions';
+export {
+  listDoctors, getDoctorProfile, listOrganizations, getOrganizationProfile, listDuties,
+  setDutyVisibility, setAccountStatus, adminSearch, getDuty,
+} from './admin/directoryFunctions';
+export {
+  getAttentionItems, getSystemHealth, listNotificationOutbox, requeueNotification, listRenewalsDue, sendRenewalReminder,
+} from './admin/operationsFunctions';
+export { createSupportCase, listSupportCases, getSupportCase, updateSupportCase } from './admin/supportFunctions';
 
 // Feedback & Reviews
 export { submitFeedback } from './feedback/feedbackFunctions';

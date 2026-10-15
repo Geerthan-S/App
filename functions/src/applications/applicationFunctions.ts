@@ -19,7 +19,7 @@ const ACTIVE_APPLICATION_STATUSES = ['submitted', 'shortlisted', 'selected'];
  * prevents parallel duplicates; replaying the same idempotency key returns the
  * original application instead of creating another snapshot or notification.
  */
-export const applyToDuty = domainCall(async (request: CallableRequest) => {
+export const applyToDuty = domainCall('applyToDuty', async (request: CallableRequest) => {
   const doctorUid = requireAuth(request);
   const correlationId = sanitizeCorrelationId(request.data?.correlationId);
 
@@ -136,7 +136,7 @@ export const applyToDuty = domainCall(async (request: CallableRequest) => {
   return { success: true, ...result };
 }, { requireConsent: true });
 
-export const shortlistApplication = domainCall(async (request: CallableRequest) => {
+export const shortlistApplication = domainCall('shortlistApplication', async (request: CallableRequest) => {
   const uid = requireAuth(request);
   const correlationId = sanitizeCorrelationId(request.data?.correlationId);
   const dutyId = DocIdSchema.safeParse(request.data?.dutyId);

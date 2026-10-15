@@ -4,7 +4,7 @@
  * Run with: npm run test:emulator
  */
 import {
-  adminDb, call, clearFirestore, describeWithEmulator, expectDomainError, verifierToken,
+  MFA, adminDb, call, clearFirestore, describeWithEmulator, expectDomainError, verifierToken,
 } from './helpers/emulator';
 import {
   getAdminDashboard, getAdminQueues, getAuditLogs, getPlatformConfig,
@@ -21,8 +21,8 @@ const VERIFIER = 'verifierA';
 const OUTSIDER = 'doctorA';
 
 const now = () => Math.floor(Date.now() / 1000);
-const superToken = () => ({ isSuperAdmin: true, auth_time: now() });
-const supportToken = () => ({ isSupportAdmin: true, auth_time: now() });
+const superToken = () => ({ isSuperAdmin: true, auth_time: now(), ...MFA });
+const supportToken = () => ({ isSupportAdmin: true, auth_time: now(), ...MFA });
 
 const db = () => adminDb();
 
@@ -202,7 +202,7 @@ describeWithEmulator('admin portal', () => {
     test('sensitive changes need a recent sign-in', async () => {
       await expectDomainError(
         call(setFeatureFlag, SUPER, { flagKey: 'phase2_disputes_enabled', enabled: true },
-          { isSuperAdmin: true, auth_time: now() - 3600 }),
+          { isSuperAdmin: true, auth_time: now() - 3600, ...MFA }),
         'STEP_UP_REQUIRED');
     });
   });

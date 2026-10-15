@@ -18,6 +18,7 @@ import { DomainError } from '../shared/errors';
 import { logAudit, stageAudit } from '../audit/auditLogger';
 import { enqueueNotification } from '../notifications/outbox';
 import { ACTIVE_CASE_STATUSES, REVIEWABLE_CASE_STATUSES } from './verificationStates';
+import { loadReviewQueue } from './reviewQueue';
 
 /** Profiles written before revisions existed are revision 1. */
 const revisionOf = (data: DocumentData | undefined, field: 'profileRevision' | 'subjectRevision'): number =>
@@ -34,25 +35,14 @@ const isTrustedEvidence = (evidence: DocumentData): boolean =>
   evidence.generation != null &&
   evidence.scannedGeneration === evidence.generation;
 
-export const getVerificationQueue = domainCall(async (request: CallableRequest) => {
+export const getVerificationQueue = domainCall('getVerificationQueue', async (request: CallableRequest) => {
   const correlationId = sanitizeCorrelationId(request.data?.correlationId);
   requireVerifier(request, correlationId);
-  const pending = await db().collection('verificationCases')
-    .where('status', 'in', REVIEWABLE_CASE_STATUSES)
-    .limit(50).get();
-  const cases = pending.docs.map(doc => doc.data());
-  // Cases do not store a display name, so look up each subject's current one in a single batch read.
-  const subjectRefs = cases.map(c => db().collection(subjectCollection(c.subjectType)).doc(c.subjectId));
-  const subjects = subjectRefs.length ? await db().getAll(...subjectRefs) : [];
-  return {
-    cases: cases.map((c, i) => {
-      const subject = subjects[i]?.data();
-      return { ...c, subjectName: subject?.fullName ?? subject?.displayName ?? subject?.legalName ?? null };
-    }),
-  };
-});
+  // Cases do not store a display name; the queue loader reads each subject's current one.
+  return { cases: await loadReviewQueue(), generatedAt: new Date().toISOString() };
+}, { audience: 'staff' });
 
-export const getVerificationCaseDetails = domainCall(async (request: CallableRequest) => {
+export const getVerificationCaseDetails = domainCall('getVerificationCaseDetails', async (request: CallableRequest) => {
   const correlationId = sanitizeCorrelationId(request.data?.correlationId);
   const verifierUid = requireVerifier(request, correlationId);
   requireStepUpAuth(request, correlationId, 600);
@@ -104,14 +94,14 @@ export const getVerificationCaseDetails = domainCall(async (request: CallableReq
       sha256: doc.data().sha256,
     })),
   };
-});
+}, { audience: 'staff' });
 
 /**
  * Returns the subject's open case for its current profile revision, or opens a
  * new one. Decided cases (approved/rejected) and cases for an older revision
  * are kept unchanged as history and linked through `previousCaseId`.
  */
-export const createVerificationCase = domainCall(async (request: CallableRequest) => {
+export const createVerificationCase = domainCall('createVerificationCase', async (request: CallableRequest) => {
   const uid = requireAuth(request);
   const correlationId = sanitizeCorrelationId(request.data?.correlationId);
   const subjectType = request.data?.subjectType || 'doctor';
@@ -183,7 +173,7 @@ export const createVerificationCase = domainCall(async (request: CallableRequest
   return { success: true, caseId: result.caseId, status: result.status, created: result.created };
 }, { requireConsent: true });
 
-export const submitVerificationCase = domainCall(async (request: CallableRequest) => {
+export const submitVerificationCase = domainCall('submitVerificationCase', async (request: CallableRequest) => {
   const uid = requireAuth(request);
   const correlationId = sanitizeCorrelationId(request.data?.correlationId);
   const caseIdParse = DocIdSchema.safeParse(request.data?.caseId);
@@ -247,7 +237,7 @@ export const submitVerificationCase = domainCall(async (request: CallableRequest
  * Strictly prohibits getDownloadURL().
  * Requires verifier role + step-up authentication.
  */
-export const getEvidenceReadUrl = domainCall(async (request: CallableRequest) => {
+export const getEvidenceReadUrl = domainCall('getEvidenceReadUrl', async (request: CallableRequest) => {
   const correlationId = sanitizeCorrelationId(request.data?.correlationId);
   const verifierUid = requireVerifier(request, correlationId);
   requireStepUpAuth(request, correlationId, 600); // 10-minute maximum token age
@@ -287,7 +277,7 @@ export const getEvidenceReadUrl = domainCall(async (request: CallableRequest) =>
   });
 
   return { success: true, signedUrl, expiresInSeconds: 300 };
-});
+}, { audience: 'staff' });
 
 /**
  * RECORD VERIFICATION DECISION
@@ -295,7 +285,7 @@ export const getEvidenceReadUrl = domainCall(async (request: CallableRequest) =>
  * (case state, subject revision, evidence set, registry allowlist, reviewer
  * conflicts) is read inside the decision transaction.
  */
-export const recordVerificationDecision = domainCall(async (request: CallableRequest) => {
+export const recordVerificationDecision = domainCall('recordVerificationDecision', async (request: CallableRequest) => {
   const correlationId = sanitizeCorrelationId(request.data?.correlationId);
   const verifierUid = requireVerifier(request, correlationId);
   requireStepUpAuth(request, correlationId, 600);
@@ -350,6 +340,10 @@ export const recordVerificationDecision = domainCall(async (request: CallableReq
     }
     if (!REVIEWABLE_CASE_STATUSES.includes(caseData.status)) {
       throw new DomainError('INVALID_STATE_TRANSITION', 'Case is not reviewable', correlationId);
+    }
+    // An escalated case needs senior sign-off.
+    if (caseData.escalated === true && request.auth?.token?.isSuperAdmin !== true) {
+      throw new DomainError('PERMISSION_DENIED', 'This case is escalated; a super admin must decide it', correlationId);
     }
     const subject = subjectSnap.data();
     if (!subjectSnap.exists || subject?.verificationCaseId !== caseId ||
@@ -447,14 +441,14 @@ export const recordVerificationDecision = domainCall(async (request: CallableReq
   });
 
   return { success: true, caseId, decision, subjectId };
-});
+}, { audience: 'staff' });
 
 /**
  * Records a request for a human official-source registration review.
  * No live authoritative registry integration is configured, so no automatic
  * match, approval, or verified badge can result from this callable.
  */
-export const verifyDoctorRegistration = domainCall(async (request: CallableRequest) => {
+export const verifyDoctorRegistration = domainCall('verifyDoctorRegistration', async (request: CallableRequest) => {
   const uid = requireAuth(request);
   const correlationId = sanitizeCorrelationId(request.data?.correlationId);
   const caseIdParse = DocIdSchema.safeParse(request.data?.caseId);

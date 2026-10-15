@@ -10,6 +10,7 @@ export type DomainErrorCode =
   | 'CONSENT_REQUIRED'
   | 'PERMISSION_DENIED'
   | 'STEP_UP_REQUIRED'
+  | 'MFA_REQUIRED'
   | 'HOSPITAL_NOT_VERIFIED'
   | 'DOCTOR_NOT_VERIFIED'
   | 'APPLICATION_ALREADY_EXISTS'
@@ -56,6 +57,7 @@ export class DomainError extends Error {
       case 'PERMISSION_DENIED':
       case 'ACCOUNT_SUSPENDED':
       case 'STEP_UP_REQUIRED':
+      case 'MFA_REQUIRED':
         functionsCode = 'permission-denied';
         break;
       case 'RESOURCE_NOT_FOUND':

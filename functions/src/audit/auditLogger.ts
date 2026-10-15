@@ -5,6 +5,7 @@
 
 import { db, nowTimestamp } from '../shared/firestoreHelpers';
 import type { StagedWriter } from '../notifications/outbox';
+import { currentRequestContext } from '../shared/requestContext';
 
 export interface AuditEntry {
   actorId: string;
@@ -23,6 +24,19 @@ export interface AuditEntry {
   };
 }
 
+/** Explicit metadata wins; otherwise the current callable request supplies it. */
+const securityMetadataFor = (entry: AuditEntry) => {
+  if (entry.securityMetadata) return entry.securityMetadata;
+  const context = currentRequestContext();
+  if (!context) return null;
+  return {
+    ipAddress: context.ipAddress ?? null,
+    forwardedFor: context.forwardedFor ?? null,
+    userAgent: context.userAgent ?? null,
+    callable: context.functionName,
+  };
+};
+
 const auditRecord = (auditId: string, entry: AuditEntry) => ({
   auditId,
   actorId: entry.actorId,
@@ -35,7 +49,7 @@ const auditRecord = (auditId: string, entry: AuditEntry) => ({
   result: entry.result,
   beforeSummary: entry.beforeSummary || null,
   afterSummary: entry.afterSummary || null,
-  securityMetadata: entry.securityMetadata || null,
+  securityMetadata: securityMetadataFor(entry),
   createdAt: nowTimestamp(),
 });
 

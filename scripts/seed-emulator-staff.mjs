@@ -15,6 +15,7 @@ import { fileURLToPath } from 'node:url';
 const require = createRequire(new URL('../functions/package.json', import.meta.url));
 const { initializeApp } = require('firebase-admin/app');
 const { getAuth } = require('firebase-admin/auth');
+const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 
 const PROJECT_ID = 'demo-healthforce';
 // Must match ADMIN_LOGIN_DOMAIN in admin/js/app.js.
@@ -29,6 +30,7 @@ const STAFF = [
 ];
 
 process.env.FIREBASE_AUTH_EMULATOR_HOST ||= '127.0.0.1:9099';
+process.env.FIRESTORE_EMULATOR_HOST ||= '127.0.0.1:8080';
 if (!PROJECT_ID.startsWith('demo-')) throw new Error('Seeding is limited to demo projects.');
 
 initializeApp({ projectId: PROJECT_ID });
@@ -39,6 +41,10 @@ for (const { username, displayName, claims } of STAFF) {
   const user = await auth.getUserByEmail(email).catch(() => auth.createUser({ email, displayName }));
   await auth.updateUser(user.uid, { password: FIXTURE_PASSWORD, displayName, emailVerified: true });
   await auth.setCustomUserClaims(user.uid, claims);
+  await getFirestore().collection('staffDirectory').doc(user.uid).set({
+    uid: user.uid, email, displayName, active: true, updatedBy: 'seed-script', updatedAt: FieldValue.serverTimestamp(),
+    roles: { isVerifier: Boolean(claims.isVerifier), isSupportAdmin: Boolean(claims.isSupportAdmin), isSuperAdmin: Boolean(claims.isSuperAdmin) },
+  });
   console.log(`${username.padEnd(15)} ${Object.keys(claims).join(', ')}`);
 }
 console.log(`\nPassword for all: see FIXTURE_PASSWORD in ${fileURLToPath(import.meta.url)}`);

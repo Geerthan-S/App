@@ -11,7 +11,7 @@ import { CreateOrganizationSchema, CreateFacilitySchema, DocIdSchema } from '../
 import { DomainError } from '../shared/errors';
 import { stageAudit } from '../audit/auditLogger';
 
-export const createOrganizationDraft = domainCall(async (request: CallableRequest) => {
+export const createOrganizationDraft = domainCall('createOrganizationDraft', async (request: CallableRequest) => {
   const uid = requireAuth(request);
   const correlationId = sanitizeCorrelationId(request.data?.correlationId);
 
@@ -71,7 +71,7 @@ export const createOrganizationDraft = domainCall(async (request: CallableReques
   return { success: true, organizationId: orgId };
 }, { requireConsent: true });
 
-export const getMyOrganizations = domainCall(async (request: CallableRequest) => {
+export const getMyOrganizations = domainCall('getMyOrganizations', async (request: CallableRequest) => {
   const uid = requireAuth(request);
   const user = await db().collection('users').doc(uid).get();
   const savedIds = user.data()?.organizationIds;
@@ -105,7 +105,7 @@ export const getMyOrganizations = domainCall(async (request: CallableRequest) =>
   return { organizations: organizations.filter(Boolean) };
 });
 
-export const addFacility = domainCall(async (request: CallableRequest) => {
+export const addFacility = domainCall('addFacility', async (request: CallableRequest) => {
   const uid = requireAuth(request);
   const correlationId = sanitizeCorrelationId(request.data?.correlationId);
 

@@ -141,6 +141,17 @@ const main = async () => {
   // Any session opened with an older password ends now.
   await auth.revokeRefreshTokens(user.uid);
 
+  // Listed under Admins & Roles in the portal (functions/src/auth/staffFunctions.ts).
+  await getFirestore().collection('staffDirectory').doc(user.uid).set({
+    uid: user.uid,
+    email,
+    displayName: user.displayName ?? username,
+    roles: { isVerifier: true, isSupportAdmin: previousClaims.isSupportAdmin === true, isSuperAdmin: true },
+    active: true,
+    updatedBy: 'bootstrap-script',
+    updatedAt: FieldValue.serverTimestamp(),
+  }, { merge: true });
+
   const auditRef = getFirestore().collection('auditLogs').doc();
   await auditRef.set({
     auditId: auditRef.id,

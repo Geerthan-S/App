@@ -15,7 +15,7 @@ import { DomainError } from '../shared/errors';
 
 export const deviceTokenId = (token: string): string => createHash('sha256').update(token).digest('hex');
 
-export const registerDeviceToken = domainCall(async (request: CallableRequest) => {
+export const registerDeviceToken = domainCall('registerDeviceToken', async (request: CallableRequest) => {
   const uid = requireAuth(request);
   const correlationId = sanitizeCorrelationId(request.data?.correlationId);
   const parsed = DeviceTokenSchema.safeParse(request.data);
@@ -42,7 +42,7 @@ export const registerDeviceToken = domainCall(async (request: CallableRequest) =
 });
 
 /** Called before sign-out so the device stops receiving the signed-out user's notifications. */
-export const unregisterDeviceToken = domainCall(async (request: CallableRequest) => {
+export const unregisterDeviceToken = domainCall('unregisterDeviceToken', async (request: CallableRequest) => {
   const uid = requireAuth(request);
   const correlationId = sanitizeCorrelationId(request.data?.correlationId);
   const parsed = DeviceTokenSchema.safeParse(request.data);

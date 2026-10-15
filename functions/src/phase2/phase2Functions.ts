@@ -49,7 +49,7 @@ const DisputeSchema = z.object({
   description: z.string().min(10).max(2000),
 });
 
-export const createAvailabilityRule = domainCall(async (request: CallableRequest) => {
+export const createAvailabilityRule = domainCall('createAvailabilityRule', async (request: CallableRequest) => {
   const doctorUid = requireAuth(request);
   const correlationId = sanitizeCorrelationId(request.data?.correlationId);
 
@@ -78,7 +78,7 @@ export const createAvailabilityRule = domainCall(async (request: CallableRequest
   return { success: true, ruleId: ruleRef.id };
 }, { requireConsent: true });
 
-export const requestDutyReplacement = domainCall(async (request: CallableRequest) => {
+export const requestDutyReplacement = domainCall('requestDutyReplacement', async (request: CallableRequest) => {
   const uid = requireAuth(request);
   const correlationId = sanitizeCorrelationId(request.data?.correlationId);
 
@@ -124,7 +124,7 @@ export const requestDutyReplacement = domainCall(async (request: CallableRequest
   return { success: true, replacementRequestId: replacementRef.id };
 }, { requireConsent: true });
 
-export const openDispute = domainCall(async (request: CallableRequest) => {
+export const openDispute = domainCall('openDispute', async (request: CallableRequest) => {
   const uid = requireAuth(request);
   const correlationId = sanitizeCorrelationId(request.data?.correlationId);
 

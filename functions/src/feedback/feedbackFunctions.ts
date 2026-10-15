@@ -11,7 +11,7 @@ import { stageAudit } from '../audit/auditLogger';
  * and transactional existence check make duplicate submissions impossible even
  * when two requests race.
  */
-export const submitFeedback = domainCall(async (request: CallableRequest) => {
+export const submitFeedback = domainCall('submitFeedback', async (request: CallableRequest) => {
   const uid = requireAuth(request);
   const correlationId = sanitizeCorrelationId(request.data?.correlationId);
 

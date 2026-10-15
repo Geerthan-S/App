@@ -12,7 +12,7 @@ import { stageAudit } from '../audit/auditLogger';
 
 const MAX_SHIFT_HOURS = 24;
 
-export const createDuty = domainCall(async (request: CallableRequest) => {
+export const createDuty = domainCall('createDuty', async (request: CallableRequest) => {
   const uid = requireAuth(request);
   const correlationId = sanitizeCorrelationId(request.data?.correlationId);
 
@@ -93,7 +93,7 @@ export const createDuty = domainCall(async (request: CallableRequest) => {
   return { success: true, dutyId };
 }, { requireConsent: true });
 
-export const publishDuty = domainCall(async (request: CallableRequest) => {
+export const publishDuty = domainCall('publishDuty', async (request: CallableRequest) => {
   const uid = requireAuth(request);
   const correlationId = sanitizeCorrelationId(request.data?.correlationId);
   const dutyIdParse = DocIdSchema.safeParse(request.data?.dutyId);
