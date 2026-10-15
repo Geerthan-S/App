@@ -224,16 +224,34 @@ service cloud.firestore {
 
     match /inboxNotifications/{notifId} {
       allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      // Recipients may only mark a notification read, stamped with server time.
       allow update: if isAuthenticated() && resource.data.userId == request.auth.uid &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead', 'readAt']);
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead', 'readAt']) &&
+        request.resource.data.isRead == true &&
+        request.resource.data.readAt == request.time;
       allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
       allow create: if false;
     }
 
+    // Reports start open with a bounded payload; only the audited
+    // submitModerationAction callable may resolve them.
+    function isValidNewReport(data) {
+      return data.keys().hasOnly(['reporterId', 'targetType', 'targetId', 'reason', 'details', 'status', 'createdAt']) &&
+        data.keys().hasAll(['reporterId', 'targetType', 'targetId', 'reason', 'status', 'createdAt']) &&
+        data.reporterId == request.auth.uid &&
+        data.status == 'open' &&
+        data.targetType in ['duty', 'user'] &&
+        data.targetId is string && data.targetId.matches('^[A-Za-z0-9_-]{1,128}$') &&
+        data.targetId != request.auth.uid &&
+        data.reason is string && data.reason.size() >= 2 && data.reason.size() <= 200 &&
+        (!data.keys().hasAny(['details']) || (data.details is string && data.details.size() <= 2000)) &&
+        data.createdAt == request.time;
+    }
+
     match /moderationReports/{reportId} {
       allow read: if isAuthenticated() && (resource.data.reporterId == request.auth.uid || isSupportAdmin());
-      allow create: if isAuthenticated() && request.resource.data.reporterId == request.auth.uid;
-      allow update, delete: if isSupportAdmin() || isSuperAdmin();
+      allow create: if isAuthenticated() && isValidNewReport(request.resource.data);
+      allow update, delete: if false;
     }
 
     match /auditLogs/{auditId} {
@@ -241,19 +259,21 @@ service cloud.firestore {
       allow write: if false; // Append-only by Cloud Functions
     }
 
+    // Platform settings change only through validated, audited callables
+    // (updatePlatformConfig, setFeatureFlag), never by direct client writes.
     match /configuration/{configKey} {
       allow read: if isAuthenticated();
-      allow write: if isSuperAdmin();
+      allow write: if false;
     }
 
     match /featureFlags/{flag} {
       allow read: if true;
-      allow write: if isSuperAdmin();
+      allow write: if false;
     }
 
     match /appVersions/{version} {
       allow read: if true;
-      allow write: if isSuperAdmin();
+      allow write: if false;
     }
 
     // =========================================================================
@@ -271,7 +291,7 @@ service cloud.firestore {
     }
 
     match /reliabilitySnapshots/{snapshotId} {
-      allow read: if isAuthenticated();
+      allow read: if isAuthenticated() && (resource.data.doctorId == request.auth.uid || isSupportAdmin());
       allow write: if false;
     }
 

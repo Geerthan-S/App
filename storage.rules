@@ -27,9 +27,12 @@ service firebase.storage {
           ['draft', 'needs_information'];
     }
 
+    // Matches Firestore's isOrgMember: removed or suspended members lose access.
+    // Memberships written before the status field existed are active.
     function isOrgAdmin(orgId) {
       return isAuthenticated()
-        && firestore.get(/databases/(default)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.role in ['owner', 'admin'];
+        && firestore.get(/databases/(default)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.role in ['owner', 'admin']
+        && firestore.get(/databases/(default)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.get('status', 'active') == 'active';
     }
 
     function ownsOrganizationCase(orgId, caseId) {
