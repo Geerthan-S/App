@@ -18,7 +18,7 @@ import {
   getAttentionItems, getSystemHealth, listRenewalsDue, requeueNotification, sendRenewalReminder,
 } from '../src/admin/operationsFunctions';
 import { createSupportCase, getSupportCase, listSupportCases, updateSupportCase } from '../src/admin/supportFunctions';
-import { createStaffAccount, listStaff, setCustomClaims } from '../src/auth/staffFunctions';
+import { createStaffAccount, getSessionPolicy, listStaff, setCustomClaims } from '../src/auth/staffFunctions';
 import { assertSignUpAllowed } from '../src/auth/blockingFunctions';
 import { submitModerationReport } from '../src/moderation/reportFunctions';
 import {
@@ -63,6 +63,19 @@ describeWithEmulator('admin portal v2', () => {
       expect(denied.docs[0].data()).toMatchObject({
         actorId: 'verifier1', targetType: 'callable', targetId: 'getAdminDashboard', reasonCode: 'MFA_REQUIRED', result: 'DENIED',
       });
+    });
+
+    test('REQUIRE_STAFF_MFA=false relaxes the second factor until TOTP is set up, and the portal can read it', async () => {
+      const session = { isVerifier: true, auth_time: now() };
+      process.env.REQUIRE_STAFF_MFA = 'false';
+      try {
+        await expect(call(getAdminDashboard, 'verifier1', {}, session)).resolves.toBeDefined();
+        expect(await call(getSessionPolicy, 'verifier1', {}, session)).toEqual({ requireMfa: false, appCheckEnforced: true });
+      } finally {
+        delete process.env.REQUIRE_STAFF_MFA;
+      }
+      expect(await call(getSessionPolicy, 'verifier1', {}, session)).toEqual({ requireMfa: true, appCheckEnforced: true });
+      await expectDomainError(call(getSessionPolicy, 'doctor1', {}), 'PERMISSION_DENIED');
     });
 
     test('a non-staff caller is denied and audited without leaking anything', async () => {

@@ -16,7 +16,7 @@ initializeApp();
 
 // Auth & Identity
 export { recordConsent } from './auth/authFunctions';
-export { setCustomClaims, listStaff, createStaffAccount } from './auth/staffFunctions';
+export { setCustomClaims, listStaff, createStaffAccount, getSessionPolicy } from './auth/staffFunctions';
 export { restrictSignUpProviders } from './auth/blockingFunctions';
 
 // Community reports (rate limited)

@@ -10,7 +10,7 @@ import { closeAllModals, errorBox, loading, openModal, toastError } from './core
 import {
   session, roles, roleLabel, initFirebase, refreshToken, hasPortalAccess, onSessionChange, signOut,
   signInWithPassword, completeSecondFactor, authMessage, needsEnrollment, startTotpEnrollment,
-  finishTotpEnrollment, qrDataUrl, invoke, enrolledFactors,
+  finishTotpEnrollment, qrDataUrl, invoke, enrolledFactors, loadSessionPolicy,
 } from './core/session.js';
 import { renderDashboard, renderAttention } from './views/dashboard.js';
 import { renderQueue, renderRenewals, openCase } from './views/verification.js';
@@ -248,8 +248,9 @@ function setupTopbar() {
   $('profile-role').textContent = roleLabel();
   $('profile-avatar').textContent = initials(name);
 
-  $('mfa-chip').className = `chip ${session.secondFactor ? 'chip-ok' : session.emulator ? 'chip-warn' : 'chip-bad'}`;
-  $('mfa-chip-label').textContent = session.secondFactor ? 'MFA active' : session.emulator ? 'Emulator · no MFA' : 'MFA off';
+  $('mfa-chip').className = `chip ${session.secondFactor ? 'chip-ok' : session.emulator || !session.mfaRequired ? 'chip-warn' : 'chip-bad'}`;
+  $('mfa-chip-label').textContent = session.secondFactor ? 'MFA active'
+    : session.emulator ? 'Emulator · no MFA' : !session.mfaRequired ? 'MFA not enforced yet' : 'MFA off';
   $('env-badge').textContent = session.emulator ? 'Local emulator · demo-healthforce' : 'Live · asia-south1';
 
   const tick = () => {
@@ -423,6 +424,7 @@ async function boot() {
         await signOut();
         return;
       }
+      await loadSessionPolicy();
       if (needsEnrollment()) {
         if (enrolledFactors().length) {
           // Enrolled, but this session skipped the second factor (e.g. restored from before enrollment).

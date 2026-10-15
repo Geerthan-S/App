@@ -7,7 +7,7 @@ import type { DocumentData, Transaction } from 'firebase-admin/firestore';
 import { DomainError } from '../shared/errors';
 import { db } from '../shared/firestoreHelpers';
 import { PLATFORM_DEFAULTS } from '../shared/platformConfig';
-import { isEmulator } from '../shared/runtime';
+import { staffMfaRequired } from '../shared/runtime';
 
 export const requireAuth = (request: CallableRequest): string => {
   if (!request.auth || !request.auth.uid) {
@@ -61,7 +61,7 @@ export const secondFactorOf = (request: CallableRequest): string | undefined => 
  * Identity Platform; production always requires it.
  */
 const requireSecondFactor = (request: CallableRequest, correlationId: string): void => {
-  if (!isEmulator() && !secondFactorOf(request)) {
+  if (staffMfaRequired() && !secondFactorOf(request)) {
     throw new DomainError('MFA_REQUIRED', 'Sign in with your authenticator app to use staff tools', correlationId);
   }
 };

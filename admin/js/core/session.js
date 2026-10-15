@@ -33,6 +33,8 @@ export const session = {
   user: null,
   claims: {},
   secondFactor: null,
+  /** Whether this deployment requires TOTP for staff (from getSessionPolicy). */
+  mfaRequired: true,
 };
 
 const isStaffClaims = c => Boolean(c.isVerifier || c.isSupportAdmin || c.isSuperAdmin);
@@ -48,7 +50,21 @@ export const roleLabel = () =>
   session.claims.isSuperAdmin ? 'Super Admin' : session.claims.isSupportAdmin ? 'Support Admin' : 'Credential Verifier';
 
 /** Production staff sessions must have completed TOTP; the emulator has no TOTP support. */
-export const needsEnrollment = () => !session.emulator && !session.secondFactor;
+export const needsEnrollment = () => !session.emulator && !session.secondFactor && session.mfaRequired;
+
+/**
+ * Asks the server whether staff MFA is enforced yet. If the call fails the
+ * portal assumes it is (the safe default), so staff are sent to enrollment.
+ */
+export async function loadSessionPolicy() {
+  if (session.emulator) { session.mfaRequired = false; return; }
+  try {
+    const policy = await httpsCallable(session.functions, 'getSessionPolicy')({});
+    session.mfaRequired = policy.data.requireMfa !== false;
+  } catch (_) {
+    session.mfaRequired = true;
+  }
+}
 
 // ── Boot ──────────────────────────────────────────────────
 export async function initFirebase() {

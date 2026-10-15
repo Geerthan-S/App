@@ -13,7 +13,8 @@ import { getAuth, type UserRecord } from 'firebase-admin/auth';
 import { z } from 'zod';
 import { db, nowTimestamp, sanitizeCorrelationId } from '../shared/firestoreHelpers';
 import { domainCall } from '../shared/callable';
-import { requireAdmin, requireStepUpAuth, requireSuperAdmin } from '../security/guards';
+import { requireAdmin, requireAuth, requireStepUpAuth, requireSuperAdmin } from '../security/guards';
+import { appCheckEnforced, staffMfaRequired } from '../shared/runtime';
 import { DocIdSchema } from '../shared/schemas';
 import { DomainError } from '../shared/errors';
 import { logAudit, stageAudit } from '../audit/auditLogger';
@@ -228,3 +229,17 @@ export const createStaffAccount = domainCall('createStaffAccount', async (reques
 
   return { success: true, uid: user.uid, username, email, temporaryPassword: password };
 }, { audience: 'staff', rateLimit: { limit: 10, windowSeconds: 3600 } });
+
+/**
+ * What this deployment enforces for staff sessions. Checks the staff role but
+ * not the second factor, so the portal can learn whether to send a new staff
+ * member to authenticator enrollment before anything else will work.
+ */
+export const getSessionPolicy = domainCall('getSessionPolicy', async (request: CallableRequest) => {
+  const correlationId = sanitizeCorrelationId(request.data?.correlationId);
+  requireAuth(request);
+  if (!STAFF_CLAIMS.some(claim => request.auth?.token?.[claim] === true)) {
+    throw new DomainError('PERMISSION_DENIED', 'Staff privileges required', correlationId);
+  }
+  return { requireMfa: staffMfaRequired(), appCheckEnforced: appCheckEnforced() };
+}, { audience: 'staff' });

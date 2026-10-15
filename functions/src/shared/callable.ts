@@ -17,7 +17,7 @@ import { logAudit } from '../audit/auditLogger';
 import { DomainError, toCallableError } from './errors';
 import { sanitizeCorrelationId } from './firestoreHelpers';
 import { contextFromRawRequest, runWithRequestContext } from './requestContext';
-import { isEmulator } from './runtime';
+import { appCheckEnforced } from './runtime';
 
 /** `app`: the Android client. `staff`: the admin portal. */
 export type CallableAudience = 'app' | 'staff';
@@ -71,7 +71,7 @@ export const domainCall = <T>(
   const rateLimit = options.rateLimit ?? (audience === 'staff' ? DEFAULT_STAFF_RATE_LIMIT : DEFAULT_APP_RATE_LIMIT);
 
   return onCall({
-    enforceAppCheck: audience === 'app' && !isEmulator(),
+    enforceAppCheck: audience === 'app' && appCheckEnforced(),
     cors: audience === 'staff' ? STAFF_ORIGINS : true,
   }, async (request: CallableRequest) => {
     const correlationId = sanitizeCorrelationId(request.data?.correlationId);

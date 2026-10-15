@@ -44,3 +44,23 @@ firebase deploy --only functions,hosting
 - Emulators exempt staff MFA and App Check (`FUNCTIONS_EMULATOR`). Seed staff with `node scripts/seed-emulator-staff.mjs`, then open `http://localhost:5050/?emulator` (`authPort` / `functionsPort` query parameters select a non-default emulator stack).
 - `serve_admin.js` sends the same security headers as Hosting, so CSP problems show up locally.
 - Tests: `cd functions && npm run test:emulator` (now starts the Auth emulator too).
+
+## 6. Current state of doctor-c7c29 and turning enforcement on
+
+The first production deploy (2026-10-15) went out with enforcement switched off,
+because the project was still on plain Firebase Auth with MFA disabled and the
+App Check API not enabled. `functions/.env.doctor-c7c29` sets:
+
+```
+REQUIRE_STAFF_MFA=false
+ENFORCE_APP_CHECK=false
+```
+
+and the `restrictSignUpProviders` blocking function was not deployed. Nothing is
+weaker than before that deploy; the new rate limits, audit metadata, CSP, CORS
+and report hardening are live.
+
+Once steps 1 and 2 are done:
+1. Set both values to `true` in `functions/.env.doctor-c7c29`.
+2. `firebase deploy --only functions` (this now includes `restrictSignUpProviders`).
+3. Staff sign in once and enroll an authenticator; the portal reads the policy from `getSessionPolicy`.
