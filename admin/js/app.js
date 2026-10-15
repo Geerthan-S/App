@@ -515,6 +515,12 @@ async function loadConfig() {
   setTxt('offer-hint', `How long a doctor has to confirm a selection. Allowed ${offerPolicy.range.min}–${offerPolicy.range.max} hours.`);
   setTxt('offer-meta', versionMeta(offerPolicy));
 
+  const { registryDomains } = config;
+  el('registry-domains').value    = registryDomains.value.join('\n');
+  el('registry-domains').disabled = !configCanEdit;
+  el('registry-save').disabled    = !configCanEdit;
+  setTxt('registry-meta', versionMeta(registryDomains));
+
   const list = el('flag-list');
   list.replaceChildren();
   for (const flag of config.featureFlags) {
@@ -564,6 +570,36 @@ async function saveOfferPolicy(event) {
     await invoke('updatePlatformConfig', { configKey: 'offer_policy', configValue: { offerExpiryHours } });
     await reloadView();
     setStatus('Offer policy saved and recorded in the audit trail.');
+  } catch (e) {
+    setStatus(e.message);
+  } finally {
+    btn.disabled = !configCanEdit;
+  }
+}
+
+// Mirrors HOSTNAME_PATTERN in functions/src/admin/adminFunctions.ts; the server validates again.
+const HOSTNAME = /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
+
+async function saveRegistryDomains(event) {
+  event.preventDefault();
+  if (!configCanEdit) return;
+  const domains = [...new Set(el('registry-domains').value
+    .split(/[\s,]+/)
+    .map(d => d.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, ''))
+    .filter(Boolean))];
+  const invalid = domains.filter(d => !HOSTNAME.test(d));
+  if (!domains.length) { setStatus('Add at least one registry domain; an empty list blocks every approval.'); return; }
+  if (invalid.length) { setStatus(`Not a valid domain: ${invalid.join(', ')}`); return; }
+  if (!window.confirm(`Trust ${plural(domains.length, 'registry domain')} for approvals?\n\n${domains.join('\n')}`)) return;
+
+  const btn = el('registry-save');
+  btn.disabled = true;
+  try {
+    await ensureRecentSignIn();
+    setStatus('Saving…');
+    await invoke('updatePlatformConfig', { configKey: 'approved_registry_domains', configValue: { value: domains } });
+    await reloadView();
+    setStatus('Trusted registries saved and recorded in the audit trail.');
   } catch (e) {
     setStatus(e.message);
   } finally {
@@ -867,6 +903,7 @@ el('audit-more').addEventListener('click', () => loadAudit(true).catch(e => setS
 el('audit-close').addEventListener('click', () => el('audit-modal').classList.add('hidden'));
 
 el('offer-form').addEventListener('submit', saveOfferPolicy);
+el('registry-form').addEventListener('submit', saveRegistryDomains);
 
 el('moderation-modal').addEventListener('click', e => {
   if (e.target === el('moderation-modal')) hideReport();

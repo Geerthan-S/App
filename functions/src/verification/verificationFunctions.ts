@@ -40,7 +40,16 @@ export const getVerificationQueue = domainCall(async (request: CallableRequest) 
   const pending = await db().collection('verificationCases')
     .where('status', 'in', REVIEWABLE_CASE_STATUSES)
     .limit(50).get();
-  return { cases: pending.docs.map(doc => doc.data()) };
+  const cases = pending.docs.map(doc => doc.data());
+  // Cases do not store a display name, so look up each subject's current one in a single batch read.
+  const subjectRefs = cases.map(c => db().collection(subjectCollection(c.subjectType)).doc(c.subjectId));
+  const subjects = subjectRefs.length ? await db().getAll(...subjectRefs) : [];
+  return {
+    cases: cases.map((c, i) => {
+      const subject = subjects[i]?.data();
+      return { ...c, subjectName: subject?.fullName ?? subject?.displayName ?? subject?.legalName ?? null };
+    }),
+  };
 });
 
 export const getVerificationCaseDetails = domainCall(async (request: CallableRequest) => {

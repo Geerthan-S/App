@@ -68,8 +68,9 @@ export const atomicSelectDoctor = domainCall(async (request: CallableRequest) =>
     const coveredDates = getDateIntervals(startAt, endAt);
     const scheduleRefs = coveredDates.map(date => db().collection('doctorSchedules').doc(`${doctorId}_${date}`));
 
-    const [isMember, orgSnap, doctorSnap, appSnap, ...scheduleSnaps] = await Promise.all([
+    const [isMember, doctorIsMember, orgSnap, doctorSnap, appSnap, ...scheduleSnaps] = await Promise.all([
       isActiveOrgMemberInTx(tx, hospitalUid, duty.organizationId),
+      isActiveOrgMemberInTx(tx, doctorId, duty.organizationId),
       tx.get(db().collection('organizations').doc(duty.organizationId)),
       tx.get(db().collection('doctors').doc(doctorId)),
       tx.get(appRef),
@@ -79,6 +80,11 @@ export const atomicSelectDoctor = domainCall(async (request: CallableRequest) =>
 
     if (!isMember) {
       throw new DomainError('PERMISSION_DENIED', 'User is not an active member of this organization', correlationId);
+    }
+    // Conflict of interest, re-checked here in case the doctor joined the hospital after applying.
+    if (doctorIsMember) {
+      throw new DomainError('PERMISSION_DENIED',
+        'A member of this hospital cannot be selected for its own duty', correlationId);
     }
     if (!orgSnap.exists || orgSnap.data()?.verificationState !== 'approved') {
       throw new DomainError('HOSPITAL_NOT_VERIFIED', 'Hospital must be verified to select doctors', correlationId);

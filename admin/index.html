@@ -321,6 +321,21 @@
 
           <div class="config-card">
             <div class="config-head">
+              <h3>Trusted Registries</h3>
+              <span class="config-meta" id="registry-meta"></span>
+            </div>
+            <form id="registry-form">
+              <div class="form-group">
+                <label for="registry-domains">Official registry domains, one per line</label>
+                <textarea id="registry-domains" rows="4" spellcheck="false" placeholder="registry.nmc.org.in"></textarea>
+                <span class="hint">Verifiers can only approve a case using a source URL on one of these sites.</span>
+              </div>
+              <button type="submit" id="registry-save" class="btn-decision">Save</button>
+            </form>
+          </div>
+
+          <div class="config-card">
+            <div class="config-head">
               <h3>Feature Flags</h3>
               <span class="config-meta">Phase 2 modules stay off until enabled here</span>
             </div>

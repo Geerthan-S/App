@@ -28,10 +28,19 @@ const ACTION_TARGET_TYPES: Record<string, string[]> = {
   dismiss: ['duty', 'user'],
 };
 
+/** A bare lowercase hostname such as `registry.nmc.org.in`: no scheme, path, port or wildcard. */
+const HOSTNAME_PATTERN = /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
+
 /** Each editable configuration document has a fixed key and a validated shape. */
 const CONFIG_SCHEMAS: Record<string, z.ZodTypeAny> = {
   offer_policy: z.object({
     offerExpiryHours: z.number().int().min(OFFER_EXPIRY_HOURS_RANGE.min).max(OFFER_EXPIRY_HOURS_RANGE.max),
+  }).strict(),
+  // Official registries a verifier may cite when approving a case (read by recordVerificationDecision).
+  // At least one is required: an empty list would block every approval.
+  approved_registry_domains: z.object({
+    value: z.array(z.string().regex(HOSTNAME_PATTERN)).min(1).max(50)
+      .refine(domains => new Set(domains).size === domains.length, 'Duplicate domain'),
   }).strict(),
 };
 
@@ -246,8 +255,9 @@ export const getPlatformConfig = domainCall(async (request: CallableRequest) => 
   const correlationId = sanitizeCorrelationId(request.data?.correlationId);
   requireAdmin(request, correlationId);
 
-  const [offerSnap, flagSnaps, offerExpiryHours] = await Promise.all([
+  const [offerSnap, registrySnap, flagSnaps, offerExpiryHours] = await Promise.all([
     db().collection('configuration').doc('offer_policy').get(),
+    db().collection('configuration').doc('approved_registry_domains').get(),
     Promise.all(FEATURE_FLAG_KEYS.map(key => db().collection('featureFlags').doc(key).get())),
     getOfferExpiryHours(),
   ]);
@@ -260,6 +270,10 @@ export const getPlatformConfig = domainCall(async (request: CallableRequest) => 
 
   return {
     offerPolicy: { offerExpiryHours, range: OFFER_EXPIRY_HOURS_RANGE, ...meta(offerSnap.data()) },
+    registryDomains: {
+      value: Array.isArray(registrySnap.data()?.value) ? registrySnap.data()!.value : [],
+      ...meta(registrySnap.data()),
+    },
     featureFlags: flagSnaps.map(snap => ({ key: snap.id, enabled: Boolean(snap.data()?.enabled), ...meta(snap.data()) })),
     fixed: {
       stepUpAuthMaxAgeSeconds: PLATFORM_DEFAULTS.STEP_UP_AUTH_MAX_AGE_SECONDS,

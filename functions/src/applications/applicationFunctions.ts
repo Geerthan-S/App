@@ -62,6 +62,11 @@ export const applyToDuty = domainCall(async (request: CallableRequest) => {
     if (new Date(duty.schedule?.startAt).getTime() <= Date.now()) {
       throw new DomainError('INVALID_STATE_TRANSITION', 'Duty has already started', correlationId);
     }
+    // Conflict of interest: hospital staff cannot staff (and be paid by) their own organization.
+    if (await isActiveOrgMemberInTx(tx, doctorUid, duty.organizationId)) {
+      throw new DomainError('PERMISSION_DENIED',
+        'Members of this hospital cannot apply to its own duties', correlationId);
+    }
     if (typeof duty.experienceMinYears === 'number' && (doctor.yearsOfExperience ?? 0) < duty.experienceMinYears) {
       throw new DomainError('VALIDATION_FAILED',
         `This duty requires at least ${duty.experienceMinYears} years of experience`, correlationId);

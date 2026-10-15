@@ -11,6 +11,7 @@ import {
   setFeatureFlag, submitModerationAction, updatePlatformConfig,
 } from '../src/admin/adminFunctions';
 import { getOfferExpiryHours } from '../src/shared/platformConfig';
+import { getVerificationQueue } from '../src/verification/verificationFunctions';
 
 jest.setTimeout(30_000);
 
@@ -58,6 +59,21 @@ describeWithEmulator('admin portal', () => {
 
     test('is refused to accounts without a staff claim', async () => {
       await expectDomainError(call(getAdminDashboard, OUTSIDER, {}), 'PERMISSION_DENIED');
+    });
+  });
+
+  describe('verification queue', () => {
+    test('each case carries the subject\'s current display name', async () => {
+      await db().doc('doctors/d1').set({ fullName: 'Dr. Queue Test' });
+      await db().doc('organizations/o1').set({ legalName: 'Queue Hospital Pvt Ltd', displayName: 'Queue Hospital' });
+      await db().doc('verificationCases/c1').set({ caseId: 'c1', subjectType: 'doctor', subjectId: 'd1', status: 'submitted' });
+      await db().doc('verificationCases/c2').set({ caseId: 'c2', subjectType: 'organization', subjectId: 'o1', status: 'submitted' });
+      await db().doc('verificationCases/c3').set({ caseId: 'c3', subjectType: 'doctor', subjectId: 'gone', status: 'submitted' });
+
+      const { cases } = await call<{ cases: { caseId: string; subjectName: string | null }[] }>(
+        getVerificationQueue, VERIFIER, {}, verifierToken());
+      const names = Object.fromEntries(cases.map(c => [c.caseId, c.subjectName]));
+      expect(names).toEqual({ c1: 'Dr. Queue Test', c2: 'Queue Hospital', c3: null });
     });
   });
 
@@ -140,6 +156,23 @@ describeWithEmulator('admin portal', () => {
       await expectDomainError(update('offer_policy', { offerExpiryHours: 73 }), 'VALIDATION_FAILED');
       await expectDomainError(update('offer_policy', { offerExpiryHours: 12, extra: true }), 'VALIDATION_FAILED');
       expect((await db().doc('configuration/offer_policy').get()).exists).toBe(false);
+    });
+
+    test('trusted registry domains are validated and stored where approvals read them', async () => {
+      const update = (value: unknown) => call(updatePlatformConfig, SUPER,
+        { configKey: 'approved_registry_domains', configValue: { value } }, superToken());
+
+      for (const bad of [[], ['https://registry.nmc.org.in'], ['*.gov.in'], ['Registry.NMC.org.in'],
+        ['registry.nmc.org.in/path'], ['a.gov.in', 'a.gov.in'], 'registry.nmc.org.in']) {
+        await expectDomainError(update(bad), 'VALIDATION_FAILED');
+      }
+
+      await update(['registry.nmc.org.in', 'tnmc.gov.in']);
+      expect((await db().doc('configuration/approved_registry_domains').get()).data()?.value)
+        .toEqual(['registry.nmc.org.in', 'tnmc.gov.in']);
+      const config = await call<{ registryDomains: { value: string[]; version: number } }>(
+        getPlatformConfig, SUPER, {}, superToken());
+      expect(config.registryDomains).toMatchObject({ value: ['registry.nmc.org.in', 'tnmc.gov.in'], version: 1 });
     });
 
     test('only a super admin can change settings', async () => {

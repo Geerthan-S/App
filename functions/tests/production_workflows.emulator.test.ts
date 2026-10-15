@@ -396,6 +396,25 @@ describeWithEmulator('production workflows (Firestore emulator)', () => {
         'DOCTOR_NOT_VERIFIED', 'failed-precondition');
     });
 
+    test('hospital staff cannot apply to, or be selected for, their own hospital\'s duty', async () => {
+      // A staff member who is also a verified doctor applies to their own hospital.
+      await seedVerifiedDoctor(STAFF);
+      await expectDomainError(
+        call(applyToDuty, STAFF, { dutyId: DUTY, idempotencyKey: 'apply-key-00003' }),
+        'PERMISSION_DENIED', 'permission-denied');
+
+      // A doctor who joins the hospital after applying cannot then be selected...
+      await call(applyToDuty, DOCTOR, { dutyId: DUTY, idempotencyKey: 'apply-key-00001' });
+      await db().doc(`organizations/${ORG}/members/${DOCTOR}`).set({ role: 'member', status: 'active' });
+      await expectDomainError(
+        call(atomicSelectDoctor, STAFF, { dutyId: DUTY, doctorId: DOCTOR, idempotencyKey: 'select-key-0001' }),
+        'PERMISSION_DENIED');
+
+      // ...until that membership ends.
+      await db().doc(`organizations/${ORG}/members/${DOCTOR}`).update({ status: 'removed' });
+      await call(atomicSelectDoctor, STAFF, { dutyId: DUTY, doctorId: DOCTOR, idempotencyKey: 'select-key-0001' });
+    });
+
     test('a suspended staff account and a removed membership cannot act for the organization', async () => {
       await call(applyToDuty, DOCTOR, { dutyId: DUTY, idempotencyKey: 'apply-key-00001' });
       await db().doc(`users/${STAFF}`).update({ status: 'suspended' });
