@@ -31,7 +31,8 @@ export type AssignmentStatus =
   | 'in_progress' 
   | 'completed' 
   | 'replaced' 
-  | 'cancelled' 
+  | 'expired'
+  | 'cancelled'
   | 'disputed' 
   | 'closed';
 
@@ -43,9 +44,10 @@ export type VerificationStatus =
   | 'approved' 
   | 'rejected' 
   | 'expired' 
-  | 'suspended';
+  | 'suspended'
+  | 'superseded';
 
-export type OutboxStatus = 'pending' | 'leased' | 'delivered' | 'failed' | 'dead_letter';
+export type OutboxStatus = 'pending' | 'leased' | 'delivered' | 'failed' | 'dead_letter' | 'skipped';
 
 export type PaymentAckStatus = 'pending' | 'acknowledged' | 'disputed';
 

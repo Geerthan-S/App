@@ -1,105 +1,125 @@
-/**
- * Storage Security Rules & Private Evidence Protection Tests
- */
+/** Exercises the deployed Storage rules against the local Firebase emulators. */
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
+import {
+  assertFails,
+  assertSucceeds,
+  initializeTestEnvironment,
+  RulesTestEnvironment,
+} from '@firebase/rules-unit-testing';
 
-describe('Firebase Storage Rules & Evidence Isolation Suite', () => {
-  const evaluateStorageRule = (params: {
-    authUid: string | null;
-    isVerifier?: boolean;
-    path: string;
-    fileSize: number;
-    contentType: string;
-    operation: 'read' | 'write';
-  }) => {
-    const { authUid, isVerifier = false, path, fileSize, contentType, operation } = params;
+const runWithEmulator = process.env.FIREBASE_STORAGE_EMULATOR_HOST ? describe : describe.skip;
+const bucket = 'demo-healthforce.appspot.com';
+const proof = '123e4567-e89b-42d3-a456-426614174000.pdf';
 
-    if (!authUid) return false; // Unauthenticated DENY
+runWithEmulator('Storage evidence rules against emulator', () => {
+  let env: RulesTestEnvironment;
 
-    // MIME and Size Check
-    const allowedMime = ['image/jpeg', 'image/png', 'application/pdf'].includes(contentType);
-    const allowedSize = fileSize <= 10 * 1024 * 1024; // 10MB limit
-
-    // Doctor evidence path: verification/doctor/{doctorUid}/{caseId}/{fileName}
-    if (path.startsWith('verification/doctor/')) {
-      const parts = path.split('/');
-      const doctorUid = parts[2];
-
-      if (operation === 'write') {
-        return authUid === doctorUid && allowedMime && allowedSize;
-      }
-      if (operation === 'read') {
-        // Direct read allowed only for owner or verifier
-        return authUid === doctorUid || isVerifier;
-      }
-    }
-
-    return false;
-  };
-
-  test('DENY: Unauthenticated evidence upload attempt', () => {
-    const allowed = evaluateStorageRule({
-      authUid: null,
-      path: 'verification/doctor/doc_1/case_1/proof.pdf',
-      fileSize: 1024 * 1024,
-      contentType: 'application/pdf',
-      operation: 'write',
+  beforeAll(async () => {
+    env = await initializeTestEnvironment({
+      projectId: 'demo-healthforce',
+      firestore: {
+        host: '127.0.0.1',
+        port: 8080,
+        rules: readFileSync(resolve(__dirname, '../../firestore.rules'), 'utf8'),
+      },
+      storage: {
+        host: '127.0.0.1',
+        port: 9199,
+        rules: readFileSync(resolve(__dirname, '../../storage.rules'), 'utf8'),
+      },
     });
-    expect(allowed).toBe(false);
   });
 
-  test('DENY: Doctor A attempting to upload to Doctor B verification path', () => {
-    const allowed = evaluateStorageRule({
-      authUid: 'doc_user_A',
-      path: 'verification/doctor/doc_user_B/case_1/proof.pdf',
-      fileSize: 1024 * 1024,
-      contentType: 'application/pdf',
-      operation: 'write',
+  beforeEach(async () => {
+    await env.clearFirestore();
+    await env.clearStorage();
+    await env.withSecurityRulesDisabled(async context => {
+      await context.firestore().doc('verificationCases/caseA').set({
+        subjectType: 'doctor', subjectId: 'doctorA', status: 'draft',
+      });
     });
-    expect(allowed).toBe(false);
   });
 
-  test('DENY: File exceeding 10MB size limit', () => {
-    const allowed = evaluateStorageRule({
-      authUid: 'doc_user_A',
-      path: 'verification/doctor/doc_user_A/case_1/large_file.pdf',
-      fileSize: 12 * 1024 * 1024, // 12MB
-      contentType: 'application/pdf',
-      operation: 'write',
-    });
-    expect(allowed).toBe(false);
+  afterAll(async () => {
+    if (env) await env.cleanup();
   });
 
-  test('DENY: Unsupported executable MIME type (.exe, .sh, .html)', () => {
-    const allowed = evaluateStorageRule({
-      authUid: 'doc_user_A',
-      path: 'verification/doctor/doc_user_A/case_1/malicious.exe',
-      fileSize: 500 * 1024,
-      contentType: 'application/x-msdownload',
-      operation: 'write',
-    });
-    expect(allowed).toBe(false);
+  const evidenceRef = (uid: string, doctorUid = 'doctorA', caseId = 'caseA', fileName = proof) =>
+    env.authenticatedContext(uid).storage(`gs://${bucket}`)
+      .ref(`verification/doctor/${doctorUid}/${caseId}/${fileName}`);
+
+  test('owner can create valid case evidence, but cannot read it through the client SDK', async () => {
+    const ref = evidenceRef('doctorA');
+    await assertSucceeds(Promise.resolve(ref.put(new Uint8Array([1, 2, 3]), { contentType: 'application/pdf' })));
+    await assertFails(ref.getMetadata());
+    await assertFails(evidenceRef('verifier').getMetadata());
   });
 
-  test('ALLOW: Valid PDF under 10MB uploaded by case owner', () => {
-    const allowed = evaluateStorageRule({
-      authUid: 'doc_user_A',
-      path: 'verification/doctor/doc_user_A/case_1/cert.pdf',
-      fileSize: 2 * 1024 * 1024,
-      contentType: 'application/pdf',
-      operation: 'write',
-    });
-    expect(allowed).toBe(true);
+  test('another doctor, missing case, and unsupported content are denied', async () => {
+    await assertFails(Promise.resolve(evidenceRef('doctorB').put(new Uint8Array([1]), { contentType: 'application/pdf' })));
+    await assertFails(Promise.resolve(evidenceRef('doctorA', 'doctorA', 'missing').put(new Uint8Array([1]), { contentType: 'application/pdf' })));
+    await assertFails(Promise.resolve(evidenceRef('doctorA', 'doctorA', 'caseA', '123e4567-e89b-42d3-a456-426614174001.exe')
+      .put(new Uint8Array([1]), { contentType: 'application/octet-stream' })));
+    await assertFails(Promise.resolve(evidenceRef('doctorA', 'doctorA', 'caseA', 'certificate.pdf')
+      .put(new Uint8Array([1]), { contentType: 'application/pdf' })));
   });
 
-  test('ALLOW: Verifier read access to private evidence', () => {
-    const allowed = evaluateStorageRule({
-      authUid: 'admin_verifier_99',
-      isVerifier: true,
-      path: 'verification/doctor/doc_user_A/case_1/cert.pdf',
-      fileSize: 2 * 1024 * 1024,
-      contentType: 'application/pdf',
-      operation: 'read',
+  test('approved cases cannot receive new evidence', async () => {
+    await env.withSecurityRulesDisabled(async context => {
+      await context.firestore().doc('verificationCases/caseA').update({ status: 'approved' });
     });
-    expect(allowed).toBe(true);
+    await assertFails(Promise.resolve(evidenceRef('doctorA')
+      .put(new Uint8Array([1]), { contentType: 'application/pdf' })));
+  });
+
+  test('organization evidence requires a matching case, admin role, and uploader metadata', async () => {
+    await env.withSecurityRulesDisabled(async context => {
+      await context.firestore().doc('verificationCases/orgCase').set({
+        subjectType: 'organization', subjectId: 'orgA', status: 'draft',
+      });
+      await context.firestore().doc('organizations/orgA/members/doctorA').set({ role: 'owner' });
+    });
+    const path = `verification/organization/orgA/orgCase/${proof}`;
+    const owner = env.authenticatedContext('doctorA').storage(`gs://${bucket}`).ref(path);
+    await assertFails(Promise.resolve(owner.put(new Uint8Array([1]), { contentType: 'application/pdf' })));
+    await assertFails(Promise.resolve(env.authenticatedContext('doctorB').storage(`gs://${bucket}`).ref(path)
+      .put(new Uint8Array([1]), { contentType: 'application/pdf', customMetadata: { uploadedBy: 'doctorB' } })));
+    await assertSucceeds(Promise.resolve(owner.put(new Uint8Array([1]), {
+      contentType: 'application/pdf', customMetadata: { uploadedBy: 'doctorA' },
+    })));
+    await assertFails(owner.getMetadata());
+  });
+
+  test('dispute evidence remains disabled', async () => {
+    const storage = env.authenticatedContext('doctorA').storage(`gs://${bucket}`);
+    await assertFails(Promise.resolve(storage.ref('disputes/disputeA/proof.pdf')
+      .put(new Uint8Array([1]), { contentType: 'application/pdf' })));
+  });
+
+  test('doctor credentials and user roles cannot be edited through Firestore client', async () => {
+    await env.withSecurityRulesDisabled(async context => {
+      await context.firestore().doc('doctors/doctorA').set({
+        userId: 'doctorA', registrationNo: 'TN123', isVerified: true,
+      });
+      await context.firestore().doc('users/doctorA').set({ uid: 'doctorA', activeRole: 'doctor' });
+    });
+    const doctor = env.authenticatedContext('doctorA').firestore();
+    await assertSucceeds(doctor.doc('doctors/doctorA').get());
+    await assertFails(doctor.doc('doctors/doctorA').update({ registrationNo: 'TN999' }));
+    await assertFails(doctor.doc('users/doctorA').update({ activeRole: 'hospital_staff' }));
+    await assertFails(env.authenticatedContext('doctorB').firestore().doc('doctors/doctorA').get());
+  });
+
+  test('organization data and memberships remain server-owned and tenant-scoped', async () => {
+    await env.withSecurityRulesDisabled(async context => {
+      await context.firestore().doc('organizations/orgA').set({ organizationId: 'orgA', verificationState: 'draft' });
+      await context.firestore().doc('organizations/orgA/members/doctorA').set({ role: 'owner' });
+    });
+    const owner = env.authenticatedContext('doctorA').firestore();
+    await assertSucceeds(owner.doc('organizations/orgA').get());
+    await assertFails(owner.doc('organizations/orgA').update({ verificationState: 'approved' }));
+    await assertFails(owner.doc('organizations/orgA/members/doctorB').set({ role: 'owner' }));
+    await assertFails(env.authenticatedContext('doctorB').firestore().doc('organizations/orgA').get());
   });
 });

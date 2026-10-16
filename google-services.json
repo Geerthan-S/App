@@ -12,7 +12,20 @@
           "package_name": "com.geerthan.healthcareworkforce"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "415742364224-rkd72nn0e7va4socav5jqg8nfkbusp4v.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.geerthan.healthcareworkforce",
+            "certificate_hash": "27689c59e7483436c5a862d9a2dd8cc1609dbdd2"
+          }
+        },
+        {
+          "client_id": "415742364224-nn7l35n8so3menivlhfcbg1ponseh4g1.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyCrke0qJvqEaNcCWdCNNoUKminvfO1s0TM"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "415742364224-nn7l35n8so3menivlhfcbg1ponseh4g1.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
