@@ -1,25 +1,28 @@
 /**
  * Doctor Verification Center Screen
- * Hybrid Verification Architecture & Official Council Match Interface
+ *
+ * The doctor uploads registration proof into the private evidence vault, then
+ * sends the case to verifiers. The registration details shown here come from
+ * the stored doctor profile, which is what the server reviews.
  */
 
 import 'dart:async';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../core/constants/app_constants.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/design_system/app_colors.dart';
 import '../../../core/design_system/app_typography.dart';
 import '../../../core/design_system/app_spacing.dart';
 import '../../../core/design_system/app_buttons.dart';
 import '../../../core/design_system/app_cards.dart';
-import '../../../core/design_system/app_inputs.dart';
 import '../../../core/widgets/status_badge.dart';
 import '../../../core/widgets/language_selector_dialog.dart';
 import '../../../core/localization/language_provider.dart';
-import '../domain/verification_models.dart';
+import '../../doctor_profile/data/doctor_repository.dart';
 import '../data/verification_repository.dart';
 import '../../settings/data/account_repository.dart' show callableErrorMessage;
 
@@ -31,16 +34,18 @@ class VerificationCenterScreen extends ConsumerStatefulWidget {
       _VerificationCenterScreenState();
 }
 
+/// Case states in which the doctor can add evidence and send the case.
+const _openCaseStatuses = ['draft', 'needs_information'];
+
 class _VerificationCenterScreenState
     extends ConsumerState<VerificationCenterScreen> {
   final _repo = VerificationRepository();
-  final _regNoController = TextEditingController();
-  final _nameController = TextEditingController();
-  final _qualificationController = TextEditingController();
-  String _selectedCouncil =
-      AppConstants.medicalCouncils[1]; // Tamil Nadu Medical Council
 
+  Map<String, dynamic>? _profile;
+  String? _caseId;
   String _caseStatus = 'loading';
+  /// Why the case could not be loaded, shown with a retry instead of a silent "Not started".
+  String? _loadError;
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _caseSubscription;
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
   _evidenceSubscription;
@@ -50,36 +55,19 @@ class _VerificationCenterScreenState
   String? _rejectedCaseId;
   Map<String, dynamic>? _rejectedCase;
   bool _isAppealing = false;
-  bool _isChecking = false;
   bool _isSubmitting = false;
   bool _isUploading = false;
-  VerificationResult? _lastResult;
 
+  /// Indexed evidence records for the current case.
   final List<Map<String, dynamic>> _uploadedDocuments = [];
+  /// Files uploaded in this session that the server has not indexed yet.
+  final List<Map<String, dynamic>> _pendingUploads = [];
 
-  Future<void> _submitCase() async {
-    setState(() => _isSubmitting = true);
-    try {
-      await _repo.submitCurrentCase();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Case submitted for verifier review.')),
-        );
-      }
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Could not submit this case. Complete your profile and try again.',
-            ),
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isSubmitting = false);
-    }
-  }
+  bool get _isCaseOpen => _caseId != null && _openCaseStatuses.contains(_caseStatus);
+
+  bool get _hasUsableEvidence =>
+      _pendingUploads.isNotEmpty ||
+      _uploadedDocuments.any((doc) => !['rejected', 'infected'].contains(doc['scanStatus']));
 
   @override
   void initState() {
@@ -87,10 +75,38 @@ class _VerificationCenterScreenState
     _loadPersistedCaseStatus();
   }
 
+  void _showSnack(String message, {Color? background}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(backgroundColor: background, content: Text(message)),
+    );
+  }
+
+  String _errorMessage(Object error, String fallback) =>
+      error is StateError ? error.message : callableErrorMessage(error, fallback);
+
   Future<void> _loadPersistedCaseStatus() async {
+    _caseSubscription?.cancel();
+    _evidenceSubscription?.cancel();
+    setState(() {
+      _caseStatus = 'loading';
+      _loadError = null;
+    });
     try {
+      final profile = await DoctorRepository.getProfile();
+      if (!mounted) return;
+      if (profile == null) {
+        setState(() {
+          _profile = null;
+          _caseId = null;
+          _caseStatus = 'not_started';
+        });
+        return;
+      }
+      setState(() => _profile = profile);
       final caseId = await _repo.currentDoctorCaseId();
       if (!mounted) return;
+      setState(() => _caseId = caseId);
       _caseSubscription = FirebaseFirestore.instance
           .collection('verificationCases')
           .doc(caseId)
@@ -102,8 +118,6 @@ class _VerificationCenterScreenState
               final status = data?['status'] as String?;
               if (status == 'superseded') {
                 // An overturned appeal replaced this draft; follow the new case.
-                _caseSubscription?.cancel();
-                _evidenceSubscription?.cancel();
                 _loadPersistedCaseStatus();
                 return;
               }
@@ -130,22 +144,31 @@ class _VerificationCenterScreenState
                   .map((doc) {
                     final data = doc.data();
                     return <String, dynamic>{
-                      'fileName': 'Evidence ${doc.id.substring(0, 8)}',
+                      'fileName': data['fileName'] as String? ??
+                          'Document ${doc.id.substring(0, 8)}',
                       'size':
                           '${((data['sizeBytes'] as num? ?? 0) / 1024).round()} KB',
                       'scanStatus': data['scanStatus'] ?? 'pending',
+                      'objectKey': data['objectKey'],
                     };
                   })
                   .toList();
+              final indexed = records.map((r) => r['objectKey']).toSet();
               setState(() {
                 _uploadedDocuments
                   ..clear()
                   ..addAll(records);
+                _pendingUploads.removeWhere((p) => indexed.contains(p['storagePath']));
               });
-            });
+            }, onError: (_) {});
       }
-    } catch (_) {
-      if (mounted) setState(() => _caseStatus = 'not_started');
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _caseStatus = 'unavailable';
+          _loadError = _errorMessage(error, 'Your verification case could not be loaded. Check your connection and try again.');
+        });
+      }
     }
   }
 
@@ -260,113 +283,111 @@ class _VerificationCenterScreenState
     );
   }
 
+
   @override
   void dispose() {
     _caseSubscription?.cancel();
     _rejectedSubscription?.cancel();
     _evidenceSubscription?.cancel();
-    _regNoController.dispose();
-    _nameController.dispose();
-    _qualificationController.dispose();
     super.dispose();
   }
 
-  Future<void> _runVerificationCheck() async {
-    final regNo = _regNoController.text.trim();
-    if (regNo.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter a valid Registration Number.'),
-        ),
-      );
-      return;
-    }
-
-    setState(() => _isChecking = true);
-
+  Future<void> _requestReview() async {
+    final caseId = _caseId;
+    if (caseId == null) return;
+    setState(() => _isSubmitting = true);
     try {
-      final result = await _repo.verifyRegistration(
-        caseId: await _repo.currentDoctorCaseId(),
-        council: _selectedCouncil,
-        registrationNumber: regNo,
-        fullName: _nameController.text.trim(),
-        qualification: _qualificationController.text.trim(),
-      );
-
-      if (mounted) {
-        setState(() {
-          _isChecking = false;
-          _lastResult = result;
-          _caseStatus = result.caseStatus;
-        });
-
-        final message = result.outcome == 'SOURCE_UNAVAILABLE'
-            ? 'Official registry access is unavailable. Your case awaits manual review.'
-            : 'Your registration check was recorded for reviewer assessment.';
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(backgroundColor: AppColors.amber, content: Text(message)),
-        );
-      }
-    } catch (_) {
-      if (mounted) {
-        setState(() => _isChecking = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Verification could not be completed. Complete onboarding and try again.',
-            ),
-          ),
-        );
-      }
+      await _repo.requestReview(caseId);
+      _showSnack('Sent for review. A verifier will check your registration and documents.');
+    } catch (error) {
+      _showSnack(_errorMessage(error, 'Could not send your case for review. Try again.'));
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
     }
   }
 
   Future<void> _uploadEvidenceDocument() async {
+    final caseId = _caseId;
+    if (caseId == null) return;
+    final PlatformFile? file;
+    try {
+      file = await _repo.pickEvidenceFile();
+    } catch (error) {
+      _showSnack(_errorMessage(error, 'Could not open that file. Try another one.'));
+      return;
+    }
+    if (file == null || !mounted) return;
+
     setState(() => _isUploading = true);
     try {
-      final uid = FirebaseAuth.instance.currentUser?.uid;
-      if (uid == null) throw StateError('Sign in first.');
-      final uploaded = await _repo.pickAndUploadEvidence(
-        caseId: await _repo.currentDoctorCaseId(),
-        doctorUid: uid,
-      );
-
-      if (mounted) {
-        setState(() {
-          _isUploading = false;
-        });
-
-        if (uploaded != null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              backgroundColor: AppColors.emerald,
-              content: Text(
-                'Document uploaded. Security screening is pending.',
-              ),
-            ),
-          );
-        }
-      }
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Upload failed. Check your connection and complete onboarding before retrying.',
-            ),
-          ),
-        );
-      }
+      final uploaded = await _repo.uploadEvidence(caseId: caseId, file: file);
+      if (mounted) setState(() => _pendingUploads.add(uploaded));
+      _showSnack('Document uploaded to your private vault.', background: AppColors.emerald);
+    } catch (error) {
+      _showSnack(_errorMessage(error, 'Upload failed. Check your connection and try again.'));
     } finally {
       if (mounted) setState(() => _isUploading = false);
     }
+  }
+
+  String _statusText() {
+    if (_loadError != null) return _loadError!;
+    if (_caseStatus == 'loading') return 'Loading your current verification case.';
+    if (_profile == null) {
+      return 'Complete your doctor profile first. Verification reviews the registration details saved there.';
+    }
+    return switch (_caseStatus) {
+      'approved' => 'An authorized reviewer approved this verification case.',
+      'needs_information' => 'A reviewer needs more information. Upload the requested proof and send the case again.',
+      'submitted' || 'under_review' => 'Your case is with a verifier, who will check your registration against the official council register.',
+      'rejected' => 'Your last verification was rejected. See the appeal section below.',
+      'unavailable' => 'Verification status is temporarily unavailable. Please try again.',
+      _ => 'Upload your registration certificate, then request a review.',
+    };
+  }
+
+  static String _scanLabel(String status) => switch (status) {
+        'clean' => 'Screened',
+        'rejected' => 'Rejected, upload a valid PDF or image',
+        'infected' => 'Rejected by security screening',
+        _ => 'Received, awaiting screening',
+      };
+
+  Widget _detailRow(AppColorsExtension colors, String label, String? value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(label, style: AppTypography.bodySmall(colors.textMuted)),
+          ),
+          Expanded(
+            child: Text(
+              (value == null || value.isEmpty) ? '—' : value,
+              style: AppTypography.bodyMedium(colors.textPrimary),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final loc = ref.watch(localizationProvider);
+    final profile = _profile;
+    final documents = [
+      ..._uploadedDocuments,
+      ..._pendingUploads.map((p) => {
+            'fileName': p['fileName'],
+            'size': '${((p['size'] as num? ?? 0) / 1024).round()} KB',
+            'scanStatus': 'pending',
+          }),
+    ];
+    final canRequestReview = _isCaseOpen && _hasUsableEvidence;
 
     return Scaffold(
       appBar: AppBar(
@@ -402,309 +423,134 @@ class _VerificationCenterScreenState
                     ),
                     const SizedBox(height: AppSpacing.sm),
                     Text(
-                      _caseStatus == 'approved'
-                          ? 'An authorized reviewer approved this verification case.'
-                          : _caseStatus == 'needs_information'
-                          ? 'A reviewer needs more information. Please upload the requested proof.'
-                          : _caseStatus == 'under_review'
-                          ? 'Your case is waiting for an authorized reviewer to check the official source.'
-                          : _caseStatus == 'loading'
-                          ? 'Loading your current verification case.'
-                          : _caseStatus == 'unavailable'
-                          ? 'Verification status is temporarily unavailable. Please try again.'
-                          : 'Complete your doctor profile and submit your evidence for review.',
+                      _statusText(),
                       style: AppTypography.bodyMedium(colors.textSecondary),
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-
-              // Interactive Verification Input Form
-              Text(
-                'Registration Credentials & Authority',
-                style: AppTypography.headingSmall(colors.textPrimary),
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              AppCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Medical council',
-                      style: AppTypography.labelBold(colors.textSecondary),
-                    ),
-                    const SizedBox(height: 6),
-                    DropdownButtonFormField<String>(
-                      value: _selectedCouncil,
-                      isExpanded: true,
-                      dropdownColor: colors.surface,
-                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                      style: AppTypography.bodyLarge(colors.textPrimary),
-                      decoration: InputDecoration(
-                        filled: true,
-                        fillColor: colors.surface,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(
-                            AppSpacing.radiusSm,
-                          ),
-                          borderSide: BorderSide(color: colors.border),
-                        ),
+                    if (_loadError != null || _caseStatus == 'unavailable') ...[
+                      const SizedBox(height: AppSpacing.sm),
+                      AppSecondaryButton(
+                        label: 'Try again',
+                        icon: Icons.refresh_outlined,
+                        onPressed: _loadPersistedCaseStatus,
                       ),
-                      items: AppConstants.medicalCouncils
-                          .map(
-                            (c) => DropdownMenuItem(
-                              value: c,
-                              child: Text(c, overflow: TextOverflow.ellipsis),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (val) =>
-                          setState(() => _selectedCouncil = val!),
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    AppTextField(
-                      label: 'Registration number',
-                      controller: _regNoController,
-                      hintText: 'e.g. TNMC_98234 or KMC_45678',
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    AppTextField(
-                      label: 'Doctor registered name',
-                      controller: _nameController,
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    AppTextField(
-                      label: 'Primary qualification',
-                      controller: _qualificationController,
-                    ),
-                    const SizedBox(height: AppSpacing.lg),
-                    if (_caseStatus == 'draft' ||
-                        _caseStatus == 'needs_information') ...[
-                      AppButton(
-                        label: 'Submit Case for Review',
-                        isLoading: _isSubmitting,
-                        icon: Icons.send_outlined,
-                        onPressed: _submitCase,
-                      ),
-                      const SizedBox(height: AppSpacing.md),
                     ],
-                    AppButton(
-                      label: 'Request Registration Review',
-                      isLoading: _isChecking,
-                      icon: Icons.verified_user_outlined,
-                      onPressed:
-                          [
-                            'submitted',
-                            'under_review',
-                            'needs_information',
-                          ].contains(_caseStatus)
-                          ? _runVerificationCheck
-                          : null,
-                    ),
+                    if (profile == null && _caseStatus == 'not_started') ...[
+                      const SizedBox(height: AppSpacing.sm),
+                      AppButton(
+                        label: 'Complete doctor profile',
+                        icon: Icons.person_outline,
+                        onPressed: () async {
+                          await context.push('/doctor-onboarding');
+                          if (mounted) _loadPersistedCaseStatus();
+                        },
+                      ),
+                    ],
                   ],
                 ),
               ),
               const SizedBox(height: AppSpacing.lg),
 
-              // Side-by-Side Comparison Card
-              if (_lastResult != null) ...[
+              if (profile != null) ...[
                 Text(
-                  'Verification Review Result',
+                  'Registration Credentials & Authority',
                   style: AppTypography.headingSmall(colors.textPrimary),
                 ),
                 const SizedBox(height: AppSpacing.xs),
                 AppCard(
-                  borderColor: _lastResult!.outcome == 'MATCH'
-                      ? AppColors.emerald.withValues(alpha: 0.5)
-                      : (_lastResult!.outcome == 'MISMATCH'
-                            ? AppColors.amber.withValues(alpha: 0.5)
-                            : AppColors.rose.withValues(alpha: 0.5)),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(
-                                _lastResult!.outcome == 'MATCH'
-                                    ? Icons.check_circle_outlined
-                                    : (_lastResult!.outcome == 'MISMATCH'
-                                          ? Icons.warning_amber_outlined
-                                          : Icons.error_outline_outlined),
-                                color: _lastResult!.outcome == 'MATCH'
-                                    ? AppColors.emerald
-                                    : (_lastResult!.outcome == 'MISMATCH'
-                                          ? AppColors.amber
-                                          : AppColors.rose),
-                                size: 22,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Outcome: ${_lastResult!.outcome}',
-                                style: AppTypography.labelBold(
-                                  _lastResult!.outcome == 'MATCH'
-                                      ? AppColors.emerald
-                                      : (_lastResult!.outcome == 'MISMATCH'
-                                            ? AppColors.amber
-                                            : AppColors.rose),
-                                ),
-                              ),
-                            ],
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: colors.surface,
-                              borderRadius: BorderRadius.circular(
-                                AppSpacing.radiusPill,
-                              ),
-                            ),
-                            child: Text(
-                              'Confidence ${_lastResult!.confidenceScore}%',
-                              style: AppTypography.bodySmall(colors.textMuted),
-                            ),
-                          ),
-                        ],
+                      _detailRow(colors, 'Medical council', profile['council'] as String?),
+                      _detailRow(colors, 'Registration no.', profile['registrationNo'] as String?),
+                      _detailRow(colors, 'Registered name', profile['fullName'] as String?),
+                      _detailRow(colors, 'Qualification', profile['qualification'] as String?),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        'These come from your doctor profile. Edit your profile to change them.',
+                        style: AppTypography.bodySmall(colors.textMuted),
                       ),
-                      const SizedBox(height: AppSpacing.sm),
-                      if (_lastResult!.discrepancySummary != null)
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-                          decoration: BoxDecoration(
-                            color: AppColors.amber.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(
-                              AppSpacing.radiusSm,
-                            ),
-                            border: Border.all(
-                              color: AppColors.amber.withValues(alpha: 0.3),
-                            ),
-                          ),
-                          child: Text(
-                            '⚠️ ${_lastResult!.discrepancySummary}',
-                            style: AppTypography.bodySmall(AppColors.amber),
-                          ),
-                        ),
-                      const Divider(),
-                      ..._lastResult!.fieldComparisons.map((cmp) {
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 6),
-                          child: Row(
-                            children: [
-                              Icon(
-                                cmp.isMatch
-                                    ? Icons.check_outlined
-                                    : Icons.close_outlined,
-                                color: cmp.isMatch
-                                    ? AppColors.emerald
-                                    : AppColors.rose,
-                                size: 16,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                flex: 2,
-                                child: Text(
-                                  cmp.field,
-                                  style: AppTypography.bodySmall(
-                                    colors.textMuted,
-                                  ),
-                                ),
-                              ),
-                              Expanded(
-                                flex: 3,
-                                child: Text(
-                                  cmp.submitted,
-                                  style: AppTypography.bodySmall(
-                                    colors.textPrimary,
-                                  ),
-                                ),
-                              ),
-                              Expanded(
-                                flex: 3,
-                                child: Text(
-                                  cmp.official,
-                                  style: AppTypography.bodySmall(
-                                    colors.textSecondary,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }),
                     ],
                   ),
                 ),
                 const SizedBox(height: AppSpacing.lg),
-              ],
 
-              // Private Evidence Documents Vault
-              Text(
-                'Private Evidence Vault (Zero Public Access)',
-                style: AppTypography.headingSmall(colors.textPrimary),
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: _uploadedDocuments.length,
-                separatorBuilder: (_, __) =>
-                    const SizedBox(height: AppSpacing.xs),
-                itemBuilder: (context, index) {
-                  final doc = _uploadedDocuments[index];
-                  return AppCard(
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.description_outlined,
-                          color: colors.textSecondary,
-                          size: 24,
-                        ),
-                        const SizedBox(width: AppSpacing.sm),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                doc['fileName'] as String,
-                                style: AppTypography.labelBold(
-                                  colors.textPrimary,
-                                ),
-                              ),
-                              Text(
-                                '${doc['size']} • Screening: ${doc['scanStatus']}',
-                                style: AppTypography.bodySmall(
-                                  colors.textMuted,
-                                ),
-                              ),
-                            ],
+                // Private Evidence Documents Vault
+                Text(
+                  'Private Evidence Vault (Zero Public Access)',
+                  style: AppTypography.headingSmall(colors.textPrimary),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: documents.length,
+                  separatorBuilder: (_, __) =>
+                      const SizedBox(height: AppSpacing.xs),
+                  itemBuilder: (context, index) {
+                    final doc = documents[index];
+                    return AppCard(
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.description_outlined,
+                            color: colors.textSecondary,
+                            size: 24,
                           ),
-                        ),
-                        const Icon(
-                          Icons.lock_outlined,
-                          color: AppColors.emerald,
-                          size: 18,
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(height: AppSpacing.md),
-              AppSecondaryButton(
-                label: 'Upload Registration Certificate (PDF / Image)',
-                isLoading: _isUploading,
-                icon: Icons.upload_file_outlined,
-                foregroundColor: colors.accent,
-                onPressed: _uploadEvidenceDocument,
-              ),
-              const SizedBox(height: AppSpacing.md),
+                          const SizedBox(width: AppSpacing.sm),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  doc['fileName'] as String,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: AppTypography.labelBold(
+                                    colors.textPrimary,
+                                  ),
+                                ),
+                                Text(
+                                  '${doc['size']} • ${_scanLabel(doc['scanStatus'] as String)}',
+                                  style: AppTypography.bodySmall(
+                                    colors.textMuted,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Icon(
+                            Icons.lock_outlined,
+                            color: AppColors.emerald,
+                            size: 18,
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+                if (documents.isNotEmpty) const SizedBox(height: AppSpacing.md),
+                AppSecondaryButton(
+                  label: 'Upload Registration Certificate (PDF / Image)',
+                  isLoading: _isUploading,
+                  icon: Icons.upload_file_outlined,
+                  foregroundColor: colors.accent,
+                  onPressed: _isCaseOpen ? _uploadEvidenceDocument : null,
+                ),
+                const SizedBox(height: AppSpacing.md),
+                AppButton(
+                  label: 'Request Registration Review',
+                  isLoading: _isSubmitting,
+                  icon: Icons.verified_user_outlined,
+                  onPressed: canRequestReview ? _requestReview : null,
+                ),
+                if (_isCaseOpen && !_hasUsableEvidence) ...[
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    'Upload your registration certificate to request a review.',
+                    style: AppTypography.bodySmall(colors.textMuted),
+                  ),
+                ],
+                const SizedBox(height: AppSpacing.lg),
+              ],
 
               // Appeal & Human Review Section
               _buildAppealSection(colors),
@@ -716,6 +562,7 @@ class _VerificationCenterScreenState
     );
   }
 }
+
 
 class _AppealSheet extends StatefulWidget {
   const _AppealSheet();

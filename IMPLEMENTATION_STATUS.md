@@ -1,5 +1,13 @@
 # Implementation Status Matrix
 
+## Doctor verification upload and hospital registration crash (2026-10-16, branch `claude/fix-verification-hospital-registration-ca26ur`)
+
+- `IMPLEMENTED` Flutter: the verification centre shows the registration details from the stored doctor profile (the server reviews those, not typed values), opens the file picker before any network call, and enables "Request Registration Review" once the open case has a non-rejected document; the request submits the case and records the source-check request. Load failures now show the server's reason with a retry instead of a silent "Not started"; a doctor without a profile is sent to onboarding.
+- `IMPLEMENTED`: uploads carry the original file name as Storage metadata; the evidence indexer stores a sanitised `fileName` (no path or control characters, 120 chars) and the admin case view shows it.
+- `FIXED`: creating a hospital organization crashed with `'_dependents.isEmpty': is not true` because the dialog's text controllers were disposed while the closing dialog still rendered them. The create-organization and add-facility dialogs now own and dispose their controllers. Reproduced and verified with a widget test (Flutter 3.47.7).
+- `TESTED`: Flutter analyze 0 errors; Flutter tests pass; Functions typecheck and `evidence_ingest` unit tests pass.
+- `UNVERIFIED`: not exercised on a device; not deployed. Admins can list documents but open them only after scanning (`BLOCKED_EXTERNAL` scanner, unchanged).
+
 ## Phase 1 completion — blueprint v1.1 gaps (2026-10-16, branch `phase1-completion`)
 
 - Spec: `docs/phase1/phase1-completion-spec.md`. Launch operations: `docs/runbooks/launch-readiness.md`.

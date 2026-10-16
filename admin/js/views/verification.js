@@ -211,7 +211,9 @@ export async function openCase(caseId, { entry = null, onChange = () => {} } = {
   const evidence = details.documents?.length
     ? h('div', {}, details.documents.map(doc => h('div', { class: 'evidence' },
       h('div', { class: 'btn-row' }, icon('file'), h('div', {},
-        h('div', { class: 'cell-main mono' }, doc.documentId.slice(0, 16)),
+        doc.fileName
+          ? h('div', { class: 'cell-main' }, doc.fileName)
+          : h('div', { class: 'cell-main mono' }, doc.documentId.slice(0, 16)),
         h('div', { class: 'cell-sub' }, `${doc.contentType || 'document'} · ${Math.round((doc.sizeBytes || 0) / 1024)} KB`))),
       h('div', { class: 'btn-row' }, badge(doc.scanStatus),
         doc.scanStatus === 'clean' ? h('button', { class: 'btn btn-secondary btn-sm', type: 'button', onclick: async () => {

@@ -80,25 +80,24 @@ class VerificationRepository {
     });
   }
 
-  Future<void> submitCurrentCase() async {
-    final caseId = await currentDoctorCaseId();
+  /// Sends the case to the verifier queue, then records the request for an
+  /// official-source check. The second call only adds the registry-check
+  /// record; the case is already with verifiers once the first succeeds.
+  Future<void> requestReview(String caseId) async {
     await _functions.httpsCallable('submitVerificationCase').call<Map<String, dynamic>>({
       'caseId': caseId,
     });
+    try {
+      await _functions.httpsCallable('verifyDoctorRegistration').call<Map<String, dynamic>>({
+        'caseId': caseId,
+      });
+    } on FirebaseFunctionsException {
+      // The case is submitted; a verifier can still record the source check.
+    }
   }
 
-  /**
-   * Secure document picker & upload to private Cloud Storage path
-   * Path: verification/doctor/{uid}/{caseId}/{fileName}
-   */
-  Future<Map<String, dynamic>?> pickAndUploadEvidence({
-    required String caseId,
-    required String doctorUid,
-  }) async {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null || uid != doctorUid) {
-      throw StateError('Sign in with the account submitting this evidence.');
-    }
+  /// Opens the system file picker. Returns null when the doctor cancels.
+  Future<PlatformFile?> pickEvidenceFile() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['pdf', 'png', 'jpg', 'jpeg'],
@@ -110,26 +109,48 @@ class VerificationRepository {
     if (bytes == null || bytes.isEmpty || bytes.length >= 10 * 1024 * 1024) {
       throw StateError('Choose a non-empty document smaller than 10 MB.');
     }
-    final extension = file.extension?.toLowerCase();
-    final contentType = switch (extension) {
-      'pdf' => 'application/pdf',
-      'png' => 'image/png',
-      'jpg' || 'jpeg' => 'image/jpeg',
-      _ => throw StateError('Choose a PDF, PNG, or JPEG document.'),
-    };
+    if (_contentTypeOf(file) == null) {
+      throw StateError('Choose a PDF, PNG, or JPEG document.');
+    }
+    return file;
+  }
+
+  /**
+   * Uploads to the private Cloud Storage path
+   * verification/doctor/{uid}/{caseId}/{uuid}.{ext}. A Storage trigger then
+   * writes the verificationDocuments record the doctor and verifiers see.
+   */
+  Future<Map<String, dynamic>> uploadEvidence({
+    required String caseId,
+    required PlatformFile file,
+  }) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) throw StateError('Sign in before uploading evidence.');
+    final bytes = file.bytes!;
+    final contentType = _contentTypeOf(file)!;
+    final extension = file.extension!.toLowerCase();
     final objectName = '${const Uuid().v4()}.$extension';
-    final storageRef = _storage.ref(
-      'verification/doctor/$uid/$caseId/$objectName',
-    );
-    final uploaded = await storageRef.putData(
-      bytes,
-      SettableMetadata(contentType: contentType),
-    );
+    final uploaded = await _storage
+        .ref('verification/doctor/$uid/$caseId/$objectName')
+        .putData(
+          bytes,
+          SettableMetadata(
+            contentType: contentType,
+            customMetadata: {'uploadedBy': uid, 'originalName': file.name},
+          ),
+        );
     return {
       'fileName': file.name,
       'size': bytes.length,
       'storagePath': uploaded.ref.fullPath,
-      'uploadedAt': DateTime.now().toUtc().toIso8601String(),
     };
   }
+
+  static String? _contentTypeOf(PlatformFile file) =>
+      switch (file.extension?.toLowerCase()) {
+        'pdf' => 'application/pdf',
+        'png' => 'image/png',
+        'jpg' || 'jpeg' => 'image/jpeg',
+        _ => null,
+      };
 }
