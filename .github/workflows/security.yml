@@ -74,6 +74,11 @@ jobs:
             --exclude node_modules --exclude functions/lib --exclude admin/js/vendor --exclude build \
             --exclude lib/firebase_options.dart --exclude google-services.json \
             --sarif --output semgrep.sarif
+      # Semgrep keeps `nosemgrep` results in SARIF (marked as in-source
+      # suppressions), and code scanning would still open alerts for them.
+      - name: Drop suppressed results
+        run: |
+          python3 -c "import json; p='semgrep.sarif'; d=json.load(open(p)); [run.update(results=[r for r in run['results'] if not r.get('suppressions')]) for run in d['runs']]; json.dump(d, open(p, 'w'))"
       - uses: github/codeql-action/upload-sarif@ce5e7eeac396d720fe2d802714996c8ce561e311 # v3.39.0
         if: always()
         with:
