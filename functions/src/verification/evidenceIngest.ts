@@ -5,6 +5,7 @@ import { onMessagePublished } from 'firebase-functions/v2/pubsub';
 import { getStorage } from 'firebase-admin/storage';
 import { db, nowTimestamp } from '../shared/firestoreHelpers';
 import { matchesFileSignature } from './evidenceSignature';
+import { displayFileName } from './evidenceFileName';
 import { CLOSED_CASE_STATUSES } from './verificationStates';
 import { EVIDENCE_SCAN_TOPIC, ScanResultMessage, ScanResultMessageSchema } from './malwareScannerAdapter';
 
@@ -88,6 +89,7 @@ export const indexVerificationEvidence = onObjectFinalized(async event => {
     subjectId,
     uploadedBy,
     objectKey,
+    fileName: displayFileName(object.metadata?.originalName),
     bucket: object.bucket,
     generation: object.generation ? String(object.generation) : null,
     contentType: object.contentType || null,

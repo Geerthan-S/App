@@ -88,6 +88,7 @@ export const getVerificationCaseDetails = domainCall('getVerificationCaseDetails
     },
     documents: documentsSnap.docs.map(doc => ({
       documentId: doc.id,
+      fileName: doc.data().fileName ?? null,
       contentType: doc.data().contentType,
       sizeBytes: doc.data().sizeBytes,
       scanStatus: doc.data().scanStatus,

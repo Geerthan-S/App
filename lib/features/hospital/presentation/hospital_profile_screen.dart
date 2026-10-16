@@ -48,40 +48,14 @@ class _HospitalProfileScreenState extends ConsumerState<HospitalProfileScreen> {
   }
 
   Future<void> _createOrganization() async {
-    final legal = TextEditingController();
-    final display = TextEditingController();
-    final registration = TextEditingController();
-    final address = TextEditingController();
-    final city = TextEditingController();
-    String type = 'hospital';
+    // The dialog owns its text controllers and disposes them when its route is
+    // removed. Disposing them here, as soon as showDialog returned, freed them
+    // while the closing animation still rendered the fields, which tripped
+    // the framework's `_dependents.isEmpty` assertion.
     final data = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (dialogContext) => StatefulBuilder(builder: (context, update) => AlertDialog(
-        title: const Text('Create hospital organization'),
-        content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
-          TextField(controller: legal, decoration: const InputDecoration(labelText: 'Legal name')),
-          TextField(controller: display, decoration: const InputDecoration(labelText: 'Display name')),
-          DropdownButtonFormField<String>(
-            value: type,
-            items: const ['hospital', 'clinic', 'nursing_home']
-                .map((value) => DropdownMenuItem(value: value, child: Text(value))).toList(),
-            onChanged: (value) => update(() => type = value ?? type),
-          ),
-          TextField(controller: registration, decoration: const InputDecoration(labelText: 'Establishment registration number')),
-          TextField(controller: address, decoration: const InputDecoration(labelText: 'Street address')),
-          TextField(controller: city, decoration: const InputDecoration(labelText: 'City')),
-        ])),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(dialogContext, {
-            'legalName': legal.text.trim(), 'displayName': display.text.trim(),
-            'organizationType': type, 'registrationNumber': registration.text.trim(),
-            'address': address.text.trim(), 'city': city.text.trim(),
-          }), child: const Text('Create')),
-        ],
-      )),
+      builder: (_) => const _CreateOrganizationDialog(),
     );
-    for (final controller in [legal, display, registration, address, city]) { controller.dispose(); }
     if (data == null) return;
     setState(() => _busy = true);
     try {
@@ -128,7 +102,7 @@ class _HospitalProfileScreenState extends ConsumerState<HospitalProfileScreen> {
       final objectName = '${const Uuid().v4()}.$extension';
       await FirebaseStorage.instance
           .ref('verification/organization/$orgId/$caseId/$objectName')
-          .putData(bytes, SettableMetadata(contentType: contentType, customMetadata: {'uploadedBy': uid}));
+          .putData(bytes, SettableMetadata(contentType: contentType, customMetadata: {'uploadedBy': uid, 'originalName': file.name}));
       if (mounted) setState(() => _message = 'License uploaded. Security screening is pending.');
     } catch (_) {
       if (mounted) setState(() => _message = 'License upload failed. Confirm your organization role and Storage setup.');
@@ -156,33 +130,10 @@ class _HospitalProfileScreenState extends ConsumerState<HospitalProfileScreen> {
   Future<void> _addFacility() async {
     final orgId = _selectedId;
     if (orgId == null) return;
-    final name = TextEditingController();
-    final address = TextEditingController();
-    final city = TextEditingController();
-    final latitude = TextEditingController();
-    final longitude = TextEditingController();
     final data = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Add a facility'),
-        content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
-          TextField(controller: name, decoration: const InputDecoration(labelText: 'Facility name')),
-          TextField(controller: address, decoration: const InputDecoration(labelText: 'Street address')),
-          TextField(controller: city, decoration: const InputDecoration(labelText: 'City')),
-          TextField(controller: latitude, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Latitude')),
-          TextField(controller: longitude, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Longitude')),
-        ])),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(dialogContext, {
-            'organizationId': orgId, 'name': name.text.trim(), 'address': address.text.trim(),
-            'city': city.text.trim(), 'latitude': double.tryParse(latitude.text.trim()),
-            'longitude': double.tryParse(longitude.text.trim()),
-          }), child: const Text('Add')),
-        ],
-      ),
+      builder: (_) => _AddFacilityDialog(organizationId: orgId),
     );
-    for (final controller in [name, address, city, latitude, longitude]) { controller.dispose(); }
     if (data == null) return;
     setState(() => _busy = true);
     try {
@@ -256,6 +207,105 @@ class _HospitalProfileScreenState extends ConsumerState<HospitalProfileScreen> {
           ),
         ],
       ]),
+    );
+  }
+}
+
+class _CreateOrganizationDialog extends StatefulWidget {
+  const _CreateOrganizationDialog();
+
+  @override
+  State<_CreateOrganizationDialog> createState() => _CreateOrganizationDialogState();
+}
+
+class _CreateOrganizationDialogState extends State<_CreateOrganizationDialog> {
+  final _legal = TextEditingController();
+  final _display = TextEditingController();
+  final _registration = TextEditingController();
+  final _address = TextEditingController();
+  final _city = TextEditingController();
+  String _type = 'hospital';
+
+  @override
+  void dispose() {
+    for (final controller in [_legal, _display, _registration, _address, _city]) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Create hospital organization'),
+      content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
+        TextField(controller: _legal, decoration: const InputDecoration(labelText: 'Legal name')),
+        TextField(controller: _display, decoration: const InputDecoration(labelText: 'Display name')),
+        DropdownButtonFormField<String>(
+          value: _type,
+          items: const ['hospital', 'clinic', 'nursing_home']
+              .map((value) => DropdownMenuItem(value: value, child: Text(value))).toList(),
+          onChanged: (value) => setState(() => _type = value ?? _type),
+        ),
+        TextField(controller: _registration, decoration: const InputDecoration(labelText: 'Establishment registration number')),
+        TextField(controller: _address, decoration: const InputDecoration(labelText: 'Street address')),
+        TextField(controller: _city, decoration: const InputDecoration(labelText: 'City')),
+      ])),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+        FilledButton(onPressed: () => Navigator.pop(context, {
+          'legalName': _legal.text.trim(), 'displayName': _display.text.trim(),
+          'organizationType': _type, 'registrationNumber': _registration.text.trim(),
+          'address': _address.text.trim(), 'city': _city.text.trim(),
+        }), child: const Text('Create')),
+      ],
+    );
+  }
+}
+
+class _AddFacilityDialog extends StatefulWidget {
+  final String organizationId;
+
+  const _AddFacilityDialog({required this.organizationId});
+
+  @override
+  State<_AddFacilityDialog> createState() => _AddFacilityDialogState();
+}
+
+class _AddFacilityDialogState extends State<_AddFacilityDialog> {
+  final _name = TextEditingController();
+  final _address = TextEditingController();
+  final _city = TextEditingController();
+  final _latitude = TextEditingController();
+  final _longitude = TextEditingController();
+
+  @override
+  void dispose() {
+    for (final controller in [_name, _address, _city, _latitude, _longitude]) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Add a facility'),
+      content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
+        TextField(controller: _name, decoration: const InputDecoration(labelText: 'Facility name')),
+        TextField(controller: _address, decoration: const InputDecoration(labelText: 'Street address')),
+        TextField(controller: _city, decoration: const InputDecoration(labelText: 'City')),
+        TextField(controller: _latitude, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Latitude')),
+        TextField(controller: _longitude, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Longitude')),
+      ])),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+        FilledButton(onPressed: () => Navigator.pop(context, {
+          'organizationId': widget.organizationId, 'name': _name.text.trim(), 'address': _address.text.trim(),
+          'city': _city.text.trim(), 'latitude': double.tryParse(_latitude.text.trim()),
+          'longitude': double.tryParse(_longitude.text.trim()),
+        }), child: const Text('Add')),
+      ],
     );
   }
 }
