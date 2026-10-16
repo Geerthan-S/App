@@ -47,7 +47,7 @@ firebase deploy --only functions,hosting
 
 ## 6. Current state of doctor-c7c29 and turning enforcement on
 
-The first production deploy (2026-10-15) went out with enforcement switched off,
+The first production deploy (2026-10-16) went out with enforcement switched off,
 because the project was still on plain Firebase Auth with MFA disabled and the
 App Check API not enabled. `functions/.env.doctor-c7c29` sets:
 
@@ -64,3 +64,16 @@ Once steps 1 and 2 are done:
 1. Set both values to `true` in `functions/.env.doctor-c7c29`.
 2. `firebase deploy --only functions` (this now includes `restrictSignUpProviders`).
 3. Staff sign in once and enroll an authenticator; the portal reads the policy from `getSessionPolicy`.
+
+## 7. Deploy notes
+
+- Billing: the project was moved from the closed "Firebase Payment" account to
+  "My Billing Account" on 2026-10-16. Functions, TTL policies and Identity
+  Platform all stop working if the linked billing account closes, even though
+  the Firebase console still shows the Blaze plan.
+- A full functions deploy (66 services) briefly exhausts the 100-instance
+  Cloud Run quota in asia-south1 with rollout instances, so every function
+  returns `429 Rate exceeded / no available instance` for roughly 10 minutes
+  until idle instances scale down. This clears by itself. To avoid it, deploy
+  in smaller groups (`--only functions:a,functions:b,...`) or request a higher
+  "Instances per region" quota.
