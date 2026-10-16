@@ -1,9 +1,9 @@
-﻿const http = require('http');
+const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
 const PORT = Number(process.env.PORT) || 8088;
-const PUBLIC_DIR = path.join(__dirname, 'build', 'web');
+const PUBLIC_DIR = path.resolve(__dirname, 'build', 'web');
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -21,10 +21,25 @@ const MIME_TYPES = {
   '.woff2': 'font/woff2',
 };
 
+// nosemgrep: problem-based-packs.insecure-transport.js-node.using-http-server.using-http-server -- local dev server bound to loopback only
 const server = http.createServer((req, res) => {
-  let reqPath = req.url.split('?')[0];
+  let reqPath;
+  try {
+    reqPath = decodeURIComponent(req.url.split('?')[0]);
+  } catch (_) {
+    res.writeHead(400, { 'Content-Type': 'text/plain' });
+    res.end('Bad Request');
+    return;
+  }
   if (reqPath === '/' || reqPath === '') reqPath = '/index.html';
-  let filePath = path.join(PUBLIC_DIR, reqPath);
+  // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal -- result is checked to stay inside PUBLIC_DIR below
+  let filePath = path.resolve(PUBLIC_DIR, `.${reqPath}`);
+  // Never serve anything outside build/web (e.g. /../../.env).
+  if (filePath !== PUBLIC_DIR && !filePath.startsWith(PUBLIC_DIR + path.sep)) {
+    res.writeHead(403, { 'Content-Type': 'text/plain' });
+    res.end('Forbidden');
+    return;
+  }
 
   if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
     filePath = path.join(PUBLIC_DIR, 'index.html');

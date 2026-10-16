@@ -19,13 +19,13 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: '3.12'
       - run: pip install mobsfscan==0.4.3
       - run: mobsfscan android lib --sarif --output mobsfscan.sarif || true
-      - uses: github/codeql-action/upload-sarif@v3
+      - uses: github/codeql-action/upload-sarif@ce5e7eeac396d720fe2d802714996c8ce561e311 # v3.39.0
         if: always() && hashFiles('mobsfscan.sarif') != ''
         with:
           sarif_file: mobsfscan.sarif
@@ -35,12 +35,12 @@ jobs:
     name: APK scan (MobSF)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
         with:
           distribution: temurin
           java-version: 17
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
           cache: true
@@ -68,7 +68,7 @@ jobs:
           curl -sf -X POST -d "hash=${HASH}" -H "Authorization: $MOBSF_API_KEY" http://localhost:8000/api/v1/report_json > mobsf-report.json
           curl -sf -X POST -d "hash=${HASH}" -H "Authorization: $MOBSF_API_KEY" http://localhost:8000/api/v1/download_pdf -o mobsf-report.pdf || true
           jq '{security_score: .appsec.security_score, high: (.appsec.high | length), warning: (.appsec.warning | length)}' mobsf-report.json | tee mobsf-summary.json
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
           name: mobsf-report

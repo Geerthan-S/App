@@ -29,7 +29,7 @@ jobs:
     name: Secret scan (Gitleaks)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0 # scan the full history, not just the tip
       - name: Gitleaks
@@ -44,13 +44,13 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: github/codeql-action/init@v3
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: github/codeql-action/init@ce5e7eeac396d720fe2d802714996c8ce561e311 # v3.39.0
         with:
           languages: javascript-typescript
           build-mode: none
           queries: security-extended
-      - uses: github/codeql-action/analyze@v3
+      - uses: github/codeql-action/analyze@ce5e7eeac396d720fe2d802714996c8ce561e311 # v3.39.0
         with:
           category: /language:javascript-typescript
 
@@ -64,14 +64,17 @@ jobs:
     container:
       image: semgrep/semgrep:1.95.0
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      # firebase_options.dart / google-services.json hold the public Firebase
+      # client config (not secrets; see .gitleaks.toml).
       - name: Semgrep
         run: |
           semgrep scan \
             --config p/default --config p/typescript --config p/javascript --config p/secrets \
             --exclude node_modules --exclude functions/lib --exclude admin/js/vendor --exclude build \
+            --exclude lib/firebase_options.dart --exclude google-services.json \
             --sarif --output semgrep.sarif
-      - uses: github/codeql-action/upload-sarif@v3
+      - uses: github/codeql-action/upload-sarif@ce5e7eeac396d720fe2d802714996c8ce561e311 # v3.39.0
         if: always()
         with:
           sarif_file: semgrep.sarif
@@ -85,12 +88,12 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: OSV-Scanner
         run: |
           docker run --rm -v "$PWD:/src" -w /src ghcr.io/google/osv-scanner:v1.9.1 \
             --recursive --format sarif --output /src/osv.sarif . || true
-      - uses: github/codeql-action/upload-sarif@v3
+      - uses: github/codeql-action/upload-sarif@ce5e7eeac396d720fe2d802714996c8ce561e311 # v3.39.0
         if: always() && hashFiles('osv.sarif') != ''
         with:
           sarif_file: osv.sarif
@@ -101,11 +104,11 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
         with:
           distribution: temurin
           java-version: 21
@@ -118,7 +121,7 @@ jobs:
           for i in $(seq 1 60); do curl -sf http://localhost:5000 > /dev/null && exit 0; sleep 2; done
           cat hosting.log; exit 1
       - name: ZAP baseline (passive)
-        uses: zaproxy/action-baseline@v0.14.0
+        uses: zaproxy/action-baseline@7c4deb10e6261301961c86d65d54a516394f9aed # v0.14.0
         with:
           target: http://localhost:5000
           allow_issue_writing: false

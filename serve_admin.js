@@ -61,6 +61,7 @@ const sendIndex = res => fs.readFile(path.join(PUBLIC_DIR, 'index.html'), (err, 
   else send(res, 200, 'text/html; charset=utf-8', data);
 });
 
+// nosemgrep: problem-based-packs.insecure-transport.js-node.using-http-server.using-http-server -- local dev server bound to loopback only
 const server = http.createServer((req, res) => {
   let reqPath;
   try {
@@ -70,6 +71,7 @@ const server = http.createServer((req, res) => {
     return;
   }
   if (reqPath === '/' || reqPath === '') reqPath = '/index.html';
+  // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal -- result is checked to stay inside PUBLIC_DIR below
   const filePath = path.resolve(PUBLIC_DIR, `.${reqPath}`);
   // Never serve anything outside admin/ (e.g. /../functions/package.json).
   if (filePath !== PUBLIC_DIR && !filePath.startsWith(PUBLIC_DIR + path.sep)) {
@@ -94,6 +96,7 @@ server.listen(PORT, '127.0.0.1', () => {
 });
 
 // Browsers may resolve "localhost" to the IPv6 loopback; serve it too (still loopback only).
+// nosemgrep: problem-based-packs.insecure-transport.js-node.using-http-server.using-http-server -- local dev server bound to loopback only
 http.createServer(server.listeners('request')[0])
   .on('error', () => { /* IPv6 loopback unavailable: IPv4 is enough */ })
   .listen(PORT, '::1');

@@ -34,7 +34,9 @@ export const resolveTarget = async () => {
     process.env.FIRESTORE_EMULATOR_HOST = FIRESTORE_EMULATOR;
     process.env.FIREBASE_AUTH_EMULATOR_HOST = AUTH_EMULATOR;
     try {
+      // nosemgrep: typescript.react.security.react-insecure-request.react-insecure-request -- local emulator health check
       await fetch(`http://${FIRESTORE_EMULATOR}/`);
+      // nosemgrep: typescript.react.security.react-insecure-request.react-insecure-request -- local emulator health check
       await fetch(`http://${AUTH_EMULATOR}/`);
     } catch {
       throw new Error('Emulators are not running. Start them first with: npm run emulators');

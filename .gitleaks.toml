@@ -20,4 +20,7 @@ paths = [
 regexes = [
   # Emulator-only fixture password used by scripts/seed-emulator-staff.mjs.
   '''local-emulator-fixture-only''',
+  # Feature-flag names (`flagKey: 'phase2_disputes_enabled'`) trip the
+  # generic-api-key rule because of the word "Key"; they are not secrets.
+  '''^phase2_[a-z_]+_enabled$''',
 ]
