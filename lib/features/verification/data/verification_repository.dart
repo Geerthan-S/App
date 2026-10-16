@@ -72,6 +72,14 @@ class VerificationRepository {
     return createdId;
   }
 
+  /// Appeals a rejected case once, within 30 days; a different verifier decides.
+  Future<void> submitAppeal({required String caseId, required String statement}) async {
+    await _functions.httpsCallable('submitVerificationAppeal').call<Map<String, dynamic>>({
+      'caseId': caseId,
+      'statement': statement,
+    });
+  }
+
   Future<void> submitCurrentCase() async {
     final caseId = await currentDoctorCaseId();
     await _functions.httpsCallable('submitVerificationCase').call<Map<String, dynamic>>({

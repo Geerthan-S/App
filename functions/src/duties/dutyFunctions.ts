@@ -5,12 +5,12 @@
 import type { CallableRequest } from 'firebase-functions/v2/https';
 import { db, nowTimestamp, sanitizeCorrelationId } from '../shared/firestoreHelpers';
 import { domainCall } from '../shared/callable';
-import { requireAuth, requireOrgMember } from '../security/guards';
+import { requireAuth, requireOrgPermission } from '../security/guards';
 import { CreateDutySchema, DocIdSchema } from '../shared/schemas';
 import { DomainError } from '../shared/errors';
 import { stageAudit } from '../audit/auditLogger';
 
-const MAX_SHIFT_HOURS = 24;
+export const MAX_SHIFT_HOURS = 24;
 
 export const createDuty = domainCall('createDuty', async (request: CallableRequest) => {
   const uid = requireAuth(request);
@@ -35,7 +35,7 @@ export const createDuty = domainCall('createDuty', async (request: CallableReque
     throw new DomainError('VALIDATION_FAILED', 'Shift must start in the future', correlationId);
   }
 
-  await requireOrgMember(uid, data.organizationId, correlationId);
+  await requireOrgPermission(uid, data.organizationId, 'manageDuties', correlationId);
 
   // Facility identity and display data come from the organization's own
   // records, never from the client.
@@ -108,7 +108,7 @@ export const publishDuty = domainCall('publishDuty', async (request: CallableReq
   if (!initial.exists) {
     throw new DomainError('RESOURCE_NOT_FOUND', 'Duty not found', correlationId);
   }
-  await requireOrgMember(uid, initial.data()!.organizationId, correlationId);
+  await requireOrgPermission(uid, initial.data()!.organizationId, 'manageDuties', correlationId);
 
   await db().runTransaction(async tx => {
     const [dutySnap, orgSnap] = await Promise.all([

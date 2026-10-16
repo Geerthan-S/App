@@ -238,9 +238,50 @@ export async function openCase(caseId, { entry = null, onChange = () => {} } = {
     h('h4', {}, 'Case'),
     dl([['Submitted', fmtDateTime(tsToIso(c.submittedAt))], ['Opened', fmtDateTime(tsToIso(c.createdAt))],
       ['Previous case', c.previousCaseId], ['Policy', c.policyVersion]]),
+    c.appeal ? h('div', { class: 'alert alert-info section-gap' },
+      `Appeal ${humanize(c.appeal.status)}: ${c.appeal.statement || ''}`) : null,
+    c.appealOf ? h('div', { class: 'alert alert-info section-gap' }, `Reopened after an appeal of case ${c.appealOf}.`) : null,
     h('h4', {}, 'Evidence'), evidence,
     closed ? h('div', { class: 'alert alert-info section-gap' }, `This case is ${humanize(c.status)}. Decisions are final; a new review starts a new case.`)
       : roles.verifier() ? [h('h4', {}, 'Decision'), decisionForm(c, details, { onDone: done })] : null);
+}
+
+// ── Appeals ───────────────────────────────────────────────
+
+/**
+ * Pending appeals of rejected cases. A different verifier from the one who
+ * rejected decides; an overturned appeal reopens review in a new case.
+ */
+export async function renderAppeals(root, ctx) {
+  const { appeals } = await invoke('listVerificationAppeals');
+  const decide = async (a, outcome) => {
+    const overturn = outcome === 'overturned';
+    const result = await actionDialog({
+      title: overturn ? `Overturn the rejection of ${a.subjectName || 'this applicant'}?` : 'Uphold the original rejection?',
+      message: overturn
+        ? 'A new case opens with the documents already submitted and goes back through normal review.'
+        : 'The rejection stands. The applicant can still submit a new verification.',
+      confirmLabel: overturn ? 'Overturn' : 'Uphold', danger: !overturn,
+      reasonPlaceholder: overturn ? 'e.g. EVIDENCE_MISREAD' : 'e.g. DECISION_CORRECT',
+      onConfirm: v => invoke('decideVerificationAppeal', { caseId: a.caseId, outcome, ...v }),
+    });
+    if (result) { toast(overturn ? 'Appeal accepted; case reopened.' : 'Rejection upheld.'); ctx.refreshCounts(); ctx.rerender(); }
+  };
+  add(root,
+    pageHead('Appeals', 'Applicants contesting a rejection. You cannot decide an appeal of your own decision.',
+      h('button', { class: 'btn btn-secondary', type: 'button', onclick: () => ctx.rerender() }, icon('refresh'), 'Refresh')),
+    card(null, null, table([
+      { label: 'Applicant', render: a => cellMain(a.subjectName || 'Unnamed', humanize(a.subjectType)) },
+      { label: 'Rejected', render: a => cellMain(fmtRelative(a.rejectedAt), a.decisionReason || '') },
+      { label: 'Appeal', render: a => h('div', { class: 'cell-sub', style: 'max-width:420px;white-space:normal' }, a.statement) },
+      { label: 'Submitted', render: a => cellMain(fmtRelative(a.submittedAt), fmtDate(a.submittedAt)) },
+      { label: '', render: a => (a.canDecide
+        ? h('div', { class: 'btn-row' },
+          h('button', { class: 'btn btn-secondary btn-sm', type: 'button', onclick: e => { e.stopPropagation(); openCase(a.caseId); } }, 'Case'),
+          h('button', { class: 'btn btn-secondary btn-sm', type: 'button', onclick: e => { e.stopPropagation(); decide(a, 'upheld'); } }, 'Uphold'),
+          h('button', { class: 'btn btn-primary btn-sm', type: 'button', onclick: e => { e.stopPropagation(); decide(a, 'overturned'); } }, 'Overturn'))
+        : badge(null, 'You rejected this')) },
+    ], appeals, { emptyTitle: 'No pending appeals', emptyDetail: 'Appeals of rejected cases appear here.' })));
 }
 
 // ── Credential renewals ───────────────────────────────────

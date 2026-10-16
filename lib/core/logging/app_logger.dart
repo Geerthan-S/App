@@ -3,6 +3,7 @@
  */
 
 import 'package:flutter/foundation.dart';
+import '../services/crash_reporting.dart';
 
 class AppLogger {
   static void info(String message, {String? correlationId, Map<String, dynamic>? data}) {
@@ -14,6 +15,8 @@ class AppLogger {
   }
 
   static void error(String message, {dynamic error, StackTrace? stackTrace, String? correlationId}) {
+    // Release builds report to Crashlytics; CrashReporting scrubs PII first.
+    CrashReporting.record((error ?? message) as Object, stackTrace, reason: message);
     if (kDebugMode) {
       debugPrint('🚨 [ERROR] $message (corr: $correlationId) Error: $error');
       if (stackTrace != null) {

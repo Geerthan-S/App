@@ -51,6 +51,23 @@ const CONFIG_SCHEMAS: Record<string, z.ZodTypeAny> = {
   }).strict(),
 };
 
+/** Semantic version as shipped in pubspec.yaml (e.g. 1.4.2). */
+const SEMVER = /^\d{1,3}\.\d{1,3}\.\d{1,3}$/;
+CONFIG_SCHEMAS.app_release = z.object({
+  minimumVersion: z.object({ android: z.string().regex(SEMVER), ios: z.string().regex(SEMVER) }).strict(),
+  latestVersion: z.string().regex(SEMVER),
+  updateUrl: z.string().url().max(500).refine(u => u.startsWith('https://'), 'Must be an https link').nullable(),
+  maintenance: z.object({ enabled: z.boolean(), message: z.string().trim().max(300) }).strict(),
+}).strict();
+
+/**
+ * Where each config key is stored. App release settings live in the public
+ * appVersions/current document because the app reads them before sign-in.
+ */
+const configDoc = (configKey: string) => (configKey === 'app_release'
+  ? db().collection('appVersions').doc('current')
+  : db().collection('configuration').doc(configKey));
+
 /** Audit actor roles that belong to portal staff (the Admin Activity view). */
 const STAFF_ACTOR_ROLES = ['verifier', 'support_admin', 'super_admin', 'admin'];
 
@@ -283,10 +300,11 @@ export const getPlatformConfig = domainCall('getPlatformConfig', async (request:
   const correlationId = sanitizeCorrelationId(request.data?.correlationId);
   requireAdmin(request, correlationId);
 
-  const [offerSnap, registrySnap, policySnap, flagSnaps, offerExpiryHours, verificationPolicy] = await Promise.all([
+  const [offerSnap, registrySnap, policySnap, releaseSnap, flagSnaps, offerExpiryHours, verificationPolicy] = await Promise.all([
     db().collection('configuration').doc('offer_policy').get(),
     db().collection('configuration').doc('approved_registry_domains').get(),
     db().collection('configuration').doc('verification_policy').get(),
+    configDoc('app_release').get(),
     Promise.all(FEATURE_FLAG_KEYS.map(key => db().collection('featureFlags').doc(key).get())),
     getOfferExpiryHours(),
     getVerificationPolicy(),
@@ -308,6 +326,13 @@ export const getPlatformConfig = domainCall('getPlatformConfig', async (request:
       ...verificationPolicy,
       ranges: { slaHours: VERIFICATION_SLA_HOURS_RANGE, reverifyAfterMonths: REVERIFY_MONTHS_RANGE },
       ...meta(policySnap.data()),
+    },
+    appRelease: {
+      minimumVersion: releaseSnap.data()?.minimumVersion ?? { android: '1.0.0', ios: '1.0.0' },
+      latestVersion: releaseSnap.data()?.latestVersion ?? '1.0.0',
+      updateUrl: releaseSnap.data()?.updateUrl ?? null,
+      maintenance: releaseSnap.data()?.maintenance ?? { enabled: false, message: '' },
+      ...meta(releaseSnap.data()),
     },
     featureFlags: flagSnaps.map(snap => ({ key: snap.id, enabled: Boolean(snap.data()?.enabled), ...meta(snap.data()) })),
     fixed: {
@@ -337,7 +362,7 @@ export const updatePlatformConfig = domainCall('updatePlatformConfig', async (re
     throw new DomainError('VALIDATION_FAILED', 'Unknown configuration key or invalid value', correlationId);
   }
 
-  const configRef = db().collection('configuration').doc(configKey);
+  const configRef = configDoc(configKey);
   await db().runTransaction(async tx => {
     const existing = (await tx.get(configRef)).data();
     const before = existing ? Object.fromEntries(

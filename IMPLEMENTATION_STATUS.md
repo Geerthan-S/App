@@ -1,5 +1,24 @@
 # Implementation Status Matrix
 
+## Phase 1 completion — blueprint v1.1 gaps (2026-10-16, branch `phase1-completion`)
+
+- Spec: `docs/phase1/phase1-completion-spec.md`. Launch operations: `docs/runbooks/launch-readiness.md`.
+- `IMPLEMENTED` backend (Cloud Functions, all audited, rate-limited, Zod-validated):
+  - Hospital roles owner / admin / recruiter / operations (`orgRoleCan`, `requireOrgPermission`); invitations by phone or verified email (7-day expiry), accept/decline, role changes (only owners touch owner/admin; last owner protected), offboarding and leaving.
+  - Doctor data rights: JSON export, correction/restriction requests (high-priority `privacy` support cases), account deletion (step-up sign-in; refused with an active duty or as a sole owner; legal-hold records kept with the name removed).
+  - Devices list and sign-out everywhere (refresh-token revocation); notification preferences (muted categories, quiet hours in IST; critical events always delivered; inbox always written).
+  - Verification appeals: once, within 30 days, decided by a different verifier; overturning opens a new case reusing the scanned evidence.
+  - Duty edits with optimistic versioning (`versions` subcollection), pay/schedule frozen once a seat is held, open applicants notified of material changes.
+  - Saved searches (max 10) with one-time alerts on first publish.
+  - Server-set minimum app version and maintenance mode (`appVersions/current`, edited in Master Config).
+  - Daily Firestore export job (`scheduledFirestoreExport`, `BLOCKED_EXTERNAL` until `BACKUP_BUCKET` is set).
+- `IMPLEMENTED` Flutter: release gate (maintenance / update-required screens), Crashlytics in release builds only with PII scrubbing, Settings › Notification preferences / Devices / Hospital invitations / Your data, hospital Team screen, duty edit sheet, appeal card in the verification centre, saved searches in the marketplace.
+- `IMPLEMENTED` admin portal: Appeals queue (uphold / overturn), App release editor in Master Config, privacy category and DPDP guidance on support cases, appeal history on the case view.
+- `IMPLEMENTED` CI: `.github/workflows/security.yml` (Gitleaks blocking, CodeQL, Semgrep, OSV-Scanner, ZAP baseline against the hosting emulator) and `mobsf.yml` (weekly mobsfscan + MobSF APK scan); `.gitleaks.toml`, optional `.pre-commit-config.yaml`.
+- `TESTED`: Functions typecheck; emulator suite 17 suites, 146 tests passing; `phase1_completion.emulator.test.ts` covers roles, invitations, privacy, deletion, devices, preferences, appeals, duty edits and saved searches. Flutter analyze: 0 errors, 126 issues (unchanged baseline); Flutter tests pass incl. new version-compare / PII-scrub / preference tests.
+- `UNVERIFIED`: the new Flutter screens have not been exercised on a device or emulator; the security workflows have not run on GitHub yet; nothing in this entry is deployed.
+- `BLOCKED_EXTERNAL`: PITR, backup bucket and restore drill; incident contacts; counsel sign-off on privacy notice and retention; Play listing and data safety form (see the launch-readiness runbook).
+
 ## Security checklist hardening + admin portal v2 (2026-10-15, branch `feature/admin-rebuild-sections`)
 
 - Spec: `docs/admin/admin-portal-v2-spec.md` (feature analysis of the reference portal, need assessment, data sources). Setup: `docs/runbooks/admin-v2-security-setup.md`.

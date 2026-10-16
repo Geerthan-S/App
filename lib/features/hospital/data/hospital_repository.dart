@@ -79,6 +79,20 @@ class HospitalRepository {
     });
   }
 
+  /// Edits a duty; the server versions the change and tells open applicants.
+  static Future<Map<String, dynamic>> updateDuty({
+    required String dutyId,
+    required int expectedVersion,
+    required Map<String, dynamic> changes,
+  }) async {
+    final result = await BackendConfig.functions.httpsCallable('updateDuty').call<Map<String, dynamic>>({
+      'dutyId': dutyId,
+      'expectedVersion': expectedVersion,
+      'changes': changes,
+    });
+    return Map<String, dynamic>.from(result.data);
+  }
+
   static Future<Map<String, dynamic>?> getOrganization(String orgId) async {
     final doc = await FirebaseFirestore.instance.collection('organizations').doc(orgId).get();
     if (!doc.exists) return null;
@@ -117,6 +131,16 @@ class HospitalRepository {
       'status': d['status'] ?? 'draft',
       'amount': pay['amount'] ?? 0,
       'organizationId': d['organizationId'] ?? '',
+      // Raw values for editing (updateDuty compares against these).
+      'version': d['version'] ?? 1,
+      'startAtIso': sched['startAt'] is String ? sched['startAt'] : null,
+      'endAtIso': sched['endAt'] is String ? sched['endAt'] : null,
+      'shiftType': sched['shiftType'] ?? 'morning',
+      'basis': pay['basis'] ?? 'per_shift',
+      'expectedPaymentTiming': pay['expectedPaymentTiming'] ?? 'end_of_shift',
+      'qualificationRequired': d['qualificationRequired'] ?? '',
+      'experienceMinYears': d['experienceMinYears'] ?? 0,
+      'notes': d['notes'] ?? '',
     };
   }
 

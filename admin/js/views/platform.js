@@ -173,7 +173,7 @@ export async function renderNotifications(root, ctx) {
 
 // ── Support cases ─────────────────────────────────────────
 
-const CATEGORIES = ['account', 'verification', 'duty', 'payment', 'safety', 'other'];
+const CATEGORIES = ['account', 'verification', 'duty', 'payment', 'safety', 'privacy', 'other'];
 const PRIORITIES = ['low', 'normal', 'high', 'urgent'];
 const select = (options, value) => h('select', { class: 'select' }, options.map(o => h('option', { value: o, selected: o === value }, humanize(o))));
 
@@ -248,6 +248,8 @@ async function openSupportCase(caseId, onChange) {
       c.assigneeId === session.user.uid
         ? h('button', { class: 'btn btn-secondary btn-sm', type: 'button', onclick: () => update({ unassign: true }, 'Unassigned.') }, 'Unassign me')
         : h('button', { class: 'btn btn-primary btn-sm', type: 'button', onclick: () => update({ assignToMe: true }, 'Assigned to you.') }, 'Assign to me')),
+    c.category === 'privacy' ? h('div', { class: 'alert alert-warn section-gap' },
+      'Data-principal request (DPDP Act). Reply within 7 days, record what you changed in a note, and never edit audit or verification records.') : null,
     h('p', { class: 'section-gap' }, c.description),
     h('h4', {}, 'Details'),
     dl([['Requester', c.requesterUid], ['Contact channel', c.requesterContact], ['Assigned to', c.assigneeName],
@@ -293,7 +295,7 @@ export async function renderSupport(root, ctx) {
   add(root, 
     pageHead('Support Cases', 'Issues people raise by phone or email, tracked to resolution',
       h('button', { class: 'btn btn-primary', type: 'button', onclick: () => newSupportCase(load) }, icon('plus'), 'New case')),
-    h('div', { class: 'alert alert-info' }, 'There is no in-app "Contact support" yet; staff open cases on the person’s behalf.'),
+    h('div', { class: 'alert alert-info' }, 'Privacy requests from the app (correction, restriction) arrive here as high-priority "privacy" cases. Other issues are opened by staff on the person’s behalf.'),
     tabBar, h('div', { class: 'section-gap' }), body);
   await load();
 }

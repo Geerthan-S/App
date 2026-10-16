@@ -11,6 +11,7 @@ import '../../../core/widgets/ui_kit.dart';
 import '../../../core/widgets/language_selector_dialog.dart';
 import '../../../core/localization/language_provider.dart';
 import '../data/duty_repository.dart';
+import 'saved_searches_sheet.dart';
 
 class DutyMarketplaceScreen extends ConsumerStatefulWidget {
   const DutyMarketplaceScreen({super.key});
@@ -45,6 +46,20 @@ class _DutyMarketplaceScreenState extends ConsumerState<DutyMarketplaceScreen> {
             icon: const Icon(Icons.translate_outlined),
             tooltip: 'Change Language',
             onPressed: () => LanguageSelectorDialog.show(context),
+          ),
+          IconButton(
+            icon: const Icon(Icons.bookmark_border_outlined),
+            tooltip: 'Saved searches',
+            onPressed: () async {
+              final apply = await SavedSearchesSheet.show(
+                context,
+                specialty: _selectedSpecialty == 'All' ? null : _selectedSpecialty,
+              );
+              if (apply != null && mounted) {
+                setState(() => _selectedSpecialty =
+                    apply == 'All' || AppConstants.specialties.contains(apply) ? apply : 'All');
+              }
+            },
           ),
           IconButton(
             icon: const Icon(Icons.notifications_none_outlined),

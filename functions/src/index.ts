@@ -79,3 +79,17 @@ export { submitFeedback } from './feedback/feedbackFunctions';
 
 // Phase 2 Modules (Gated behind feature flags)
 export { createAvailabilityRule, requestDutyReplacement, openDispute } from './phase2/phase2Functions';
+
+// Phase 1 completion (docs/phase1/phase1-completion-spec.md)
+export {
+  inviteOrgMember, listMyInvitations, respondToInvitation, listOrgMembers, updateOrgMemberRole,
+  removeOrgMember, revokeOrgInvitation,
+} from './hospitals/teamFunctions';
+export {
+  exportMyData, submitPrivacyRequest, deleteMyAccount, listMyDevices, signOutEverywhere,
+  getNotificationPreferences, updateNotificationPreferences,
+} from './account/accountFunctions';
+export { submitVerificationAppeal, listVerificationAppeals, decideVerificationAppeal } from './verification/appealFunctions';
+export { updateDuty } from './duties/dutyEditFunctions';
+export { saveSearch, listSavedSearches, updateSavedSearch, alertSavedSearches } from './search/savedSearchFunctions';
+export { scheduledFirestoreExport } from './ops/backupFunctions';

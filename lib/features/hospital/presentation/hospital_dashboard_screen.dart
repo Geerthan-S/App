@@ -12,6 +12,7 @@ import '../../../core/widgets/state_views.dart';
 import '../../../core/widgets/language_selector_dialog.dart';
 import '../../../core/localization/language_provider.dart';
 import '../data/hospital_repository.dart';
+import 'edit_duty_sheet.dart';
 import '../../../core/errors/error_envelope.dart';
 import '../../../core/config/backend_config.dart';
 
@@ -413,6 +414,14 @@ class _HospitalDashboardScreenState
             onPressed: () => LanguageSelectorDialog.show(context),
           ),
           IconButton(
+            icon: const Icon(Icons.groups_outlined),
+            tooltip: 'Team',
+            onPressed: () => context.push('/hospital-team', extra: {
+              'organizationId': _selectedOrgId!,
+              'organizationName': _selectedOrgName,
+            }),
+          ),
+          IconButton(
             icon: const Icon(Icons.local_hospital_outlined),
             tooltip: 'Hospital Profile & Facilities',
             onPressed: () => context.push('/hospital-profile'),
@@ -554,6 +563,18 @@ class _HospitalDashboardScreenState
                                   ),
                                 ),
                                 StatusBadge(status: duty['status'] as String),
+                                if (const ['draft', 'published', 'paused'].contains(duty['status']))
+                                  IconButton(
+                                    tooltip: 'Edit duty',
+                                    visualDensity: VisualDensity.compact,
+                                    icon: const Icon(Icons.edit_outlined, size: 18),
+                                    onPressed: () async {
+                                      final message = await EditDutySheet.show(context, duty);
+                                      if (message != null && context.mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+                                      }
+                                    },
+                                  ),
                               ],
                             ),
                             const SizedBox(height: 2),

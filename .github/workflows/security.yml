@@ -1,0 +1,126 @@
+name: Security
+
+# Blueprint §9.7 security pipeline: SAST (CodeQL, Semgrep), secret scanning
+# (Gitleaks), dependency advisories (OSV-Scanner) and a passive DAST baseline
+# (OWASP ZAP) of the admin portal. Mobile binary analysis (MobSF) runs weekly
+# in mobsf.yml because it needs an APK build.
+#
+# Gating: Gitleaks and CodeQL high/critical alerts block. Semgrep, OSV and ZAP
+# report to the Security tab / job artifacts while the first baseline is
+# triaged; flip their `continue-on-error` off once the baseline is clean.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '30 21 * * 0' # Mondays 03:00 IST
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gitleaks:
+    name: Secret scan (Gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # scan the full history, not just the tip
+      - name: Gitleaks
+        run: |
+          docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.21.2 \
+            git /repo --config /repo/.gitleaks.toml --redact --verbose --exit-code 1
+
+  codeql:
+    name: SAST (CodeQL)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          build-mode: none
+          queries: security-extended
+      - uses: github/codeql-action/analyze@v3
+        with:
+          category: /language:javascript-typescript
+
+  semgrep:
+    name: SAST (Semgrep)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      contents: read
+      security-events: write
+    container:
+      image: semgrep/semgrep:1.95.0
+    steps:
+      - uses: actions/checkout@v4
+      - name: Semgrep
+        run: |
+          semgrep scan \
+            --config p/default --config p/typescript --config p/javascript --config p/secrets \
+            --exclude node_modules --exclude functions/lib --exclude admin/js/vendor --exclude build \
+            --sarif --output semgrep.sarif
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep
+
+  osv:
+    name: Dependency advisories (OSV-Scanner)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: OSV-Scanner
+        run: |
+          docker run --rm -v "$PWD:/src" -w /src ghcr.io/google/osv-scanner:v1.9.1 \
+            --recursive --format sarif --output /src/osv.sarif . || true
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always() && hashFiles('osv.sarif') != ''
+        with:
+          sarif_file: osv.sarif
+          category: osv-scanner
+
+  zap:
+    name: DAST baseline (OWASP ZAP, admin portal)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      # The hosting emulator serves admin/ with the same security headers as
+      # production (firebase.json), so no traffic goes to the live site.
+      - name: Serve admin portal locally
+        run: |
+          npm install -g firebase-tools
+          firebase emulators:start --only hosting --project demo-healthforce > hosting.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf http://localhost:5000 > /dev/null && exit 0; sleep 2; done
+          cat hosting.log; exit 1
+      - name: ZAP baseline (passive)
+        uses: zaproxy/action-baseline@v0.14.0
+        with:
+          target: http://localhost:5000
+          allow_issue_writing: false
+          artifact_name: zap-baseline-report
+          cmd_options: -I

@@ -21,6 +21,7 @@ import '../../../core/widgets/language_selector_dialog.dart';
 import '../../../core/localization/language_provider.dart';
 import '../domain/verification_models.dart';
 import '../data/verification_repository.dart';
+import '../../settings/data/account_repository.dart' show callableErrorMessage;
 
 class VerificationCenterScreen extends ConsumerStatefulWidget {
   const VerificationCenterScreen({super.key});
@@ -43,6 +44,12 @@ class _VerificationCenterScreenState
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _caseSubscription;
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
   _evidenceSubscription;
+  /// The most recent rejected case (the current one, or the one a fresh draft
+  /// follows), which the doctor may appeal.
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _rejectedSubscription;
+  String? _rejectedCaseId;
+  Map<String, dynamic>? _rejectedCase;
+  bool _isAppealing = false;
   bool _isChecking = false;
   bool _isSubmitting = false;
   bool _isUploading = false;
@@ -91,8 +98,19 @@ class _VerificationCenterScreenState
           .listen(
             (snapshot) {
               if (!mounted) return;
-              final status = snapshot.data()?['status'] as String?;
+              final data = snapshot.data();
+              final status = data?['status'] as String?;
+              if (status == 'superseded') {
+                // An overturned appeal replaced this draft; follow the new case.
+                _caseSubscription?.cancel();
+                _evidenceSubscription?.cancel();
+                _loadPersistedCaseStatus();
+                return;
+              }
               setState(() => _caseStatus = status ?? 'not_started');
+              _watchRejectedCase(
+                status == 'rejected' ? caseId : (status == 'draft' ? (data?['previousCaseId'] as String?) : null),
+              );
             },
             onError: (_) {
               if (mounted) setState(() => _caseStatus = 'unavailable');
@@ -131,9 +149,121 @@ class _VerificationCenterScreenState
     }
   }
 
+  void _watchRejectedCase(String? caseId) {
+    if (caseId == _rejectedCaseId) return;
+    _rejectedSubscription?.cancel();
+    _rejectedCaseId = caseId;
+    if (caseId == null) {
+      setState(() => _rejectedCase = null);
+      return;
+    }
+    _rejectedSubscription = FirebaseFirestore.instance
+        .collection('verificationCases')
+        .doc(caseId)
+        .snapshots()
+        .listen((snap) {
+      if (!mounted) return;
+      final data = snap.data();
+      setState(() => _rejectedCase = data?['status'] == 'rejected' ? data : null);
+    }, onError: (_) {});
+  }
+
+  Future<void> _appeal() async {
+    final caseId = _rejectedCaseId;
+    if (caseId == null) return;
+    final statement = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => const _AppealSheet(),
+    );
+    if (statement == null || !mounted) return;
+    setState(() => _isAppealing = true);
+    try {
+      await _repo.submitAppeal(caseId: caseId, statement: statement);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Appeal sent. A different verifier will review it.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(callableErrorMessage(e))));
+      }
+    } finally {
+      if (mounted) setState(() => _isAppealing = false);
+    }
+  }
+
+  Widget _buildAppealSection(AppColorsExtension colors) {
+    final rejected = _rejectedCase;
+    if (rejected == null) {
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.support_agent_outlined, size: 16, color: colors.textMuted),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              'If a verifier rejects your registration, you can appeal it here within 30 days.',
+              style: AppTypography.bodySmall(colors.textSecondary),
+            ),
+          ),
+        ],
+      );
+    }
+    final appeal = rejected['appeal'] as Map<String, dynamic>?;
+    final decidedAt = (rejected['decidedAt'] as Timestamp?)?.toDate();
+    final windowOpen = decidedAt != null && DateTime.now().difference(decidedAt).inDays < 30;
+    final reason = rejected['decisionReason'] as String?;
+    final String body;
+    if (appeal == null) {
+      body = windowOpen
+          ? 'Your last verification was rejected${reason == null ? '' : ': $reason'}. '
+              'If you think this is wrong, appeal within 30 days and a different verifier will review it.'
+          : 'The 30-day appeal window for your last rejection has closed. Submit a new verification instead.';
+    } else {
+      body = switch (appeal['status']) {
+        'pending' => 'Your appeal is with a different verifier. We will notify you of the outcome.',
+        'overturned' => 'Your appeal was accepted and your verification is back in review.',
+        _ => 'Your appeal was reviewed and the original decision stands. Submit a new verification with corrected details.',
+      };
+    }
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            const Icon(Icons.gavel_outlined, size: 18),
+            const SizedBox(width: 8),
+            Text('Appeal', style: AppTypography.headingSmall(colors.textPrimary)),
+            const Spacer(),
+            if (appeal != null)
+              StatusBadge(
+                status: appeal['status'] as String? ?? 'pending',
+                color: appeal['status'] == 'overturned' ? AppColors.emerald : AppColors.rose,
+              ),
+          ]),
+          const SizedBox(height: AppSpacing.xs),
+          Text(body, style: AppTypography.bodySmall(colors.textSecondary)),
+          if (appeal == null && windowOpen) ...[
+            const SizedBox(height: AppSpacing.sm),
+            AppSecondaryButton(
+              label: 'Appeal this decision',
+              icon: Icons.gavel_outlined,
+              isLoading: _isAppealing,
+              onPressed: _isAppealing ? null : _appeal,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _caseSubscription?.cancel();
+    _rejectedSubscription?.cancel();
     _evidenceSubscription?.cancel();
     _regNoController.dispose();
     _nameController.dispose();
@@ -577,27 +707,69 @@ class _VerificationCenterScreenState
               const SizedBox(height: AppSpacing.md),
 
               // Appeal & Human Review Section
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.support_agent_outlined,
-                    size: 16,
-                    color: colors.textMuted,
-                  ),
-                  const SizedBox(width: 6),
-                  Flexible(
-                    child: Text(
-                      'Appeals will be available after manual review setup',
-                      style: AppTypography.bodySmall(colors.textSecondary),
-                    ),
-                  ),
-                ],
-              ),
+              _buildAppealSection(colors),
               const SizedBox(height: AppSpacing.lg),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _AppealSheet extends StatefulWidget {
+  const _AppealSheet();
+
+  @override
+  State<_AppealSheet> createState() => _AppealSheetState();
+}
+
+class _AppealSheetState extends State<_AppealSheet> {
+  final _statement = TextEditingController();
+  String? _error;
+
+  @override
+  void dispose() {
+    _statement.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        AppSpacing.gutter, 0, AppSpacing.gutter, MediaQuery.of(context).viewInsets.bottom + AppSpacing.lg),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('Appeal the decision', style: AppTypography.headingMedium(colors.textPrimary)),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'You can appeal once. Your documents carry over; explain what the reviewer missed.',
+            style: AppTypography.bodySmall(colors.textSecondary),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          TextField(
+            controller: _statement,
+            maxLines: 6,
+            maxLength: 2000,
+            decoration: InputDecoration(hintText: 'Why is the decision wrong?', errorText: _error),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          AppButton(
+            label: 'Send appeal',
+            onPressed: () {
+              final text = _statement.text.trim();
+              if (text.length < 20) {
+                setState(() => _error = 'Explain why the decision is wrong (at least 20 characters)');
+                return;
+              }
+              Navigator.pop(context, text);
+            },
+          ),
+        ],
       ),
     );
   }

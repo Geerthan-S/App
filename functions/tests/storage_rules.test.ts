@@ -7,6 +7,7 @@ import {
   initializeTestEnvironment,
   RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
+import { emulatorAddress } from './helpers/emulator';
 
 const runWithEmulator = process.env.FIREBASE_STORAGE_EMULATOR_HOST ? describe : describe.skip;
 const bucket = 'demo-healthforce.appspot.com';
@@ -19,13 +20,11 @@ runWithEmulator('Storage evidence rules against emulator', () => {
     env = await initializeTestEnvironment({
       projectId: 'demo-healthforce',
       firestore: {
-        host: '127.0.0.1',
-        port: 8080,
+        ...emulatorAddress('FIRESTORE_EMULATOR_HOST', 8080),
         rules: readFileSync(resolve(__dirname, '../../firestore.rules'), 'utf8'),
       },
       storage: {
-        host: '127.0.0.1',
-        port: 9199,
+        ...emulatorAddress('FIREBASE_STORAGE_EMULATOR_HOST', 9199),
         rules: readFileSync(resolve(__dirname, '../../storage.rules'), 'utf8'),
       },
     });

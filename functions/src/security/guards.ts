@@ -139,6 +139,47 @@ export const isActiveOrgMemberInTx = async (tx: Transaction, uid: string, orgId:
 };
 
 /**
+ * What each role inside a hospital may do (blueprint §4.2). `member` is the
+ * legacy default and keeps the duty permissions it always had.
+ */
+export type OrgPermission = 'manageTeam' | 'manageDuties' | 'operateAssignments';
+
+export const ORG_ROLES = ['owner', 'admin', 'recruiter', 'operations', 'member'] as const;
+export type OrgRole = typeof ORG_ROLES[number];
+
+const ORG_ROLE_PERMISSIONS: Record<OrgRole, OrgPermission[]> = {
+  owner: ['manageTeam', 'manageDuties', 'operateAssignments'],
+  admin: ['manageTeam', 'manageDuties', 'operateAssignments'],
+  recruiter: ['manageDuties', 'operateAssignments'],
+  member: ['manageDuties', 'operateAssignments'],
+  operations: ['operateAssignments'],
+};
+
+export const orgRoleCan = (role: string | undefined, permission: OrgPermission): boolean =>
+  (ORG_ROLE_PERMISSIONS[(role ?? 'member') as OrgRole] ?? []).includes(permission);
+
+/** Active member whose role grants the permission; returns the role. */
+export const requireOrgPermission = async (
+  uid: string,
+  orgId: string,
+  permission: OrgPermission,
+  correlationId: string
+): Promise<string> => {
+  const role = await requireOrgMember(uid, orgId, correlationId);
+  if (!orgRoleCan(role, permission)) {
+    throw new DomainError('PERMISSION_DENIED', 'Your role in this hospital does not allow this action', correlationId);
+  }
+  return role;
+};
+
+/** The caller's role inside a transaction, or null when not an active member. */
+export const activeOrgRoleInTx = async (tx: Transaction, uid: string, orgId: string): Promise<string | null> => {
+  const memberDoc = await tx.get(memberRef(orgId, uid));
+  if (!memberDoc.exists || !isActiveMembership(memberDoc.data())) return null;
+  return memberDoc.data()?.role ?? 'member';
+};
+
+/**
  * Validates that the caller is an admin or owner of the organization
  */
 export const requireOrgAdmin = async (uid: string, orgId: string, correlationId: string): Promise<void> => {

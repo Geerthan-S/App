@@ -91,6 +91,12 @@ class SettingsScreen extends ConsumerWidget {
                         : () => PushRegistrationService.register(),
                   ),
                 ),
+                ListRow(
+                  icon: Icons.tune_outlined,
+                  title: 'Notification preferences',
+                  subtitle: 'Mute categories and set quiet hours',
+                  onTap: () => context.push('/notification-preferences'),
+                ),
               ],
             ),
             const SizedBox(height: AppSpacing.lg),
@@ -104,6 +110,12 @@ class SettingsScreen extends ConsumerWidget {
                   subtitle: 'Registration documents and review status',
                   onTap: () => context.push('/verification'),
                 ),
+                ListRow(
+                  icon: Icons.devices_outlined,
+                  title: 'Devices',
+                  subtitle: 'Where you are signed in; sign out everywhere',
+                  onTap: () => context.push('/devices'),
+                ),
                 // Reflects the App Check provider activated in main.dart.
                 // Server-side enforcement is configured separately.
                 const ListRow(
@@ -112,6 +124,25 @@ class SettingsScreen extends ConsumerWidget {
                   subtitle: kDebugMode
                       ? 'App Check debug provider (development build)'
                       : 'App Check with Play Integrity',
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.lg),
+
+            const GroupLabel('Account'),
+            RowGroup(
+              children: [
+                ListRow(
+                  icon: Icons.mail_outline,
+                  title: 'Hospital invitations',
+                  subtitle: 'Join a hospital team you were invited to',
+                  onTap: () => context.push('/invitations'),
+                ),
+                ListRow(
+                  icon: Icons.privacy_tip_outlined,
+                  title: 'Your data',
+                  subtitle: 'Download, correct or delete your data',
+                  onTap: () => context.push('/privacy'),
                 ),
               ],
             ),

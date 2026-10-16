@@ -5,7 +5,7 @@
 import type { CallableRequest } from 'firebase-functions/v2/https';
 import { db, nowTimestamp, sanitizeCorrelationId } from '../shared/firestoreHelpers';
 import { domainCall } from '../shared/callable';
-import { requireAuth, isActiveOrgMemberInTx } from '../security/guards';
+import { requireAuth, isActiveOrgMemberInTx, activeOrgRoleInTx, orgRoleCan } from '../security/guards';
 import { ApplyToDutySchema, DocIdSchema } from '../shared/schemas';
 import { DomainError } from '../shared/errors';
 import { stageAudit } from '../audit/auditLogger';
@@ -154,8 +154,12 @@ export const shortlistApplication = domainCall('shortlistApplication', async (re
     if (!dutySnap.exists) {
       throw new DomainError('RESOURCE_NOT_FOUND', 'Duty not found', correlationId);
     }
-    if (!(await isActiveOrgMemberInTx(tx, uid, dutySnap.data()!.organizationId))) {
+    const role = await activeOrgRoleInTx(tx, uid, dutySnap.data()!.organizationId);
+    if (!role) {
       throw new DomainError('PERMISSION_DENIED', 'User is not an active member of this organization', correlationId);
+    }
+    if (!orgRoleCan(role, 'manageDuties')) {
+      throw new DomainError('PERMISSION_DENIED', 'Your role in this hospital does not allow shortlisting', correlationId);
     }
     if (!appSnap.exists) {
       throw new DomainError('RESOURCE_NOT_FOUND', 'Application not found', correlationId);

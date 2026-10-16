@@ -58,3 +58,13 @@ export const CONSENT = { consentVersion: 'v1.0_2026', status: 'active' };
 
 export const isoIn = (ms: number) => new Date(Date.now() + ms).toISOString();
 export const HOUR = 60 * 60 * 1000;
+
+/**
+ * Host and port of an emulator, as `firebase emulators:exec` exports them
+ * (e.g. FIRESTORE_EMULATOR_HOST=127.0.0.1:8180). Falls back to the defaults.
+ */
+export const emulatorAddress = (envVar: string, fallbackPort: number): { host: string; port: number } => {
+  const value = process.env[envVar];
+  const match = value?.match(/^\[?([^\]]+?)\]?:(\d+)$/);
+  return match ? { host: match[1], port: Number(match[2]) } : { host: '127.0.0.1', port: fallbackPort };
+};

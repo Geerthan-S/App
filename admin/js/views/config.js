@@ -57,6 +57,7 @@ export async function renderMasterConfig(root, ctx) {
           hint: 'Verified doctors appear in Credential Renewals after this long.',
           onSave: n => save(`Re-verify doctors every ${n} months?`, 'verification_policy', { slaHours: policy.slaHours, reverifyAfterMonths: n }),
         })))),
+    h('div', { class: 'section-gap' }, card('App release', versionMeta(config.appRelease), appReleaseForm(config.appRelease, canEdit, ctx))),
     h('div', { class: 'section-gap' }, card('Fixed security settings', 'Set in code; shown for reference', dl([
       ['Re-authentication window', `${config.fixed.stepUpAuthMaxAgeSeconds / 60} minutes`],
       ['Max evidence file size', `${config.fixed.maxEvidenceFileSizeBytes / (1024 * 1024)} MB`],
@@ -64,6 +65,54 @@ export async function renderMasterConfig(root, ctx) {
       ['Consent version', config.fixed.consentVersion],
       ['Staff sign-in', 'Password + authenticator app (TOTP)'],
     ]))));
+}
+
+const SEMVER = /^\d{1,3}\.\d{1,3}\.\d{1,3}$/;
+
+/** Minimum supported version and maintenance mode, read live by the mobile app. */
+function appReleaseForm(release, canEdit, ctx) {
+  const field = (label, value, hint, attrs = {}) => {
+    const input = h('input', { class: 'input', value: value ?? '', disabled: !canEdit, spellcheck: false, ...attrs });
+    return [input, h('div', { class: 'field' }, h('label', {}, label), input, hint ? h('span', { class: 'hint' }, hint) : null)];
+  };
+  const [android, androidField] = field('Minimum Android version', release.minimumVersion.android, 'Older installs are blocked with an update screen.');
+  const [ios, iosField] = field('Minimum iOS version', release.minimumVersion.ios, 'Unused until an iOS app ships.');
+  const [latest, latestField] = field('Latest version', release.latestVersion, 'The version currently in the store.');
+  const [url, urlField] = field('Update link', release.updateUrl, 'https link to the Play Store listing; leave empty to hide the button.', { type: 'url' });
+  const maintenanceOn = h('input', { type: 'checkbox', checked: release.maintenance.enabled, disabled: !canEdit });
+  const message = h('textarea', { class: 'textarea', maxlength: 300, disabled: !canEdit,
+    placeholder: 'Shown to every user while maintenance is on' }, release.maintenance.message || '');
+  const err = h('div', { class: 'alert alert-error', hidden: true });
+  const form = h('form', { novalidate: true },
+    h('div', { class: 'form-grid' }, androidField, iosField, latestField, urlField),
+    h('label', { class: 'check section-gap' }, maintenanceOn, 'Maintenance mode: block the app for everyone'),
+    h('div', { class: 'field' }, h('label', {}, 'Maintenance message'), message),
+    err,
+    h('div', { class: 'btn-row end' }, h('button', { class: 'btn btn-primary', type: 'submit', disabled: !canEdit }, 'Save')));
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    err.hidden = true;
+    const bad = [[android, 'Android'], [ios, 'iOS'], [latest, 'Latest']].find(([i]) => !SEMVER.test(i.value.trim()));
+    if (bad) { err.textContent = `${bad[1]} version must look like 1.4.2.`; err.hidden = false; return; }
+    const link = url.value.trim();
+    if (link && !/^https:\/\//.test(link)) { err.textContent = 'The update link must start with https://'; err.hidden = false; return; }
+    const value = {
+      minimumVersion: { android: android.value.trim(), ios: ios.value.trim() },
+      latestVersion: latest.value.trim(),
+      updateUrl: link || null,
+      maintenance: { enabled: maintenanceOn.checked, message: message.value.trim() },
+    };
+    const ok = await actionDialog({
+      title: value.maintenance.enabled ? 'Turn maintenance mode on?' : 'Save app release settings?',
+      message: value.maintenance.enabled
+        ? 'Every user is blocked from the app until you turn it off. Server functions keep running.'
+        : 'Installs older than the minimum version see an update screen immediately.',
+      reason: false, notes: false, danger: value.maintenance.enabled, confirmLabel: 'Save',
+      onConfirm: () => invoke('updatePlatformConfig', { configKey: 'app_release', configValue: value }),
+    });
+    if (ok) { toast('App release settings saved.'); ctx.rerender(); }
+  });
+  return form;
 }
 
 // Mirrors HOSTNAME_PATTERN in functions/src/admin/adminFunctions.ts; the server validates again.

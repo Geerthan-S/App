@@ -1,0 +1,23 @@
+# Gitleaks configuration: the default rule set plus a narrow allowlist.
+#
+# Firebase client configuration (API key, app ID, project ID) is public by
+# design: it identifies the project to Google, and access is controlled by
+# security rules, App Check and API-key restrictions, not by keeping it secret.
+# Only those generated client config files are allowlisted; a key anywhere else
+# still fails the scan.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Public Firebase client configuration and local emulator fixtures"
+paths = [
+  '''^google-services\.json$''',
+  '''^android/app/google-services\.json$''',
+  '''^lib/firebase_options\.dart$''',
+  '''^admin/firebase-config\.json$''',
+]
+regexes = [
+  # Emulator-only fixture password used by scripts/seed-emulator-staff.mjs.
+  '''local-emulator-fixture-only''',
+]

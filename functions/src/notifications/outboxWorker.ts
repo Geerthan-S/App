@@ -16,12 +16,14 @@ import { getMessaging } from 'firebase-admin/messaging';
 import { Timestamp, type DocumentData, type DocumentReference } from 'firebase-admin/firestore';
 import { db, nowTimestamp } from '../shared/firestoreHelpers';
 import { MAX_OUTBOX_ATTEMPTS } from './outbox';
+import { shouldPush } from './preferences';
 
 const LEASE_MS = 60 * 1000;
 const BASE_BACKOFF_MS = 60 * 1000;
 const MAX_BACKOFF_MS = 60 * 60 * 1000;
 const MAX_TOKENS_PER_USER = 10;
-const ORG_RECIPIENT_ROLES = ['owner', 'admin'];
+// Hospital people who act on applications and assignments (operations staff are not paged).
+const ORG_RECIPIENT_ROLES = ['owner', 'admin', 'recruiter'];
 
 /** FCM errors meaning the token will never work again and should be disabled. */
 const PERMANENT_TOKEN_ERRORS = [
@@ -142,8 +144,12 @@ export const deliverOutboxEvent = async (ref: DocumentReference, nowMs = Date.no
     });
     await inbox.commit();
 
-    for (const uid of recipients) {
-      await sendPush(uid, event);
+    // Preferences only suppress the push; the inbox above always has the message.
+    const users = recipients.length ? await db().getAll(...recipients.map(uid => db().collection('users').doc(uid))) : [];
+    for (const [index, uid] of recipients.entries()) {
+      if (shouldPush(event.eventType, users[index]?.data()?.notificationPreferences, nowMs)) {
+        await sendPush(uid, event);
+      }
     }
 
     await ref.update({

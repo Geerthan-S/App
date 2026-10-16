@@ -20,6 +20,8 @@ import 'core/navigation/app_router.dart';
 import 'core/logging/app_logger.dart';
 import 'core/errors/error_screens.dart';
 import 'core/widgets/connectivity_gate.dart';
+import 'core/widgets/app_release_gate.dart';
+import 'core/services/crash_reporting.dart';
 import 'core/services/push_registration_service.dart';
 import 'core/config/backend_config.dart';
 
@@ -60,6 +62,7 @@ void main() {
         AppLogger.info(
           'Firebase initialized successfully for com.geerthan.healthcareworkforce',
         );
+        await CrashReporting.init(usingEmulator: LocalTestConfig.enabled);
 
         // Register this device for push on every sign-in and token rotation.
         PushRegistrationService.start();
@@ -130,8 +133,9 @@ class HealthcareWorkforceApp extends ConsumerWidget {
       darkTheme: AppTheme.darkTheme,
       themeMode: themeMode,
       routerConfig: appRouter,
-      builder: (context, child) =>
-          ConnectivityGate(child: child ?? const SizedBox.shrink()),
+      builder: (context, child) => AppReleaseGate(
+        child: ConnectivityGate(child: child ?? const SizedBox.shrink()),
+      ),
     );
   }
 }

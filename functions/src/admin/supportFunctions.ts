@@ -15,7 +15,7 @@ import { DomainError } from '../shared/errors';
 import { stageAudit } from '../audit/auditLogger';
 import { CorrelationField, parseOrThrow, toIso } from './adminShared';
 
-const CATEGORIES = ['account', 'verification', 'duty', 'payment', 'safety', 'other'] as const;
+const CATEGORIES = ['account', 'verification', 'duty', 'payment', 'safety', 'privacy', 'other'] as const;
 const PRIORITIES = ['low', 'normal', 'high', 'urgent'] as const;
 const STATUSES = ['open', 'pending', 'resolved'] as const;
 const MAX_NOTES = 100;

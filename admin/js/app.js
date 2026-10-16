@@ -13,7 +13,7 @@ import {
   finishTotpEnrollment, qrDataUrl, invoke, enrolledFactors, loadSessionPolicy,
 } from './core/session.js';
 import { renderDashboard, renderAttention } from './views/dashboard.js';
-import { renderQueue, renderRenewals, openCase } from './views/verification.js';
+import { renderQueue, renderRenewals, renderAppeals, openCase } from './views/verification.js';
 import {
   renderDoctors, renderHospitals, renderDuties, renderDutyModeration, openDoctor, openOrganization, openDuty,
 } from './views/directory.js';
@@ -33,6 +33,7 @@ const NAV = [
     { id: 'doctors-verification', label: 'Doctor Verification', icon: 'stethoscope', access: 'verifier', render: (c, x) => renderQueue(c, x, 'doctor'), count: 'doctorCases' },
     { id: 'hospitals-verification', label: 'Hospital Verification', icon: 'building', access: 'verifier', render: (c, x) => renderQueue(c, x, 'organization'), count: 'organizationCases' },
     { id: 'escalated', label: 'Escalated Cases', icon: 'flame', access: 'verifier', render: (c, x) => renderQueue(c, x, 'escalated'), count: 'escalated', hot: true },
+    { id: 'appeals', label: 'Appeals', icon: 'scroll', access: 'verifier', render: renderAppeals },
     { id: 'renewals', label: 'Credential Renewals', icon: 'refresh', access: 'staff', render: renderRenewals },
   ] },
   { group: 'Management', items: [

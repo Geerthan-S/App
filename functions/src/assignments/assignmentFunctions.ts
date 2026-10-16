@@ -14,6 +14,8 @@ import {
   requireAuth,
   requireOrgMember,
   isActiveOrgMemberInTx,
+  activeOrgRoleInTx,
+  orgRoleCan,
   assertAccountActiveInTx,
 } from '../security/guards';
 import { AtomicSelectDoctorSchema, ConfirmAssignmentSchema, AssignmentActionSchema } from '../shared/schemas';
@@ -68,8 +70,8 @@ export const atomicSelectDoctor = domainCall('atomicSelectDoctor', async (reques
     const coveredDates = getDateIntervals(startAt, endAt);
     const scheduleRefs = coveredDates.map(date => db().collection('doctorSchedules').doc(`${doctorId}_${date}`));
 
-    const [isMember, doctorIsMember, orgSnap, doctorSnap, appSnap, ...scheduleSnaps] = await Promise.all([
-      isActiveOrgMemberInTx(tx, hospitalUid, duty.organizationId),
+    const [hospitalRole, doctorIsMember, orgSnap, doctorSnap, appSnap, ...scheduleSnaps] = await Promise.all([
+      activeOrgRoleInTx(tx, hospitalUid, duty.organizationId),
       isActiveOrgMemberInTx(tx, doctorId, duty.organizationId),
       tx.get(db().collection('organizations').doc(duty.organizationId)),
       tx.get(db().collection('doctors').doc(doctorId)),
@@ -78,8 +80,11 @@ export const atomicSelectDoctor = domainCall('atomicSelectDoctor', async (reques
     ]);
     await assertAccountActiveInTx(tx, doctorId, correlationId);
 
-    if (!isMember) {
+    if (!hospitalRole) {
       throw new DomainError('PERMISSION_DENIED', 'User is not an active member of this organization', correlationId);
+    }
+    if (!orgRoleCan(hospitalRole, 'manageDuties')) {
+      throw new DomainError('PERMISSION_DENIED', 'Your role in this hospital does not allow selecting doctors', correlationId);
     }
     // Conflict of interest, re-checked here in case the doctor joined the hospital after applying.
     if (doctorIsMember) {

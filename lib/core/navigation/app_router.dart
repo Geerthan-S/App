@@ -29,6 +29,11 @@ import '../../features/hospital/presentation/hospital_profile_screen.dart';
 import '../../features/hospital/presentation/create_duty_screen.dart';
 import '../../features/notifications/presentation/notifications_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
+import '../../features/settings/presentation/privacy_screen.dart';
+import '../../features/settings/presentation/devices_screen.dart';
+import '../../features/settings/presentation/notification_preferences_screen.dart';
+import '../../features/hospital/presentation/team_screen.dart';
+import '../../features/hospital/presentation/invitations_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/search/presentation/search_screen.dart';
 import '../../features/add_post/presentation/add_post_screen.dart';
@@ -191,6 +196,24 @@ final appRouter = GoRouter(
           );
         }
         return ChatScreen(conversation: conversation);
+      },
+    ),
+    GoRoute(path: '/privacy', builder: (context, state) => const PrivacyScreen()),
+    GoRoute(path: '/devices', builder: (context, state) => const DevicesScreen()),
+    GoRoute(
+      path: '/notification-preferences',
+      builder: (context, state) => const NotificationPreferencesScreen(),
+    ),
+    GoRoute(path: '/invitations', builder: (context, state) => const InvitationsScreen()),
+    GoRoute(
+      path: '/hospital-team',
+      redirect: (context, state) => state.extra is Map<String, String> ? null : '/hospital-dashboard',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, String>;
+        return TeamScreen(
+          organizationId: extra['organizationId']!,
+          organizationName: extra['organizationName'] ?? '',
+        );
       },
     ),
     GoRoute(

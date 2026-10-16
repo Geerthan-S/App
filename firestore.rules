@@ -113,6 +113,12 @@ service cloud.firestore {
                      isSupportAdmin();
       allow create, update, delete: if false; // Mutated strictly via Cloud Functions
 
+      // Edit history (updateDuty). Written only by the server.
+      match /versions/{version} {
+        allow read: if isOrgMember(get(/databases/$(database)/documents/duties/$(dutyId)).data.organizationId) || isSupportAdmin();
+        allow write: if false;
+      }
+
       match /applications/{doctorId} {
         allow read: if isOwner(doctorId) || isOrgMember(get(/databases/$(database)/documents/duties/$(dutyId)).data.organizationId) || isSupportAdmin();
         allow write: if false; // Mutated strictly via Cloud Functions
@@ -258,6 +264,18 @@ service cloud.firestore {
 
     match /supportCases/{caseId} {
       allow read, write: if false;
+    }
+
+    // Hospital team invitations: read and answered only through callables that
+    // match the invitee by their verified phone number or email.
+    match /organizationInvitations/{inviteId} {
+      allow read, write: if false;
+    }
+
+    // A doctor's saved searches; created and changed only through callables (limit, normalisation).
+    match /savedSearches/{searchId} {
+      allow read: if isAuthenticated() && resource.data.uid == request.auth.uid;
+      allow write: if false;
     }
 
     match /auditLogs/{auditId} {
