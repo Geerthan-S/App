@@ -1,5 +1,14 @@
 # Implementation Status Matrix
 
+## Client review: chat, sample data, hospital onboarding (2026-10-23, branch `phase1-completion`)
+
+- `DEPLOYED` to doctor-c7c29: rules, indexes, 98 functions, admin portal. Sample data turned on (4 sample hospitals, 4 sample doctors, 8 open duties, 5 reviews; audited as `DEMO_WORKSPACE_SEEDED`).
+- Chat between doctors and hospitals (threads opened around an application; unread counts; `messages` push category). Every user gets 4 sample chats that reply automatically, a pending offer, a completed duty with a review and inbox items; a hospital gets 4 sample chats and, once approved, a private sample duty with 3 applicants. Remove everything from Admin › Master Config › Client review sample data.
+- Hospital onboarding fixed: guided steps (details, licence, submit) with live status; main facility created automatically; signing in lands hospital staff on the hospital dashboard (was always the doctor home).
+- `TESTING MODE` (`REQUIRE_VERIFICATION_EVIDENCE=false` in functions/.env.doctor-c7c29): approvals rest on the registry check because no virus scanner exists; app and portal show a Testing mode notice. Revert after the client review: delete the line and redeploy functions.
+- `TESTED`: 18 suites, 159 emulator tests; full walkthrough in the browser against the emulators (register hospital → admin queue → approve → re-login lands on dashboard → chats, auto-reply, applicants, selection; doctor offers, notifications).
+- `UNVERIFIED`: the APK on a physical phone against production.
+
 ## Phase 1 completion — blueprint v1.1 gaps (2026-10-16, branch `phase1-completion`)
 
 - Spec: `docs/phase1/phase1-completion-spec.md`. Launch operations: `docs/runbooks/launch-readiness.md`.

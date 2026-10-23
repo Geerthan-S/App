@@ -209,23 +209,25 @@ const seedDoctorSide = async (uid: string, displayName: string) => {
   const offerTemplate = dutyByKey.get('meridian_icu_day')!;
   const offerDutyRef = db().collection('duties').doc(`demo_duty_offer_${uid}`);
   const offerSchedule = demoScheduleOf({ ...offerTemplate, dayOffset: 2 });
+  const offerExpiresAt = new Date(Date.now() + 2 * DAY_MS).toISOString();
   w.set(offerDutyRef, dutyDoc(offerTemplate, offerDutyRef.id, offerTemplate.orgId, 'filled',
     { headcount: 1, remainingHeadcount: 0, schedule: { ...offerSchedule, shiftType: offerTemplate.shiftType } }));
   w.set(offerDutyRef.collection('applications').doc(uid), {
     applicationId: `demo_app_offer_${uid}`, dutyId: offerDutyRef.id, doctorId: uid, organizationId: offerTemplate.orgId,
-    doctorName: displayName, status: 'selected', assignmentId: `demo_asg_offer_${uid}`, isDemo: true,
+    doctorName: displayName, status: 'selected', assignmentId: `demo_asg_offer_${uid}`, offerExpiresAt, isDemo: true,
     version: 2, appliedAt: ago(DAY_MS), updatedAt: nowTimestamp(),
   });
   const org = orgById.get(offerTemplate.orgId)!;
-  const terms = (startAt: string, endAt: string) => ({
-    amount: offerTemplate.amount, currency: 'INR', basis: offerTemplate.basis, expectedPaymentTiming: 'end_of_shift', startAt, endAt,
+  const terms = (t: DemoDutyTemplate, startAt: string, endAt: string) => ({
+    amount: t.amount, currency: 'INR', basis: t.basis, expectedPaymentTiming: 'end_of_shift', startAt, endAt,
   });
   w.set(db().collection('assignments').doc(`demo_asg_offer_${uid}`), {
     assignmentId: `demo_asg_offer_${uid}`, dutyId: offerDutyRef.id, doctorId: uid, doctorName: displayName,
     organizationId: org.id, facilityId: org.facility.id, facilityName: org.facility.name,
     department: offerTemplate.department, specialtyName: offerTemplate.specialtyName,
-    termsSnapshot: terms(offerSchedule.startAt, offerSchedule.endAt),
-    status: 'selected', expiresAt: Timestamp.fromMillis(Date.now() + 2 * DAY_MS),
+    termsSnapshot: terms(offerTemplate, offerSchedule.startAt, offerSchedule.endAt),
+    // ISO string, as atomicSelectDoctor writes it (confirm and expiry compare strings).
+    status: 'selected', expiresAt: offerExpiresAt,
     confirmedAt: null, startedAt: null, completedAt: null, isDemo: true,
     createdAt: ago(3 * 3_600_000), updatedAt: ago(3 * 3_600_000), version: 1,
   });
@@ -241,7 +243,7 @@ const seedDoctorSide = async (uid: string, displayName: string) => {
     assignmentId: `demo_asg_past_${uid}`, dutyId: pastDutyRef.id, doctorId: uid, doctorName: displayName,
     organizationId: pastOrg.id, facilityId: pastOrg.facility.id, facilityName: pastOrg.facility.name,
     department: pastTemplate.department, specialtyName: pastTemplate.specialtyName,
-    termsSnapshot: terms(pastSchedule.startAt, pastSchedule.endAt),
+    termsSnapshot: terms(pastTemplate, pastSchedule.startAt, pastSchedule.endAt),
     status: 'completed', expiresAt: null, confirmedAt: ago(8 * DAY_MS), startedAt: ago(6 * DAY_MS), completedAt: ago(6 * DAY_MS - 8 * 3_600_000),
     isDemo: true, createdAt: ago(9 * DAY_MS), updatedAt: ago(6 * DAY_MS), version: 4,
   });
@@ -295,7 +297,8 @@ const seedOrganizationSide = async (uid: string, orgId: string, org: DocumentDat
     const open = dutyByKey.get('meridian_er_night')!;
     const draft = dutyByKey.get('stanne_opd_morning')!;
     const openRef = db().collection('duties').doc(`demo_duty_${orgId}_open`);
-    w.set(openRef, { ...dutyDoc(open, openRef.id, orgId, 'published', { createdBy: uid }), ...place, headcount: 2, remainingHeadcount: 2 });
+    // demoPrivate: shown to this hospital only, never in other users' marketplace.
+    w.set(openRef, { ...dutyDoc(open, openRef.id, orgId, 'published', { createdBy: uid, demoPrivate: true }), ...place, headcount: 2, remainingHeadcount: 2 });
     w.set(db().collection('duties').doc(`demo_duty_${orgId}_draft`),
       { ...dutyDoc(draft, `demo_duty_${orgId}_draft`, orgId, 'draft', { createdBy: uid }), ...place });
     DEMO_DOCTORS.slice(0, 3).forEach((d, i) => {

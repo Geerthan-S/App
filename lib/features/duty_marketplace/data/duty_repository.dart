@@ -19,8 +19,12 @@ class DutyRepository {
     if (specialty != null && specialty != 'All') {
       q = q.where('specialtyName', isEqualTo: specialty);
     }
+    // A hospital's own sample duty (client-review demo) is not for other users.
     return q.snapshots().map(
-      (snap) => snap.docs.map((doc) => toUiMap(doc.id, doc.data())).toList(),
+      (snap) => snap.docs
+          .where((doc) => doc.data()['demoPrivate'] != true)
+          .map((doc) => toUiMap(doc.id, doc.data()))
+          .toList(),
     );
   }
 

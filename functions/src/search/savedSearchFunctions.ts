@@ -131,6 +131,8 @@ export const alertSavedSearches = onDocumentWritten('duties/{dutyId}', async eve
   const before = event.data?.before.data();
   const after = event.data?.after.data();
   if (!after || after.status !== 'published' || before?.status === 'published' || after.savedSearchAlertsAt) return;
+  // Client-review sample duties never alert real doctors.
+  if (after.isDemo === true) return;
   const dutyRef = event.data!.after.ref;
 
   const claimed = await db().runTransaction(async tx => {

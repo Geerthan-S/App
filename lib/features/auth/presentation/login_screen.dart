@@ -64,7 +64,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       });
       try {
         await _authRepository.signInToLocalTestAccount();
-        if (mounted) context.go('/home');
+        // Same path as a real sign-in: the router sends the user to their workspace.
+        if (mounted) context.go('/consent');
       } catch (_) {
         if (mounted) {
           setState(

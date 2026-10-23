@@ -67,3 +67,6 @@ tools/
 perf/data/
 perf/node_modules/
 perf/results/
+
+# Emulator-only function settings (never deployed)
+functions/.env.local

@@ -12,6 +12,7 @@ import {
 import { DEMO_DOCTORS, DEMO_DUTIES, DEMO_ORGS, demoScheduleOf } from '../src/demo/demoData';
 import { recordVerificationDecision } from '../src/verification/verificationFunctions';
 import { getHospitalProfile } from '../src/hospitals/hospitalFunctions';
+import { confirmAssignment } from '../src/assignments/assignmentFunctions';
 
 jest.setTimeout(90_000);
 
@@ -105,12 +106,23 @@ describeWithEmulator('chat, demo workspace and testing-mode approvals', () => {
 
       const assignments = await db().collection('assignments').where('doctorId', '==', 'newdoc').get();
       expect(assignments.docs.map(a => a.data().status).sort()).toEqual(['completed', 'selected']);
+      const offer = assignments.docs.find(a => a.data().status === 'selected')!.data();
+      expect(typeof offer.expiresAt).toBe('string');
+      expect(Date.parse(offer.expiresAt)).toBeGreaterThan(Date.now());
       expect((await db().collection('inboxNotifications').where('userId', '==', 'newdoc').get()).size).toBe(4);
       expect((await db().collection('feedback').where('targetId', '==', 'newdoc').get()).size).toBe(1);
 
       // A second call adds nothing.
       await call(ensureDemoContent, 'newdoc', {});
       expect((await db().collection('conversations').where('doctorId', '==', 'newdoc').get()).size).toBe(4);
+    });
+
+    test('a new user can confirm the sample offer like a real one', async () => {
+      await call(seedDemoWorkspace, 'super1', {}, superToken());
+      await consented('newdoc');
+      await call(ensureDemoContent, 'newdoc', {});
+      await call(confirmAssignment, 'newdoc', { assignmentId: 'demo_asg_offer_newdoc', idempotencyKey: '1b4e28ba-2fa1-41d2-883f-0016d3cca427' });
+      expect((await db().doc('assignments/demo_asg_offer_newdoc').get()).data()?.status).toBe('confirmed');
     });
 
     test('a sample thread replies automatically and sends no push', async () => {
