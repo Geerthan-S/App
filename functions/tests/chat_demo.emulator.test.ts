@@ -2,6 +2,7 @@
  * Chat, the client-review demo workspace and testing-mode approvals, against
  * the Auth and Firestore emulators. Run with: npm run test:emulator
  */
+import { randomUUID } from 'crypto';
 import {
   CONSENT, HOUR, MFA, adminDb, call, clearFirestore, describeWithEmulator, expectDomainError, isoIn, verifierToken,
 } from './helpers/emulator';
@@ -121,7 +122,7 @@ describeWithEmulator('chat, demo workspace and testing-mode approvals', () => {
       await call(seedDemoWorkspace, 'super1', {}, superToken());
       await consented('newdoc');
       await call(ensureDemoContent, 'newdoc', {});
-      await call(confirmAssignment, 'newdoc', { assignmentId: 'demo_asg_offer_newdoc', idempotencyKey: '1b4e28ba-2fa1-41d2-883f-0016d3cca427' });
+      await call(confirmAssignment, 'newdoc', { assignmentId: 'demo_asg_offer_newdoc', idempotencyKey: randomUUID() });
       expect((await db().doc('assignments/demo_asg_offer_newdoc').get()).data()?.status).toBe('confirmed');
     });
 
