@@ -42,13 +42,24 @@ class NotificationRepository {
     final payload = data['payload'] as Map<String, dynamic>? ?? {};
     return {
       'notificationId': docId,
-      'type': data['type'] ?? 'info',
+      'type': data['type'] ?? _typeOf(data['eventType'] as String? ?? ''),
       'title': data['title'] ?? '',
       'body': data['body'] ?? '',
       'time': _relTime(data['createdAt']),
       'isRead': data['isRead'] ?? false,
       'dutyId': payload['dutyId'],
+      'conversationId': payload['conversationId'],
+      'assignmentId': payload['assignmentId'],
     };
+  }
+
+  /// Icon group for a server event type.
+  static String _typeOf(String eventType) {
+    if (eventType.startsWith('chat.')) return 'message';
+    if (eventType.contains('selected') || eventType.contains('offer') || eventType.startsWith('assignment.')) return 'confirmed';
+    if (eventType.startsWith('duty.') || eventType.contains('match') || eventType.contains('applicants')) return 'new_duty';
+    if (eventType.contains('verif')) return 'verification';
+    return 'info';
   }
 
   static String _relTime(dynamic ts) {

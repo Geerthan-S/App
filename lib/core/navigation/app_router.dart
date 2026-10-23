@@ -38,7 +38,9 @@ import '../../features/home/presentation/home_screen.dart';
 import '../../features/search/presentation/search_screen.dart';
 import '../../features/add_post/presentation/add_post_screen.dart';
 import '../../features/messages/presentation/messages_screen.dart';
-import '../../features/messages/presentation/chat_screen.dart';
+import '../../features/chat/presentation/chat_screen.dart';
+import '../../features/chat/presentation/chats_screen.dart';
+import '../../features/chat/data/chat_repository.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -102,8 +104,15 @@ final appRouter = GoRouter(
     if (!consented) {
       return location == '/consent' ? null : '/consent';
     }
-    if (isLoggingIn || location == '/otp') {
-      return '/home';
+    // Sign-in and the consent screen hand a returning user to their own
+    // workspace instead of the doctor shell or the role picker.
+    if (isLoggingIn || location == '/otp' || location == '/consent') {
+      try {
+        return await OnboardingGate.landingFor(user.uid);
+      } catch (e, st) {
+        AppLogger.error('Could not decide the landing page', error: e, stackTrace: st);
+        return '/home';
+      }
     }
     return null;
   },
@@ -182,20 +191,33 @@ final appRouter = GoRouter(
       },
     ),
     GoRoute(
+      path: '/chats',
+      builder: (context, state) {
+        final extra = state.extra is Map ? state.extra as Map : const <String, dynamic>{};
+        return ChatsScreen(
+          organizationId: extra['organizationId'] as String?,
+          organizationName: extra['organizationName'] as String?,
+        );
+      },
+    ),
+    GoRoute(
       path: '/chat',
       builder: (context, state) {
-        final conversation = state.extra;
-        if (conversation is! Map<String, dynamic>) {
+        final extra = state.extra;
+        if (extra is! Map || extra['conversationId'] is! String) {
           return ContentNotFoundScreen(
             title: 'Conversation Not Found',
-            message:
-                'This conversation may have been deleted or is no longer available.',
+            message: 'This conversation may have been removed or is no longer available.',
             icon: Icons.forum_outlined,
-            actionLabel: 'Back to Messages',
-            onAction: () => context.go('/messages'),
+            actionLabel: 'Back to Chats',
+            onAction: () => context.go('/chats'),
           );
         }
-        return ChatScreen(conversation: conversation);
+        return ChatScreen(
+          conversationId: extra['conversationId'] as String,
+          viewer: extra['side'] == 'organization' ? ChatSide.organization : ChatSide.doctor,
+          title: extra['title'] as String? ?? 'Chat',
+        );
       },
     ),
     GoRoute(path: '/privacy', builder: (context, state) => const PrivacyScreen()),

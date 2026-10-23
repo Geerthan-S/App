@@ -23,6 +23,7 @@ import 'core/widgets/connectivity_gate.dart';
 import 'core/widgets/app_release_gate.dart';
 import 'core/services/crash_reporting.dart';
 import 'core/services/push_registration_service.dart';
+import 'core/services/demo_content_service.dart';
 import 'core/config/backend_config.dart';
 
 Future<void> initializeFirebaseServices() async {
@@ -66,6 +67,8 @@ void main() {
 
         // Register this device for push on every sign-in and token rotation.
         PushRegistrationService.start();
+        // Client-review sample content; a no-op unless the demo workspace is on.
+        DemoContentService.start();
       } catch (e, st) {
         AppLogger.error(
           'Firebase initialization skipped or failed in offline preview mode',

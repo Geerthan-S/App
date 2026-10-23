@@ -1,7 +1,7 @@
 /** Master Config, Medical Councils (trusted registries) and Feature Flags. */
 
 import { h, icon, fmtDateTime, badge, add, put } from '../core/dom.js';
-import { actionDialog, card, dl, pageHead, toast, toggle } from '../core/ui.js';
+import { actionDialog, card, dl, errorBox, loading, pageHead, toast, toggle } from '../core/ui.js';
 import { invoke } from '../core/session.js';
 
 const versionMeta = item => (item.version ? `Version ${item.version} · changed ${fmtDateTime(item.updatedAt)}` : 'Default value, never changed');
@@ -57,6 +57,7 @@ export async function renderMasterConfig(root, ctx) {
           hint: 'Verified doctors appear in Credential Renewals after this long.',
           onSave: n => save(`Re-verify doctors every ${n} months?`, 'verification_policy', { slaHours: policy.slaHours, reverifyAfterMonths: n }),
         })))),
+    canEdit ? h('div', { class: 'section-gap' }, demoWorkspaceCard(ctx)) : null,
     h('div', { class: 'section-gap' }, card('App release', versionMeta(config.appRelease), appReleaseForm(config.appRelease, canEdit, ctx))),
     h('div', { class: 'section-gap' }, card('Fixed security settings', 'Set in code; shown for reference', dl([
       ['Re-authentication window', `${config.fixed.stepUpAuthMaxAgeSeconds / 60} minutes`],
@@ -65,6 +66,50 @@ export async function renderMasterConfig(root, ctx) {
       ['Consent version', config.fixed.consentVersion],
       ['Staff sign-in', 'Password + authenticator app (TOTP)'],
     ]))));
+}
+
+/**
+ * Client-review sample data: hospitals, doctors, duties and reviews for
+ * everyone, plus chats, an offer and notifications for each user who signs in.
+ */
+function demoWorkspaceCard(ctx) {
+  const body = h('div', {}, loading('Checking sample data…'));
+  const draw = async () => {
+    let status;
+    try { status = await invoke('getDemoWorkspaceStatus'); } catch (error) { put(body, errorBox(error, draw)); return; }
+    const total = Object.values(status.counts).reduce((a, b) => a + b, 0);
+    put(body,
+      h('p', { class: 'muted' }, status.enabled
+        ? `On since ${fmtDateTime(status.seededAt)}. Every user who signs in gets 4 sample chats, a pending offer, a completed duty with a review and inbox notifications; hospitals also get sample applicants once approved.`
+        : 'Off. Turn it on before a client review so every screen has realistic sample content. All of it is labelled "Sample" and can be removed in one step.'),
+      dl([
+        ['Status', status.enabled ? badge('approved', 'On') : badge(null, 'Off')],
+        ['Sample records', String(total)],
+        ['Chats', String(status.counts.conversations ?? 0)],
+        ['Duties', String(status.counts.duties ?? 0)],
+        ['Hospitals / doctors', `${status.counts.organizations ?? 0} / ${status.counts.doctors ?? 0}`],
+      ]),
+      h('div', { class: 'btn-row end section-gap' },
+        total ? h('button', { class: 'btn btn-danger', type: 'button', onclick: async () => {
+          const ok = await actionDialog({
+            title: 'Remove all sample data?', danger: true, confirmLabel: 'Remove', reason: false, notes: false,
+            message: 'Deletes every sample hospital, doctor, duty, chat, offer, review and notification, and turns sample data off. Real users and hospitals are not touched.',
+            onConfirm: () => invoke('clearDemoWorkspace'),
+          });
+          if (ok) { toast('Sample data removed.'); draw(); }
+        } }, 'Remove sample data') : null,
+        h('button', { class: 'btn btn-primary', type: 'button', onclick: async () => {
+          const ok = await actionDialog({
+            title: status.enabled ? 'Refresh sample data?' : 'Turn on sample data?', confirmLabel: status.enabled ? 'Refresh' : 'Turn on',
+            reason: false, notes: false,
+            message: 'Adds (or refreshes) 4 sample hospitals, 4 sample doctors, 8 open duties and reviews. Users get their own sample chats the next time they open the app.',
+            onConfirm: () => invoke('seedDemoWorkspace'),
+          });
+          if (ok) { toast('Sample data is on.'); draw(); }
+        } }, status.enabled ? 'Refresh sample data' : 'Turn on sample data')));
+  };
+  draw();
+  return card('Client review sample data', 'Realistic sample content for demos, removable in one step', body);
 }
 
 const SEMVER = /^\d{1,3}\.\d{1,3}\.\d{1,3}$/;
@@ -128,7 +173,7 @@ export async function renderCouncils(root, ctx) {
   const input = h('input', { class: 'input', placeholder: 'e.g. www.nmc.org.in', spellcheck: false, disabled: !canEdit });
   const err = h('div', { class: 'alert alert-error', hidden: true });
   const saveBtn = h('button', { class: 'btn btn-primary', type: 'button', disabled: true }, 'Save changes');
-  let dirty = false;
+  let dirty = registryDomains.isDefault === true && canEdit;
 
   const draw = () => {
     put(list, ...(domains.length ? domains.map(domain => h('div', {},
@@ -168,7 +213,9 @@ export async function renderCouncils(root, ctx) {
     pageHead('Medical Councils', 'Official registers a verifier may cite when approving a case'),
     readOnlyNote(canEdit),
     h('div', { class: 'grid grid-main' },
-      card('Trusted registries', versionMeta(registryDomains), h('div', {}, list, h('div', { class: 'section-gap' }), err, addForm),
+      card('Trusted registries', registryDomains.isDefault ? 'Built-in defaults (nothing saved yet)' : versionMeta(registryDomains), h('div', {},
+        registryDomains.isDefault ? h('div', { class: 'alert alert-info' }, 'Using the built-in national registers: the Indian Medical Register (nmc.org.in) for doctors and the National Register of Clinical Establishments for hospitals. Add or remove hosts and save to replace them.') : null,
+        list, h('div', { class: 'section-gap' }), err, addForm),
         saveBtn),
       card('How approval uses this', null, h('div', { class: 'stack' },
         h('p', { class: 'muted' }, 'To approve, a verifier records the registry page they checked. The server only accepts pages on a host listed here, checked within the last 24 hours, with every field matching and an Active status.'),

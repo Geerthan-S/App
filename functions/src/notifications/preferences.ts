@@ -7,7 +7,7 @@
 
 import type { DocumentData } from 'firebase-admin/firestore';
 
-export const NOTIFICATION_CATEGORIES = ['applications', 'duty_alerts', 'verification', 'team'] as const;
+export const NOTIFICATION_CATEGORIES = ['applications', 'duty_alerts', 'verification', 'team', 'messages'] as const;
 export type NotificationCategory = typeof NOTIFICATION_CATEGORIES[number] | 'general';
 
 /** Time-critical: the person must act or their shift changed. */
@@ -21,6 +21,7 @@ export const categoryOf = (eventType: string): NotificationCategory => {
   if (/^(application|assignment)\./.test(eventType) || eventType === 'duty.updated') return 'applications';
   if (eventType.startsWith('verification.')) return 'verification';
   if (eventType.startsWith('organization.')) return 'team';
+  if (eventType.startsWith('chat.')) return 'messages';
   return 'general';
 };
 

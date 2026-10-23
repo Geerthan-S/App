@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../chat/presentation/chats_screen.dart' show ChatButton;
 import 'package:intl/intl.dart';
 import '../../../core/design_system/app_colors.dart';
 import '../../../core/design_system/app_typography.dart';
@@ -87,6 +88,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                   ),
                                 ),
                                 const Spacer(),
+                                const ChatButton(),
+                                const SizedBox(width: 8),
                                 const _NotificationBell(),
                               ],
                             ),

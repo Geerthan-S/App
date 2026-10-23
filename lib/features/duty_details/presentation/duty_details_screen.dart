@@ -1,3 +1,5 @@
+import 'dart:async';
+
 /**
  * Duty Details & Application Submission Screen
  * Doctor view: pay, facility, shift timeline, terms and requirements, GPS
@@ -5,7 +7,10 @@
  * server-side duplicate prevention.
  */
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/design_system/app_colors.dart';
@@ -21,6 +26,8 @@ import '../../../core/localization/language_provider.dart';
 import '../../duty_marketplace/data/duty_repository.dart';
 import '../../doctor_profile/data/doctor_repository.dart';
 import '../../../core/errors/error_envelope.dart';
+import '../../chat/data/chat_repository.dart';
+import '../../settings/data/account_repository.dart' show callableErrorMessage;
 
 class DutyDetailsScreen extends ConsumerStatefulWidget {
   final Map<String, dynamic> duty;
@@ -41,6 +48,37 @@ class _DutyDetailsScreenState extends ConsumerState<DutyDetailsScreen> {
     DoctorRepository.getProfile().then((p) {
       if (mounted) setState(() => _doctorProfile = p);
     });
+    _checkApplied();
+  }
+
+  /// A duty the doctor already applied to shows its state, not "Apply".
+  Future<void> _checkApplied() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    final dutyId = widget.duty['dutyId'] as String?;
+    if (uid == null || dutyId == null || dutyId.isEmpty) return;
+    try {
+      final app = await FirebaseFirestore.instance.collection('duties').doc(dutyId).collection('applications').doc(uid).get();
+      if (mounted && app.exists) setState(() => _hasApplied = true);
+    } catch (_) {
+      // Unknown: keep the Apply action; the server refuses duplicates anyway.
+    }
+  }
+
+  Future<void> _messageHospital() async {
+    try {
+      final conversationId = await ChatRepository.start(dutyId: widget.duty['dutyId'] as String);
+      if (mounted) {
+        unawaited(context.push('/chat', extra: {
+          'conversationId': conversationId,
+          'side': 'doctor',
+          'title': widget.duty['facilityName'] as String? ?? 'Hospital',
+        }));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(callableErrorMessage(e, 'Could not open the chat.'))));
+      }
+    }
   }
 
   void _showApplicationModal() {
@@ -350,6 +388,11 @@ class _DutyDetailsScreenState extends ConsumerState<DutyDetailsScreen> {
               ],
             ),
           ),
+          TextButton.icon(
+            icon: const Icon(Icons.chat_bubble_outline, size: 18),
+            label: const Text('Message'),
+            onPressed: _messageHospital,
+          ),
         ],
       );
     }
@@ -368,6 +411,12 @@ class _DutyDetailsScreenState extends ConsumerState<DutyDetailsScreen> {
             ),
           ),
           StatusBadge(status: status),
+          const SizedBox(width: 4),
+          IconButton(
+            tooltip: 'Message hospital',
+            icon: const Icon(Icons.chat_bubble_outline, size: 20),
+            onPressed: _messageHospital,
+          ),
         ],
       );
     }
@@ -447,6 +496,12 @@ class _DutyDetailsScreenState extends ConsumerState<DutyDetailsScreen> {
       backgroundColor: colors.bg,
       appBar: AppBar(
         actions: [
+          if ((duty['organizationId'] as String? ?? '').isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.local_hospital_outlined),
+              tooltip: 'Hospital profile',
+              onPressed: () => context.push('/hospital-info', extra: {'organizationId': duty['organizationId'] as String}),
+            ),
           IconButton(
             icon: const Icon(Icons.translate_outlined),
             tooltip: 'Language',

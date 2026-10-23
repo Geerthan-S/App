@@ -31,18 +31,23 @@ class _HospitalInfoScreenState extends State<HospitalInfoScreen> {
   }
 
   Future<void> _load() async {
-    final org = await HospitalRepository.getOrganization(
-      widget.organizationId!,
-    );
+    Map<String, dynamic>? profile;
+    try {
+      profile = await HospitalRepository.getHospitalProfile(widget.organizationId!);
+    } catch (_) {
+      // Not approved yet, or not visible to this user: shown as "not found".
+      profile = null;
+    }
     if (!mounted) return;
     setState(() {
-      _org = org;
+      _org = profile == null
+          ? null
+          : {...profile, 'verificationStatus': profile['verified'] == true ? 'approved' : 'pending'};
+      _reviews = ((profile?['reviews'] as List?) ?? [])
+          .map((r) => Map<String, dynamic>.from(r as Map))
+          .map((r) => {...r, 'reviewerName': r['reviewer'] ?? 'Doctor', 'rating': (r['rating'] as num?)?.toInt() ?? 0})
+          .toList();
       _loading = false;
-    });
-    HospitalRepository.watchOrgReviews(widget.organizationId!).listen((
-      reviews,
-    ) {
-      if (mounted) setState(() => _reviews = reviews);
     });
   }
 

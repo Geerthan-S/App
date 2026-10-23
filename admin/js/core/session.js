@@ -35,6 +35,8 @@ export const session = {
   secondFactor: null,
   /** Whether this deployment requires TOTP for staff (from getSessionPolicy). */
   mfaRequired: true,
+  /** Set while a safeguard is relaxed for client-review testing (from getSessionPolicy). */
+  testingModeNotice: null,
 };
 
 const isStaffClaims = c => Boolean(c.isVerifier || c.isSupportAdmin || c.isSuperAdmin);
@@ -61,6 +63,7 @@ export async function loadSessionPolicy() {
   try {
     const policy = await httpsCallable(session.functions, 'getSessionPolicy')({});
     session.mfaRequired = policy.data.requireMfa !== false;
+    session.testingModeNotice = policy.data.testingModeNotice || null;
   } catch (_) {
     session.mfaRequired = true;
   }

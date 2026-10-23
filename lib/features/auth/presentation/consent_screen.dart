@@ -40,7 +40,8 @@ class _ConsentScreenState extends ConsumerState<ConsentScreen> {
         'consentVersion': AppConstants.currentConsentVersion,
       });
       OnboardingGate.markConsented(uid);
-      if (mounted) context.go('/role-selection');
+      final landing = await OnboardingGate.landingFor(uid).catchError((_) => '/role-selection');
+      if (mounted) context.go(landing);
     } on FirebaseFunctionsException catch (e) {
       if (mounted) setState(() => _error = e.message ?? 'Could not record your consent. Try again.');
     } catch (_) {

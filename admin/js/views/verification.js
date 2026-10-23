@@ -97,13 +97,16 @@ function decisionForm(caseData, details, { onDone }) {
   const reason = h('input', { class: 'input', placeholder: 'e.g. DOCS_VERIFIED', maxlength: 64, spellcheck: false });
   reason.addEventListener('input', () => { reason.value = reason.value.toUpperCase().replace(/[^A-Z0-9_]/g, '_'); });
   const notes = h('textarea', { class: 'textarea', maxlength: 1000, placeholder: 'What you checked and what you found. Saved to the audit trail.' });
-  const sourceUrl = h('input', { class: 'input', type: 'url', placeholder: 'https://… page on an approved registry' });
+  const sourceUrl = h('input', { class: 'input', type: 'url', placeholder: caseData.subjectType === 'organization' ? 'https://clinicalestablishments.gov.in/…' : 'https://www.nmc.org.in/…' });
   const now = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16);
   const checkedAt = h('input', { class: 'input', type: 'datetime-local', value: now, max: now });
   const status = h('select', { class: 'select' },
     h('option', { value: '' }, 'Select'), h('option', { value: 'ACTIVE' }, 'Active'),
     h('option', { value: 'SUSPENDED' }, 'Suspended'), h('option', { value: 'EXPIRED' }, 'Expired'));
-  const checks = ['Registration number matches', 'Name matches', 'Council matches', 'Qualification matches']
+  const isOrg = caseData.subjectType === 'organization';
+  const checks = (isOrg
+    ? ['Registration number matches', 'Legal name matches', 'Registering authority matches', 'Establishment type matches']
+    : ['Registration number matches', 'Name matches', 'Council matches', 'Qualification matches'])
     .map(label => ({ label, input: h('input', { type: 'checkbox' }) }));
   const source = h('fieldset', { class: 'box', hidden: true },
     h('legend', {}, 'Official registry check'),
@@ -112,7 +115,10 @@ function decisionForm(caseData, details, { onDone }) {
       h('div', { class: 'field' }, h('label', {}, 'Checked at'), checkedAt)),
     h('div', { class: 'field' }, h('label', {}, 'Status on the register'), status),
     checks.map(c => h('label', { class: 'check' }, c.input, c.label)),
-    h('p', { class: 'hint' }, 'Approval needs every match confirmed, an Active status, a check within 24 hours, clean documents and a source on a trusted registry (Medical Councils).'));
+    h('p', { class: 'hint' }, session.testingModeNotice
+      ? `Approval needs every match confirmed, an Active status, a check within 24 hours and a source on a trusted registry (Medical Councils). ${session.testingModeNotice}`
+      : 'Approval needs every match confirmed, an Active status, a check within 24 hours, clean documents and a source on a trusted registry (Medical Councils).'),
+    isOrg ? h('p', { class: 'hint' }, 'For hospitals, check the National Register of Clinical Establishments (clinicalestablishments.gov.in) or the state register.') : null);
   decision.addEventListener('change', () => { source.hidden = decision.value !== 'approved'; });
   const submit = h('button', { class: 'btn btn-primary', type: 'submit', disabled: escalatedBlock }, 'Record decision');
 
@@ -220,7 +226,9 @@ export async function openCase(caseId, { entry = null, onChange = () => {} } = {
             window.open(r.signedUrl, '_blank', 'noopener,noreferrer');
           } catch (error) { toastError(error); }
         } }, 'Open', icon('external', 'icon-sm')) : null))))
-    : empty('No documents uploaded', 'The applicant has not uploaded evidence for this case.', 'file');
+    : empty('No documents uploaded', session.testingModeNotice
+      ? 'Documents are optional while testing mode is on; approve on the registry check.'
+      : 'The applicant has not uploaded evidence for this case.', 'file');
 
   put(modal.body, 
     h('div', { class: 'page-head' }, status, headerActions),

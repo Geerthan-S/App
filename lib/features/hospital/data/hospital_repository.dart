@@ -99,6 +99,14 @@ class HospitalRepository {
     return {'organizationId': doc.id, ...doc.data()!};
   }
 
+  /// An approved hospital's public profile with anonymised reviews (any signed-in user).
+  static Future<Map<String, dynamic>> getHospitalProfile(String orgId) async {
+    final result = await BackendConfig.functions
+        .httpsCallable('getHospitalProfile')
+        .call<Map<String, dynamic>>({'organizationId': orgId});
+    return Map<String, dynamic>.from(result.data);
+  }
+
   static Stream<List<Map<String, dynamic>>> watchOrgReviews(String orgId) {
     return FirebaseFirestore.instance
         .collection('feedback')

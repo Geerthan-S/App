@@ -14,7 +14,7 @@ import { z } from 'zod';
 import { db, nowTimestamp, sanitizeCorrelationId } from '../shared/firestoreHelpers';
 import { domainCall } from '../shared/callable';
 import { requireAdmin, requireAuth, requireStepUpAuth, requireSuperAdmin } from '../security/guards';
-import { appCheckEnforced, staffMfaRequired } from '../shared/runtime';
+import { appCheckEnforced, staffMfaRequired, testingModeNotice } from '../shared/runtime';
 import { DocIdSchema } from '../shared/schemas';
 import { DomainError } from '../shared/errors';
 import { logAudit, stageAudit } from '../audit/auditLogger';
@@ -241,5 +241,5 @@ export const getSessionPolicy = domainCall('getSessionPolicy', async (request: C
   if (!STAFF_CLAIMS.some(claim => request.auth?.token?.[claim] === true)) {
     throw new DomainError('PERMISSION_DENIED', 'Staff privileges required', correlationId);
   }
-  return { requireMfa: staffMfaRequired(), appCheckEnforced: appCheckEnforced() };
+  return { requireMfa: staffMfaRequired(), appCheckEnforced: appCheckEnforced(), testingModeNotice: testingModeNotice() };
 }, { audience: 'staff' });

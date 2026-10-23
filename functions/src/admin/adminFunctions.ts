@@ -13,6 +13,7 @@ import { DocIdSchema, ModerationActionSchema } from '../shared/schemas';
 import { DomainError } from '../shared/errors';
 import { stageAudit } from '../audit/auditLogger';
 import { REVIEWABLE_CASE_STATUSES } from '../verification/verificationStates';
+import { registryDomainsOf } from '../verification/registryDefaults';
 import {
   FEATURE_FLAG_KEYS, OFFER_EXPIRY_HOURS_RANGE, PLATFORM_DEFAULTS, REVERIFY_MONTHS_RANGE, VERIFICATION_SLA_HOURS_RANGE,
   getOfferExpiryHours, getVerificationPolicy,
@@ -319,7 +320,8 @@ export const getPlatformConfig = domainCall('getPlatformConfig', async (request:
   return {
     offerPolicy: { offerExpiryHours, range: OFFER_EXPIRY_HOURS_RANGE, ...meta(offerSnap.data()) },
     registryDomains: {
-      value: Array.isArray(registrySnap.data()?.value) ? registrySnap.data()!.value : [],
+      value: registryDomainsOf(registrySnap.data()),
+      isDefault: !(Array.isArray(registrySnap.data()?.value) && registrySnap.data()!.value.length),
       ...meta(registrySnap.data()),
     },
     verificationPolicy: {

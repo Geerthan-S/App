@@ -600,20 +600,16 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
                     onTap: () => _openDoctorReviews(context),
                   ),
                   ListRow(
-                    icon: Icons.reviews_outlined,
-                    title: 'Hospital reviews',
-                    onTap: () => context.push(
-                      '/reviews',
-                      extra: {
-                        'title': 'Hospital Reviews',
-                        'reviews': <Map<String, dynamic>>[],
-                      },
-                    ),
+                    icon: Icons.chat_bubble_outline,
+                    title: 'Chats',
+                    subtitle: 'Messages with hospitals',
+                    onTap: () => context.push('/chats'),
                   ),
                   ListRow(
                     icon: Icons.local_hospital_outlined,
-                    title: 'My hospital / clinic',
-                    onTap: () => context.push('/hospital-info'),
+                    title: 'Hospital workspace',
+                    subtitle: 'Register or manage a hospital you work for',
+                    onTap: () => context.push('/hospital-dashboard'),
                   ),
                 ],
               ),

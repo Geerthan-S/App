@@ -234,6 +234,7 @@ fieldset.box legend { padding: 0 6px; font-size: 12px; font-weight: 700; color: 
 .menu hr { border: 0; border-top: 1px solid var(--border); margin: 6px 0; }
 
 .content { padding: 28px; max-width: 1440px; width: 100%; }
+.testing-banner { margin: 16px clamp(16px, 3vw, 28px) 0; padding: 10px 14px; border-radius: var(--r-sm); background: var(--amber-soft); color: var(--amber); font-size: 13px; font-weight: 600; }
 .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 22px; }
 .page-title { font-size: 24px; font-weight: 800; }
 .page-sub { color: var(--text-2); margin-top: 4px; }

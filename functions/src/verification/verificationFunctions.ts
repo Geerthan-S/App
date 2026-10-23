@@ -19,6 +19,8 @@ import { logAudit, stageAudit } from '../audit/auditLogger';
 import { enqueueNotification } from '../notifications/outbox';
 import { ACTIVE_CASE_STATUSES, REVIEWABLE_CASE_STATUSES } from './verificationStates';
 import { loadReviewQueue } from './reviewQueue';
+import { registryDomainsOf } from './registryDefaults';
+import { verificationEvidenceRequired } from '../shared/runtime';
 
 /** Profiles written before revisions existed are revision 1. */
 const revisionOf = (data: DocumentData | undefined, field: 'profileRevision' | 'subjectRevision'): number =>
@@ -351,16 +353,20 @@ export const recordVerificationDecision = domainCall('recordVerificationDecision
       throw new DomainError('PROFILE_CHANGED',
         'The profile changed after this case was opened; the case no longer describes it', correlationId);
     }
+    // Testing mode (client review): evidence is optional, so approval rests on
+    // the official-registry check alone. The policy used is recorded below.
+    const evidenceRequired = verificationEvidenceRequired();
     if (decision === 'approved') {
-      if (evidenceSnap.empty || evidenceSnap.docs.some(doc => !isTrustedEvidence(doc.data()))) {
+      if (evidenceRequired && (evidenceSnap.empty || evidenceSnap.docs.some(doc => !isTrustedEvidence(doc.data())))) {
         throw new DomainError('INVALID_STATE_TRANSITION', 'Approval requires scanned, clean evidence', correlationId);
       }
-      const domains = registryConfig.data()?.value;
-      if (!Array.isArray(domains) || !domains.some(domain =>
-        typeof domain === 'string' && domain.toLowerCase() === sourceHostname)) {
-        throw new DomainError('INVALID_STATE_TRANSITION', 'Official source domain is not approved', correlationId);
+      const domains = registryDomainsOf(registryConfig.data());
+      if (!domains.some(domain => typeof domain === 'string' && domain.toLowerCase() === sourceHostname)) {
+        throw new DomainError('INVALID_STATE_TRANSITION',
+          `Official source domain is not trusted. Use a page on: ${domains.join(', ')}`, correlationId);
       }
     }
+    const evidencePolicy = evidenceRequired ? 'SCANNED_EVIDENCE_REQUIRED' : 'TESTING_MODE_EVIDENCE_OPTIONAL';
 
     // ---- writes ----
     const reviewedEvidence = evidenceSnap.docs.map(doc => ({
@@ -377,6 +383,7 @@ export const recordVerificationDecision = domainCall('recordVerificationDecision
       subjectRevision: revisionOf(caseData, 'subjectRevision'),
       credentialFingerprint: subject?.credentialFingerprint ?? null,
       reviewedEvidence,
+      evidencePolicy,
       checkedAt: nowTimestamp(),
       reviewerId: verifierUid,
     });
@@ -435,6 +442,7 @@ export const recordVerificationDecision = domainCall('recordVerificationDecision
         subjectId: caseData.subjectId,
         subjectRevision: revisionOf(caseData, 'subjectRevision'),
         evidenceCount: reviewedEvidence.length,
+        evidencePolicy,
       },
     });
     return caseData.subjectId as string;

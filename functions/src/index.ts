@@ -26,7 +26,7 @@ export { submitModerationReport } from './moderation/reportFunctions';
 export { submitDoctorProfile } from './doctors/doctorFunctions';
 
 // Hospitals & Facilities
-export { createOrganizationDraft, addFacility, getMyOrganizations } from './hospitals/hospitalFunctions';
+export { createOrganizationDraft, addFacility, getMyOrganizations, getHospitalProfile } from './hospitals/hospitalFunctions';
 
 // Duties
 export { createDuty, publishDuty } from './duties/dutyFunctions';
@@ -93,3 +93,9 @@ export { submitVerificationAppeal, listVerificationAppeals, decideVerificationAp
 export { updateDuty } from './duties/dutyEditFunctions';
 export { saveSearch, listSavedSearches, updateSavedSearch, alertSavedSearches } from './search/savedSearchFunctions';
 export { scheduledFirestoreExport } from './ops/backupFunctions';
+
+// Doctor–hospital chat and the client-review demo workspace
+export { startConversation, sendChatMessage, markConversationRead } from './chat/chatFunctions';
+export {
+  seedDemoWorkspace, refreshDemoWorkspace, ensureDemoContent, getDemoWorkspaceStatus, clearDemoWorkspace,
+} from './demo/demoFunctions';

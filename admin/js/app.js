@@ -264,6 +264,9 @@ function setupTopbar() {
 
 async function enterWorkspace() {
   show('screen-app');
+  const banner = $('testing-banner');
+  banner.textContent = session.testingModeNotice || '';
+  banner.hidden = !session.testingModeNotice;
   setupTopbar();
   await render();
   refreshCounts();

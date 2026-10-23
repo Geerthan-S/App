@@ -71,6 +71,7 @@ class NotificationPreferences {
     'duty_alerts': ('Duty alerts', 'Saved-search matches and duty changes'),
     'verification': ('Verification', 'Review decisions and appeals'),
     'team': ('Team', 'Invitations and hospital team changes'),
+    'messages': ('Messages', 'New chat messages from doctors or hospitals'),
   };
 
   final Set<String> muted;

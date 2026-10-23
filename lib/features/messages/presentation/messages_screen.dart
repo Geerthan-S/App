@@ -11,6 +11,7 @@ import '../../../core/widgets/state_views.dart';
 import '../../../core/widgets/ui_kit.dart';
 import '../../doctor_profile/data/doctor_repository.dart';
 import '../../../core/errors/error_envelope.dart';
+import '../../chat/presentation/chats_screen.dart' show ChatButton;
 
 class MessagesScreen extends StatelessWidget {
   const MessagesScreen({super.key});
@@ -39,9 +40,16 @@ class MessagesScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'My Duties',
-                    style: AppTypography.display(colors.textPrimary),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'My Duties',
+                          style: AppTypography.display(colors.textPrimary),
+                        ),
+                      ),
+                      const ChatButton(),
+                    ],
                   ),
                   const SizedBox(height: 4),
                   Text(

@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/design_system/app_colors.dart';
@@ -69,6 +72,20 @@ class _NotificationCard extends StatelessWidget {
   Future<void> _open(BuildContext context) async {
     final id = notification['notificationId'] as String;
     NotificationRepository.markRead(id).ignore();
+
+    final conversationId = notification['conversationId'] as String?;
+    if (conversationId != null && conversationId.isNotEmpty) {
+      // Doctor threads end with the doctor's uid; anything else is a hospital thread.
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      final side = uid != null && conversationId.endsWith('__$uid') ? 'doctor' : 'organization';
+      unawaited(context.push('/chat', extra: {'conversationId': conversationId, 'side': side, 'title': notification['title'] ?? 'Chat'}));
+      return;
+    }
+    final assignmentId = notification['assignmentId'] as String?;
+    if (assignmentId != null && assignmentId.isNotEmpty) {
+      context.go('/messages');
+      return;
+    }
 
     final dutyId = notification['dutyId'] as String?;
     if (dutyId != null && dutyId.isNotEmpty) {

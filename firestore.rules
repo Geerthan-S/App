@@ -228,6 +228,25 @@ service cloud.firestore {
       allow read, write: if false; // Server-only outbox delivery records
     }
 
+    // =========================================================================
+    // CHAT (doctor <-> hospital). Sent through callables only.
+    // =========================================================================
+    match /conversations/{conversationId} {
+      allow read: if isAuthenticated() && (
+        resource.data.doctorId == request.auth.uid ||
+        isOrgMember(resource.data.organizationId) ||
+        isSupportAdmin());
+      allow write: if false;
+
+      match /messages/{messageId} {
+        allow read: if isAuthenticated() && (
+          get(/databases/$(database)/documents/conversations/$(conversationId)).data.doctorId == request.auth.uid ||
+          isOrgMember(get(/databases/$(database)/documents/conversations/$(conversationId)).data.organizationId) ||
+          isSupportAdmin());
+        allow write: if false;
+      }
+    }
+
     match /inboxNotifications/{notifId} {
       allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
       // Recipients may only mark a notification read, stamped with server time.

@@ -70,11 +70,11 @@ describeWithEmulator('admin portal v2', () => {
       process.env.REQUIRE_STAFF_MFA = 'false';
       try {
         await expect(call(getAdminDashboard, 'verifier1', {}, session)).resolves.toBeDefined();
-        expect(await call(getSessionPolicy, 'verifier1', {}, session)).toEqual({ requireMfa: false, appCheckEnforced: true });
+        expect(await call(getSessionPolicy, 'verifier1', {}, session)).toEqual({ requireMfa: false, appCheckEnforced: true, testingModeNotice: null });
       } finally {
         delete process.env.REQUIRE_STAFF_MFA;
       }
-      expect(await call(getSessionPolicy, 'verifier1', {}, session)).toEqual({ requireMfa: true, appCheckEnforced: true });
+      expect(await call(getSessionPolicy, 'verifier1', {}, session)).toEqual({ requireMfa: true, appCheckEnforced: true, testingModeNotice: null });
       await expectDomainError(call(getSessionPolicy, 'doctor1', {}), 'PERMISSION_DENIED');
     });
 

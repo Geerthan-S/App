@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,6 +16,11 @@ import '../../../core/widgets/language_selector_dialog.dart';
 import '../../../core/localization/language_provider.dart';
 import '../data/hospital_repository.dart';
 import 'edit_duty_sheet.dart';
+import 'hospital_profile_screen.dart' show TestingModeBanner;
+import '../../chat/data/chat_repository.dart';
+import '../../chat/presentation/chats_screen.dart' show ChatButton;
+import '../../settings/data/account_repository.dart' show callableErrorMessage;
+import '../../../core/services/demo_content_service.dart';
 import '../../../core/errors/error_envelope.dart';
 import '../../../core/config/backend_config.dart';
 
@@ -30,6 +38,10 @@ class _HospitalDashboardScreenState
   String? _selectedOrgId;
   String _selectedOrgName = '';
   bool _loadingOrgs = true;
+  String? _testingNotice;
+
+  Map<String, dynamic>? get _selectedOrg =>
+      _organizations.where((o) => o['organizationId'] == _selectedOrgId).firstOrNull;
 
   @override
   void initState() {
@@ -48,16 +60,21 @@ class _HospitalDashboardScreenState
       if (mounted) {
         setState(() {
           _organizations = orgs;
+          _testingNotice = (result.data['verificationPolicy'] as Map?)?['testingModeNotice'] as String?;
           if (orgs.isNotEmpty) {
-            _selectedOrgId = orgs.first['organizationId'] as String?;
+            final keep = orgs.where((o) => o['organizationId'] == _selectedOrgId).firstOrNull;
+            final org = keep ?? orgs.first;
+            _selectedOrgId = org['organizationId'] as String?;
             _selectedOrgName =
-                orgs.first['displayName'] as String? ??
-                orgs.first['legalName'] as String? ??
+                org['displayName'] as String? ??
+                org['legalName'] as String? ??
                 'My Organization';
           }
           _loadingOrgs = false;
         });
       }
+      // Client-review sample chats and applicants (no-op unless enabled).
+      if (orgs.isNotEmpty) unawaited(DemoContentService.ensure());
     } catch (_) {
       if (mounted) setState(() => _loadingOrgs = false);
     }
@@ -200,6 +217,15 @@ class _HospitalDashboardScreenState
                             Row(
                               mainAxisAlignment: MainAxisAlignment.end,
                               children: [
+                                TextButton.icon(
+                                  icon: const Icon(Icons.chat_bubble_outline, size: 16),
+                                  label: const Text('Message'),
+                                  onPressed: () async {
+                                    Navigator.pop(ctx);
+                                    await _messageApplicant(dutyId, app['doctorId'] as String, app['name'] as String);
+                                  },
+                                ),
+                                const SizedBox(width: 8),
                                 ElevatedButton(
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: AppColors.emerald,
@@ -229,6 +255,19 @@ class _HospitalDashboardScreenState
         );
       },
     );
+  }
+
+  Future<void> _messageApplicant(String dutyId, String doctorId, String doctorName) async {
+    try {
+      final conversationId = await ChatRepository.start(dutyId: dutyId, doctorId: doctorId);
+      if (mounted) {
+        unawaited(context.push('/chat', extra: {'conversationId': conversationId, 'side': 'organization', 'title': doctorName}));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(callableErrorMessage(e, 'Could not open the chat.'))));
+      }
+    }
   }
 
   Future<void> _selectDoctor(
@@ -389,12 +428,22 @@ class _HospitalDashboardScreenState
 
     if (_selectedOrgId == null) {
       return Scaffold(
-        appBar: AppBar(title: Text(loc.translate('hospitalOperations'))),
+        appBar: AppBar(
+          title: Text(loc.translate('hospitalOperations')),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.settings_outlined),
+              tooltip: 'Settings',
+              onPressed: () => context.push('/settings'),
+            ),
+          ],
+        ),
         body: EmptyStateView(
           icon: Icons.apartment_outlined,
-          title: 'No organization found',
+          title: 'Register your hospital',
           description:
-              'Set up your hospital organization to start posting duties.',
+              'Add your hospital and submit it for verification. Once approved you can post duties and hire doctors. '
+              'Invited by a hospital? Accept it in Settings › Hospital invitations.',
           actionLabel: 'Set up hospital',
           // Reload on return so the new organization appears straight away.
           onAction: () async {
@@ -413,6 +462,7 @@ class _HospitalDashboardScreenState
             icon: const Icon(Icons.translate_outlined),
             onPressed: () => LanguageSelectorDialog.show(context),
           ),
+          ChatButton(organizationId: _selectedOrgId, organizationName: _selectedOrgName),
           IconButton(
             icon: const Icon(Icons.groups_outlined),
             tooltip: 'Team',
@@ -492,8 +542,14 @@ class _HospitalDashboardScreenState
                               ),
                             ),
                             Text(
-                              'Verified Organization',
-                              style: AppTypography.bodySmall(colors.textMuted),
+                              _selectedOrg?['verificationState'] == 'approved'
+                                  ? 'Verified hospital'
+                                  : 'Verification pending',
+                              style: AppTypography.bodySmall(
+                                _selectedOrg?['verificationState'] == 'approved'
+                                    ? AppColors.emerald
+                                    : AppColors.amber,
+                              ),
                             ),
                           ],
                         ),
@@ -504,13 +560,25 @@ class _HospitalDashboardScreenState
                         style: OutlinedButton.styleFrom(
                           foregroundColor: colors.accent,
                         ),
-                        onPressed: () => context.push('/hospital-profile'),
+                        onPressed: () async {
+                          await context.push('/hospital-profile');
+                          if (mounted) _loadOrgs();
+                        },
                       ),
                     ],
                   ),
                 ),
               const SizedBox(height: AppSpacing.lg),
 
+              if (_testingNotice != null) TestingModeBanner(message: _testingNotice!),
+              if (_selectedOrg != null && _selectedOrg!['verificationState'] != 'approved')
+                _VerificationCallout(
+                  caseId: _selectedOrg!['verificationCaseId'] as String?,
+                  onOpen: () async {
+                    await context.push('/hospital-profile');
+                    if (mounted) _loadOrgs();
+                  },
+                ),
               AppButton(
                 label: loc.translate('postDuty'),
                 icon: Icons.add_circle_outline_outlined,
@@ -711,6 +779,61 @@ class _HospitalDashboardScreenState
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Shown until the hospital is approved: where verification stands and how to finish it.
+class _VerificationCallout extends StatelessWidget {
+  final String? caseId;
+  final VoidCallback onOpen;
+
+  const _VerificationCallout({required this.caseId, required this.onOpen});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final stream = caseId == null
+        ? Stream<String>.value('draft')
+        : FirebaseFirestore.instance.collection('verificationCases').doc(caseId).snapshots()
+            .map((d) => d.data()?['status'] as String? ?? 'draft');
+    return StreamBuilder<String>(
+      stream: stream,
+      builder: (context, snap) {
+        final status = snap.data ?? 'draft';
+        final (title, body, action) = switch (status) {
+          'submitted' || 'under_review' => (
+              'Verification in review',
+              'A HealthForce admin is checking your hospital. You can prepare draft duties; publishing unlocks once approved.',
+              'View status',
+            ),
+          'needs_information' => ('More information needed', 'The reviewer asked for changes before approving your hospital.', 'See what is needed'),
+          'rejected' => ('Verification not approved', 'See the reason and how to appeal.', 'View details'),
+          _ => ('Finish verifying your hospital', 'Submit your hospital for review to publish duties and select doctors.', 'Continue'),
+        };
+        return Container(
+          margin: const EdgeInsets.only(bottom: AppSpacing.md),
+          padding: const EdgeInsets.all(AppSpacing.md),
+          decoration: BoxDecoration(
+            color: colors.surface,
+            border: Border.all(color: AppColors.amber.withValues(alpha: 0.6)),
+            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+          ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              const Icon(Icons.verified_user_outlined, color: AppColors.amber, size: 20),
+              const SizedBox(width: 8),
+              Expanded(child: Text(title, style: AppTypography.headingSmall(colors.textPrimary))),
+            ]),
+            const SizedBox(height: 4),
+            Text(body, style: AppTypography.bodySmall(colors.textSecondary)),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(onPressed: onOpen, child: Text(action)),
+            ),
+          ]),
+        );
+      },
     );
   }
 }
