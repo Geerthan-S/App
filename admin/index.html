@@ -1,94 +1,150 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Healthcare Workforce Platform — Admin Portal</title>
-  <link rel="stylesheet" href="css/admin.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#F4F4F1" id="theme-color">
+  <title>HealthForce Admin</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/admin.css">
 </head>
 <body>
-  <div id="app" class="admin-layout">
-    <!-- Sidebar -->
-    <aside class="sidebar">
+
+  <!-- Sign in -->
+  <main id="screen-login" class="auth-screen" hidden>
+    <div class="auth-card">
       <div class="brand">
-        <div class="brand-badge">🩺</div>
-        <div class="brand-info">
-          <h2>HealthForce Admin</h2>
-          <span class="env-badge">Production Safe</span>
+        <div class="brand-mark" data-icon="cross"></div>
+        <div>
+          <div class="brand-name">HealthForce</div>
+          <div class="brand-sub">Staff workspace</div>
         </div>
       </div>
-
-      <nav class="nav-menu">
-        <a href="#dashboard" class="nav-item active" data-page="dashboard">
-          <span class="icon">📊</span> Dashboard
-        </a>
-        <a href="#doctor-verification" class="nav-item" data-page="doctor-verification">
-          <span class="icon">👨‍⚕️</span> Doctor Verification
-          <span class="badge" id="doc-queue-count">0</span>
-        </a>
-        <a href="#hospital-verification" class="nav-item" data-page="hospital-verification">
-          <span class="icon">🏥</span> Hospital Verification
-          <span class="badge" id="hosp-queue-count">0</span>
-        </a>
-        <a href="#moderation" class="nav-item" data-page="moderation">
-          <span class="icon">🛡️</span> Duty Moderation
-        </a>
-        <a href="#audit-logs" class="nav-item" data-page="audit-logs">
-          <span class="icon">📜</span> Audit & Compliance
-        </a>
-        <a href="#config" class="nav-item" data-page="config">
-          <span class="icon">⚙️</span> Master Config
-        </a>
-      </nav>
-
-      <div class="sidebar-footer">
-        <div class="admin-user-card">
-          <div class="avatar" id="admin-avatar">AD</div>
-          <div class="admin-details">
-            <span class="name" id="admin-name">Super Admin</span>
-            <span class="role" id="admin-role">Platform Verifier</span>
-          </div>
+      <h1 class="auth-title">Sign in</h1>
+      <p class="auth-lead">Verifiers and administrators only. Every action is recorded.</p>
+      <div id="login-error" class="alert alert-error" role="alert" hidden></div>
+      <form id="login-form" novalidate>
+        <div class="field">
+          <label for="login-username">Username</label>
+          <input id="login-username" class="input" autocomplete="username" autocapitalize="none" spellcheck="false" required>
         </div>
-        <button id="logout-btn" class="btn-logout">Sign Out</button>
+        <div class="field">
+          <label for="login-password">Password</label>
+          <input id="login-password" class="input" type="password" autocomplete="current-password" required>
+        </div>
+        <button id="login-submit" class="btn btn-primary btn-block" type="submit">Continue</button>
+      </form>
+      <p class="auth-foot" id="env-note">Protected by two-step verification.</p>
+    </div>
+  </main>
+
+  <!-- Second factor at sign-in -->
+  <main id="screen-mfa" class="auth-screen" hidden>
+    <div class="auth-card">
+      <div class="brand">
+        <div class="brand-mark" data-icon="shield"></div>
+        <div>
+          <div class="brand-name">Two-step verification</div>
+          <div class="brand-sub">Authenticator app</div>
+        </div>
       </div>
+      <p class="auth-lead">Enter the 6-digit code from your authenticator app.</p>
+      <div id="mfa-error" class="alert alert-error" role="alert" hidden></div>
+      <form id="mfa-form" novalidate>
+        <div class="field">
+          <label for="mfa-code">Code</label>
+          <input id="mfa-code" class="input code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" required>
+        </div>
+        <button id="mfa-submit" class="btn btn-primary btn-block" type="submit">Verify</button>
+      </form>
+      <p class="auth-foot"><button type="button" class="link-btn" id="mfa-cancel">Use a different account</button></p>
+    </div>
+  </main>
+
+  <!-- Authenticator enrollment (required before staff tools work) -->
+  <main id="screen-enroll" class="auth-screen" hidden>
+    <div class="auth-card">
+      <div class="brand">
+        <div class="brand-mark" data-icon="shield"></div>
+        <div>
+          <div class="brand-name">Set up two-step verification</div>
+          <div class="brand-sub">Required for all staff accounts</div>
+        </div>
+      </div>
+      <p class="auth-lead">Scan this code with Google Authenticator, Microsoft Authenticator or 1Password, then enter the 6-digit code it shows.</p>
+      <div id="enroll-error" class="alert alert-error" role="alert" hidden></div>
+      <div class="qr-box"><img id="enroll-qr" alt="Authenticator QR code"></div>
+      <div class="label">Can't scan? Enter this key</div>
+      <div class="secret" id="enroll-secret"></div>
+      <form id="enroll-form" novalidate>
+        <div class="field">
+          <label for="enroll-code">Code from the app</label>
+          <input id="enroll-code" class="input code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" required>
+        </div>
+        <button id="enroll-submit" class="btn btn-primary btn-block" type="submit">Turn on</button>
+      </form>
+      <p class="auth-foot"><button type="button" class="link-btn" id="enroll-cancel">Sign out</button></p>
+    </div>
+  </main>
+
+  <!-- Workspace -->
+  <div id="screen-app" class="shell" hidden>
+    <button class="skip-link" id="skip-link" type="button">Skip to content</button>
+    <div class="scrim" id="scrim" hidden></div>
+    <aside class="sidebar" id="sidebar" aria-label="Sections">
+      <div class="brand">
+        <div class="brand-mark" data-icon="cross"></div>
+        <div>
+          <div class="brand-name">HealthForce</div>
+          <div class="brand-sub">Trusted healthcare workforce</div>
+        </div>
+      </div>
+      <nav id="nav"></nav>
+      <div class="sidebar-foot" id="env-badge">Live · asia-south1</div>
     </aside>
 
-    <!-- Main Content Area -->
-    <main class="main-content">
-      <header class="top-header">
-        <div class="header-title">
-          <h1 id="page-title">Executive Operations Dashboard</h1>
-          <p id="page-subtitle">Real-time verification queues, shift health, and audit trail</p>
+    <div class="main">
+      <header class="topbar">
+        <button class="btn btn-ghost btn-icon menu-btn" id="menu-btn" type="button" aria-label="Open menu" aria-controls="sidebar" aria-expanded="false" data-icon="menu"></button>
+        <button class="search-trigger" id="search-btn" type="button">
+          <span data-icon="search"></span>
+          <span>Search doctors, hospitals, duties, cases</span>
+          <span class="kbd">Ctrl K</span>
+        </button>
+        <div class="topbar-right">
+          <span class="clock" id="clock"></span>
+          <span class="chip" id="mfa-chip"><span class="dot"></span><span id="mfa-chip-label">MFA</span></span>
+          <button class="btn btn-ghost btn-icon bell" id="bell-btn" type="button" aria-label="Attention items">
+            <span data-icon="bell"></span>
+            <span class="badge-dot" id="bell-count" hidden></span>
+          </button>
+          <button class="profile-btn" id="profile-btn" type="button" aria-haspopup="menu" aria-expanded="false">
+            <span class="avatar" id="profile-avatar"></span>
+            <span class="profile-meta">
+              <span class="profile-name" id="profile-name"></span><br>
+              <span class="profile-role" id="profile-role"></span>
+            </span>
+          </button>
         </div>
-        <div class="header-actions">
-          <div class="mfa-status-pill">
-            <span class="dot"></span> MFA Session Active
-          </div>
-          <button id="refresh-btn" class="btn-secondary">🔄 Refresh Data</button>
+        <div class="menu" id="profile-menu" role="menu" hidden>
+          <button type="button" role="menuitem" data-action="account"><span data-icon="user"></span>My account &amp; security</button>
+          <button type="button" role="menuitem" data-action="theme"><span data-icon="moon"></span><span id="theme-label">Dark theme</span></button>
+          <hr>
+          <button type="button" role="menuitem" data-action="signout"><span data-icon="logout"></span>Sign out</button>
         </div>
       </header>
-
-      <div class="content-body" id="page-container">
-        <!-- Dynamic Page Templates will be injected here -->
-      </div>
-    </main>
-  </div>
-
-  <!-- Verification Modal -->
-  <div id="modal-container" class="modal-overlay hidden">
-    <div class="modal-card">
-      <div class="modal-header">
-        <h3 id="modal-title">Review Case</h3>
-        <button class="btn-close" id="modal-close">&times;</button>
-      </div>
-      <div class="modal-body" id="modal-body"></div>
+      <div class="testing-banner" id="testing-banner" role="status" hidden></div>
+      <main class="content" id="content" tabindex="-1"></main>
     </div>
   </div>
 
-  <!-- Scripts -->
+  <div id="modal-root"></div>
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+
+  <script src="js/vendor/qrcode.js"></script>
   <script type="module" src="js/app.js"></script>
 </body>
 </html>

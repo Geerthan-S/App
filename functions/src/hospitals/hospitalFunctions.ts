@@ -2,14 +2,18 @@
  * Hospital, Organization & Facility Cloud Functions
  */
 
-import { onCall, CallableRequest } from 'firebase-functions/v2/https';
+import type { CallableRequest } from 'firebase-functions/v2/https';
+import { FieldValue } from 'firebase-admin/firestore';
 import { db, nowTimestamp, sanitizeCorrelationId } from '../shared/firestoreHelpers';
+import { domainCall } from '../shared/callable';
 import { requireAuth, requireOrgAdmin } from '../security/guards';
-import { CreateOrganizationSchema, CreateFacilitySchema } from '../shared/schemas';
+import { CreateOrganizationSchema, CreateFacilitySchema, DocIdSchema } from '../shared/schemas';
 import { DomainError } from '../shared/errors';
-import { logAudit } from '../audit/auditLogger';
+import { z } from 'zod';
+import { stageAudit } from '../audit/auditLogger';
+import { verificationEvidenceRequired, testingModeNotice } from '../shared/runtime';
 
-export const createOrganizationDraft = onCall(async (request: CallableRequest) => {
+export const createOrganizationDraft = domainCall('createOrganizationDraft', async (request: CallableRequest) => {
   const uid = requireAuth(request);
   const correlationId = sanitizeCorrelationId(request.data?.correlationId);
 
@@ -36,24 +40,24 @@ export const createOrganizationDraft = onCall(async (request: CallableRequest) =
     updatedAt: nowTimestamp(),
   };
 
-  await orgRef.set(orgData);
-
-  // Add creator as owner member
-  await orgRef.collection('members').doc(uid).set({
+  // Organization, owner membership, user role and audit commit together.
+  const batch = db().batch();
+  batch.set(orgRef, orgData);
+  batch.set(orgRef.collection('members').doc(uid), {
     userId: uid,
     organizationId: orgId,
     role: 'owner',
     permissions: ['all'],
+    status: 'active',
     joinedAt: nowTimestamp(),
   });
-
-  // Update user active role
-  await db().collection('users').doc(uid).set({
+  batch.set(db().collection('users').doc(uid), {
     activeRole: 'hospital_staff',
+    organizationIds: FieldValue.arrayUnion(orgId),
     updatedAt: nowTimestamp(),
   }, { merge: true });
 
-  await logAudit({
+  stageAudit(batch, {
     actorId: uid,
     actorRole: 'hospital_staff',
     action: 'ORGANIZATION_CREATED',
@@ -64,11 +68,50 @@ export const createOrganizationDraft = onCall(async (request: CallableRequest) =
     result: 'SUCCESS',
     afterSummary: { legalName: parsed.data.legalName, orgId },
   });
+  await batch.commit();
 
   return { success: true, organizationId: orgId };
+}, { requireConsent: true });
+
+export const getMyOrganizations = domainCall('getMyOrganizations', async (request: CallableRequest) => {
+  const uid = requireAuth(request);
+  const user = await db().collection('users').doc(uid).get();
+  const savedIds = user.data()?.organizationIds;
+  const legacyOwned = await db().collection('organizations').where('createdBy', '==', uid).limit(20).get();
+  const ids = [...new Set([
+    ...(Array.isArray(savedIds) ? savedIds : []),
+    ...legacyOwned.docs.map(doc => doc.id),
+  ])];
+  const organizations = await Promise.all(ids.slice(0, 20).map(async id => {
+    if (!DocIdSchema.safeParse(id).success) return null;
+    const orgRef = db().collection('organizations').doc(id);
+    const [member, org] = await Promise.all([
+      orgRef.collection('members').doc(uid).get(), orgRef.get(),
+    ]);
+    const memberStatus = member.data()?.status;
+    if (!member.exists || !org.exists || (memberStatus !== undefined && memberStatus !== 'active')) return null;
+    const data = org.data()!;
+    return {
+      organizationId: id,
+      legalName: data.legalName,
+      displayName: data.displayName,
+      organizationType: data.organizationType,
+      registrationNumber: data.registrationNumber,
+      address: data.address,
+      city: data.city,
+      verificationState: data.verificationState,
+      verificationCaseId: data.verificationCaseId,
+      memberRole: member.data()?.role,
+    };
+  }));
+  return {
+    organizations: organizations.filter(Boolean),
+    // Lets the app show the verification steps that apply right now.
+    verificationPolicy: { evidenceRequired: verificationEvidenceRequired(), testingModeNotice: testingModeNotice() },
+  };
 });
 
-export const addFacility = onCall(async (request: CallableRequest) => {
+export const addFacility = domainCall('addFacility', async (request: CallableRequest) => {
   const uid = requireAuth(request);
   const correlationId = sanitizeCorrelationId(request.data?.correlationId);
 
@@ -78,6 +121,9 @@ export const addFacility = onCall(async (request: CallableRequest) => {
   }
 
   const { organizationId, name, address, city, latitude, longitude } = parsed.data;
+  if (!DocIdSchema.safeParse(organizationId).success) {
+    throw new DomainError('VALIDATION_FAILED', 'Invalid organization', correlationId);
+  }
   await requireOrgAdmin(uid, organizationId, correlationId);
 
   const facilityRef = db().collection('organizations').doc(organizationId).collection('facilities').doc();
@@ -98,9 +144,9 @@ export const addFacility = onCall(async (request: CallableRequest) => {
     updatedAt: nowTimestamp(),
   };
 
-  await facilityRef.set(facilityData);
-
-  await logAudit({
+  const batch = db().batch();
+  batch.set(facilityRef, facilityData);
+  stageAudit(batch, {
     actorId: uid,
     actorRole: 'hospital_staff',
     action: 'FACILITY_ADDED',
@@ -111,6 +157,54 @@ export const addFacility = onCall(async (request: CallableRequest) => {
     result: 'SUCCESS',
     afterSummary: { name, city, organizationId },
   });
+  await batch.commit();
 
   return { success: true, facilityId };
-});
+}, { requireConsent: true });
+
+const ProfileSchema = z.object({ organizationId: DocIdSchema }).passthrough();
+
+/**
+ * The public profile of an approved hospital, as a doctor sees it from a duty:
+ * public fields, facilities and reviews with the reviewer shown by initials.
+ * Rules keep organization and feedback documents private to members, so this
+ * is the only way an outsider reads them.
+ */
+export const getHospitalProfile = domainCall('getHospitalProfile', async (request: CallableRequest) => {
+  const uid = requireAuth(request);
+  const correlationId = sanitizeCorrelationId(request.data?.correlationId);
+  const parsed = ProfileSchema.safeParse(request.data);
+  if (!parsed.success) throw new DomainError('VALIDATION_FAILED', 'organizationId is required', correlationId);
+  const orgRef = db().collection('organizations').doc(parsed.data.organizationId);
+  const [org, member] = await Promise.all([orgRef.get(), orgRef.collection('members').doc(uid).get()]);
+  const data = org.data();
+  if (!data || (data.verificationState !== 'approved' && !member.exists)) {
+    throw new DomainError('RESOURCE_NOT_FOUND', 'Hospital not found', correlationId);
+  }
+  const [facilities, reviews, openDuties] = await Promise.all([
+    orgRef.collection('facilities').limit(20).get(),
+    db().collection('feedback').where('targetId', '==', org.id).where('targetType', '==', 'organization')
+      .orderBy('createdAt', 'desc').limit(30).get(),
+    db().collection('duties').where('organizationId', '==', org.id).where('status', '==', 'published').count().get(),
+  ]);
+  const initialsOf = (name: unknown) => String(name ?? '').replace(/^dr\.?\s*/i, '').split(/\s+/).filter(Boolean)
+    .slice(0, 2).map(part => `${part[0].toUpperCase()}.`).join(' ') || 'Doctor';
+  return {
+    organizationId: org.id,
+    displayName: data.displayName ?? data.legalName ?? 'Hospital',
+    legalName: data.legalName ?? null,
+    organizationType: data.organizationType ?? 'hospital',
+    address: data.address ?? null,
+    city: data.city ?? null,
+    verified: data.verificationState === 'approved',
+    isDemo: data.isDemo === true,
+    openDuties: openDuties.data().count,
+    facilities: facilities.docs.map(f => ({ name: f.data().name ?? null, address: f.data().address ?? null, city: f.data().city ?? null })),
+    reviews: reviews.docs.map(r => ({
+      rating: Number(r.data().rating ?? 0),
+      comment: String(r.data().comment ?? ''),
+      reviewer: `Dr. ${initialsOf(r.data().reviewerName)}`,
+      createdAt: r.data().createdAt?.toDate?.().toISOString() ?? null,
+    })),
+  };
+}, { rateLimit: { limit: 120, windowSeconds: 3600 } });

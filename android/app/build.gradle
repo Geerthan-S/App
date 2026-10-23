@@ -25,10 +25,18 @@ if (flutterVersionName == null) {
     flutterVersionName = '1.0'
 }
 
+def releaseProperties = new Properties()
+def releasePropertiesFile = rootProject.file('key.properties')
+if (releasePropertiesFile.exists()) {
+    releasePropertiesFile.withReader('UTF-8') { reader ->
+        releaseProperties.load(reader)
+    }
+}
+
 android {
     namespace "com.geerthan.healthcareworkforce"
-    compileSdk 34
-    ndkVersion flutter.ndkVersion
+    compileSdk 36
+    ndkVersion "28.2.13676358"
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
@@ -45,19 +53,43 @@ android {
 
     defaultConfig {
         applicationId "com.geerthan.healthcareworkforce"
-        minSdkVersion 23
-        targetSdkVersion 34
+        minSdkVersion flutter.minSdkVersion
+        targetSdkVersion 36
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
         multiDexEnabled true
     }
 
+    signingConfigs {
+        release {
+            if (releasePropertiesFile.exists()) {
+                keyAlias releaseProperties['keyAlias']
+                keyPassword releaseProperties['keyPassword']
+                storeFile file(releaseProperties['storeFile'])
+                storePassword releaseProperties['storePassword']
+            }
+        }
+    }
+
     buildTypes {
         release {
-            signingConfig signingConfigs.debug
-            minifyEnabled false
-            shrinkResources false
+            if (releasePropertiesFile.exists()) {
+                signingConfig signingConfigs.release
+            }
+            // R8 shrinks and obfuscates release builds (Flutter's default). Plugins ship
+            // their own keep rules; app-specific ones go in proguard-rules.pro.
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
+    }
+}
+
+gradle.taskGraph.whenReady { graph ->
+    if (!releasePropertiesFile.exists() && graph.allTasks.any {
+        it.name in ['bundleRelease', 'assembleRelease', 'packageRelease', 'signReleaseBundle']
+    }) {
+        throw new GradleException('Release signing requires android/key.properties and a client-owned upload key.')
     }
 }
 

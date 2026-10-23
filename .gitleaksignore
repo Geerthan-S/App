@@ -1,0 +1,4 @@
+# Reviewed false positives (fingerprint: commit:file:rule:line). Gitleaks scans
+# the full history, so a finding fixed in a later commit stays listed here.
+# A random UUID used as a test idempotency key (replaced by randomUUID()).
+dad94c390f598d8aa4a93c2fc5c00735fe346815:functions/tests/chat_demo.emulator.test.ts:generic-api-key:124

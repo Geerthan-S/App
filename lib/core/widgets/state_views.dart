@@ -15,18 +15,24 @@ class LoadingView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+          SizedBox(
+            width: 28,
+            height: 28,
+            child: CircularProgressIndicator(
+              strokeWidth: 2.5,
+              valueColor: AlwaysStoppedAnimation<Color>(colors.accent),
+            ),
           ),
           if (message != null) ...[
             const SizedBox(height: AppSpacing.md),
             Text(
               message!,
-              style: AppTypography.bodyMedium(AppColors.textDarkSecondary),
+              style: AppTypography.bodyMedium(colors.textSecondary),
             ),
           ],
         ],
@@ -39,39 +45,38 @@ class ErrorView extends StatelessWidget {
   final String message;
   final VoidCallback? onRetry;
 
-  const ErrorView({
-    super.key,
-    required this.message,
-    this.onRetry,
-  });
+  const ErrorView({super.key, required this.message, this.onRetry});
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Center(
       child: Padding(
-        padding: AppSpacing.paddingScreen,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.xl,
+          vertical: AppSpacing.xl,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline_rounded, color: AppColors.rose, size: 48),
+            const _StateIcon(
+              icon: Icons.error_outline_outlined,
+              color: AppColors.rose,
+            ),
             const SizedBox(height: AppSpacing.md),
             Text(
               'Something Went Wrong',
-              style: AppTypography.headingSmall(AppColors.textDarkPrimary),
+              style: AppTypography.headingSmall(colors.textPrimary),
             ),
             const SizedBox(height: AppSpacing.xs),
             Text(
               message,
               textAlign: TextAlign.center,
-              style: AppTypography.bodyMedium(AppColors.textDarkSecondary),
+              style: AppTypography.bodyMedium(colors.textSecondary),
             ),
             if (onRetry != null) ...[
               const SizedBox(height: AppSpacing.lg),
-              AppButton(
-                label: 'Retry',
-                isFullWidth: false,
-                onPressed: onRetry,
-              ),
+              AppButton(label: 'Retry', isFullWidth: false, onPressed: onRetry),
             ],
           ],
         ),
@@ -98,23 +103,24 @@ class EmptyStateView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Center(
       child: Padding(
-        padding: AppSpacing.paddingScreen,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.xl,
+          vertical: AppSpacing.xl,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: AppColors.textDarkMuted, size: 56),
+            _StateIcon(icon: icon, color: colors.textSecondary),
             const SizedBox(height: AppSpacing.md),
-            Text(
-              title,
-              style: AppTypography.headingSmall(AppColors.textDarkPrimary),
-            ),
+            Text(title, style: AppTypography.headingSmall(colors.textPrimary)),
             const SizedBox(height: AppSpacing.xs),
             Text(
               description,
               textAlign: TextAlign.center,
-              style: AppTypography.bodyMedium(AppColors.textDarkSecondary),
+              style: AppTypography.bodyMedium(colors.textSecondary),
             ),
             if (actionLabel != null && onAction != null) ...[
               const SizedBox(height: AppSpacing.lg),
@@ -127,6 +133,28 @@ class EmptyStateView extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Soft circular backdrop for empty/error state icons.
+class _StateIcon extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+
+  const _StateIcon({required this.icon, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    return Container(
+      width: 64,
+      height: 64,
+      decoration: BoxDecoration(
+        color: colors.surfaceElevated,
+        shape: BoxShape.circle,
+      ),
+      child: Icon(icon, color: color, size: 32),
     );
   }
 }

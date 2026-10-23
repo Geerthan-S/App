@@ -1,627 +1,450 @@
 /**
- * Admin Web Portal Application
- * Healthcare Workforce Platform
- * Provides:
- * - Dashboard: overview of doctors, hospitals, duties, applications, pending actions
- * - Doctor & Hospital Verification: side-by-side comparison of submitted vs official council data, evidence preview, approve, reject, request info, escalate
- * - Duty & User Moderation: manage reported duties/users (hide, warn, suspend, restore, escalate)
- * - Configuration: managed platform settings (including centralized 12-hour offer expiry) and feature flags
- * - Audit Logs: immutable audit trail tracking actor, action, timestamp, target, and correlation ID
+ * HealthForce Admin — staff workspace.
+ *
+ * Boot → sign-in (password + authenticator) → workspace. Sections are listed
+ * in NAV; each renders into #content from live, server-authorized callables.
  */
 
-const state = {
-  activePage: 'dashboard',
-  config: {
-    offerExpiryHours: 12,
-    maxEvidenceSizeMb: 10,
-    mfaStepUpSeconds: 600,
-  },
-  verificationQueue: [
-    {
-      caseId: 'case_doc_101',
-      subjectType: 'doctor',
-      subjectId: 'doc_aravind_01',
-      name: 'Dr. Aravind Swaminathan',
-      council: 'Tamil Nadu Medical Council',
-      registrationNo: 'TNMC_98234',
-      qualification: 'MBBS, MD (General Medicine)',
-      status: 'submitted',
-      automatedCheck: {
-        provider: 'National Medical Commission (NMC) Official API',
-        outcome: 'MATCH',
-        confidence: 100,
-        officialRecord: {
-          name: 'Dr. Aravind Swaminathan',
-          council: 'Tamil Nadu Medical Council',
-          registrationNo: 'TNMC_98234',
-          qualification: 'MBBS, MD (General Medicine)',
-          status: 'ACTIVE',
-        },
-      },
-      submittedAt: new Date(Date.now() - 3600000).toISOString(),
-    },
-    {
-      caseId: 'case_doc_102',
-      subjectType: 'doctor',
-      subjectId: 'doc_priya_02',
-      name: 'Dr. Priya Ramachandran',
-      council: 'Karnataka Medical Council',
-      registrationNo: 'KMC_54129',
-      qualification: 'MBBS, MS (General Surgery)',
-      status: 'under_review',
-      automatedCheck: {
-        provider: 'NMC / State Medical Council Portal',
-        outcome: 'MISMATCH',
-        confidence: 75,
-        officialRecord: {
-          name: 'Dr. P. Ramachandran',
-          council: 'Karnataka Medical Council',
-          registrationNo: 'KMC_54129',
-          qualification: 'MBBS',
-          status: 'ACTIVE',
-        },
-        discrepancy: 'Degree discrepancy: submitted "MS (General Surgery)" vs registry "MBBS"',
-      },
-      submittedAt: new Date(Date.now() - 7200000).toISOString(),
-    },
-    {
-      caseId: 'case_org_201',
-      subjectType: 'organization',
-      subjectId: 'org_apollo_spec',
-      name: 'Apollo Specialty Clinic - OMR',
-      council: 'State Health Establishment Registry',
-      registrationNo: 'CLINIC_TN_8741',
-      qualification: 'Multi-specialty Clinic',
-      status: 'submitted',
-      submittedAt: new Date(Date.now() - 14400000).toISOString(),
-    }
-  ],
-  moderationReports: [
-    {
-      reportId: 'mod_rep_01',
-      targetType: 'duty',
-      targetId: 'duty_blr_er_99',
-      targetTitle: 'Night Duty Casualty - Fortis Bannerghatta',
-      reporterId: 'doc_usr_882',
-      reason: 'TERMS_DISCREPANCY',
-      details: 'Hospital requested 14 hours on-site while published duty specified 8 hours.',
-      status: 'open',
-      createdAt: new Date(Date.now() - 5400000).toISOString(),
-    }
-  ],
-  auditLogs: [
-    {
-      auditId: 'aud_902',
-      actorId: 'system_verif_engine',
-      actorRole: 'system',
-      action: 'VERIFICATION_AUTO_APPROVED',
-      targetType: 'verificationCases',
-      targetId: 'case_doc_101',
-      reasonCode: 'AUTOMATED_MATCH_FAST_TRACK',
-      correlationId: 'corr_auto_9182',
-      result: 'SUCCESS',
-      createdAt: new Date(Date.now() - 900000).toISOString(),
-    },
-    {
-      auditId: 'aud_901',
-      actorId: 'admin_usr_01',
-      actorRole: 'verifier',
-      action: 'VERIFICATION_DECISION_RECORDED',
-      targetType: 'verificationCases',
-      targetId: 'case_doc_99',
-      reasonCode: 'REGISTRY_MATCH',
-      correlationId: 'corr_8721_abc',
-      result: 'SUCCESS',
-      createdAt: new Date(Date.now() - 1800000).toISOString(),
-    },
-    {
-      auditId: 'aud_900',
-      actorId: 'usr_hosp_44',
-      actorRole: 'hospital_staff',
-      action: 'DOCTOR_SELECTED',
-      targetType: 'assignments',
-      targetId: 'asg_7812',
-      reasonCode: 'ATOMIC_SELECTION',
-      correlationId: 'corr_3319_xyz',
-      result: 'SUCCESS',
-      createdAt: new Date(Date.now() - 5400000).toISOString(),
-    }
-  ]
-};
+import { $, h, icon, clear, hydrateIcons, initials } from './core/dom.js';
+import { closeAllModals, errorBox, loading, openModal, toastError } from './core/ui.js';
+import {
+  session, roles, roleLabel, initFirebase, refreshToken, hasPortalAccess, onSessionChange, signOut,
+  signInWithPassword, completeSecondFactor, authMessage, needsEnrollment, startTotpEnrollment,
+  finishTotpEnrollment, qrDataUrl, invoke, enrolledFactors, loadSessionPolicy,
+} from './core/session.js';
+import { renderDashboard, renderAttention } from './views/dashboard.js';
+import { renderQueue, renderRenewals, renderAppeals, openCase } from './views/verification.js';
+import {
+  renderDoctors, renderHospitals, renderDuties, renderDutyModeration, openDoctor, openOrganization, openDuty,
+} from './views/directory.js';
+import { renderReports } from './views/moderation.js';
+import { renderAudit } from './views/governance.js';
+import { renderStaff, renderSystemHealth, renderNotifications, renderSupport } from './views/platform.js';
+import { renderMasterConfig, renderCouncils, renderFlags } from './views/config.js';
+import { openAccount } from './views/account.js';
 
-const routes = {
-  dashboard: renderDashboard,
-  'doctor-verification': renderDoctorVerification,
-  'hospital-verification': renderHospitalVerification,
-  moderation: renderModeration,
-  'audit-logs': renderAuditLogs,
-  config: renderConfig,
-};
+// ── Sections ──────────────────────────────────────────────
+const NAV = [
+  { group: null, items: [
+    { id: 'dashboard', label: 'Dashboard', icon: 'grid', access: 'staff', render: renderDashboard },
+    { id: 'attention', label: 'Attention Center', icon: 'alert', access: 'staff', render: renderAttention, count: 'attention' },
+  ] },
+  { group: 'Verification', items: [
+    { id: 'doctors-verification', label: 'Doctor Verification', icon: 'stethoscope', access: 'verifier', render: (c, x) => renderQueue(c, x, 'doctor'), count: 'doctorCases' },
+    { id: 'hospitals-verification', label: 'Hospital Verification', icon: 'building', access: 'verifier', render: (c, x) => renderQueue(c, x, 'organization'), count: 'organizationCases' },
+    { id: 'escalated', label: 'Escalated Cases', icon: 'flame', access: 'verifier', render: (c, x) => renderQueue(c, x, 'escalated'), count: 'escalated', hot: true },
+    { id: 'appeals', label: 'Appeals', icon: 'scroll', access: 'verifier', render: renderAppeals },
+    { id: 'renewals', label: 'Credential Renewals', icon: 'refresh', access: 'staff', render: renderRenewals },
+  ] },
+  { group: 'Management', items: [
+    { id: 'doctors', label: 'Doctors', icon: 'users', access: 'staff', render: renderDoctors },
+    { id: 'hospitals', label: 'Hospitals', icon: 'building', access: 'staff', render: renderHospitals },
+    { id: 'duties', label: 'Duties', icon: 'calendar', access: 'staff', render: renderDuties },
+  ] },
+  { group: 'Moderation', items: [
+    { id: 'reports', label: 'Reports', icon: 'flag', access: 'admin', render: renderReports, count: 'openReports' },
+    { id: 'duty-moderation', label: 'Duty Moderation', icon: 'eyeOff', access: 'admin', render: renderDutyModeration },
+  ] },
+  { group: 'Governance', items: [
+    { id: 'audit', label: 'Audit & Compliance', icon: 'scroll', access: 'admin', render: (c, x) => renderAudit(c, x, 'all') },
+    { id: 'admin-activity', label: 'Admin Activity', icon: 'activity', access: 'admin', render: (c, x) => renderAudit(c, x, 'staff') },
+  ] },
+  { group: 'Platform', items: [
+    { id: 'staff', label: 'Admins & Roles', icon: 'key', access: 'admin', render: renderStaff },
+    { id: 'system-health', label: 'System Health', icon: 'pulse', access: 'admin', render: renderSystemHealth },
+    { id: 'notifications', label: 'Notifications', icon: 'send', access: 'admin', render: renderNotifications },
+    { id: 'support', label: 'Support Cases', icon: 'lifebuoy', access: 'admin', render: renderSupport },
+  ] },
+  { group: 'Configuration', items: [
+    { id: 'config', label: 'Master Config', icon: 'sliders', access: 'admin', render: renderMasterConfig },
+    { id: 'councils', label: 'Medical Councils', icon: 'landmark', access: 'admin', render: renderCouncils },
+    { id: 'flags', label: 'Feature Flags', icon: 'toggle', access: 'admin', render: renderFlags },
+  ] },
+];
+const SECTIONS = NAV.flatMap(g => g.items);
+const sectionById = id => SECTIONS.find(s => s.id === id);
+const canOpen = section => Boolean(section) && roles[section.access]();
 
-function init() {
-  setupNavigation();
-  updateCounts();
-  renderPage('dashboard');
+// ── Screens ───────────────────────────────────────────────
+const SCREENS = ['screen-login', 'screen-mfa', 'screen-enroll', 'screen-app'];
+const show = id => SCREENS.forEach(s => { $(s).hidden = s !== id; });
+const showError = (id, message) => { $(id).textContent = message || ''; $(id).hidden = !message; };
 
-  document.getElementById('refresh-btn').addEventListener('click', () => {
-    renderPage(state.activePage);
-  });
+let pendingResolver = null;
+let enrollment = null;
+let notice = '';
 
-  document.getElementById('modal-close').addEventListener('click', () => {
-    document.getElementById('modal-container').classList.add('hidden');
-  });
+function showLogin(message = '') {
+  closeAllModals();
+  stopTimers();
+  $('login-form').reset();
+  $('login-submit').disabled = false;
+  showError('login-error', message);
+  show('screen-login');
+  $('login-username').focus();
 }
 
-function setupNavigation() {
-  document.querySelectorAll('.nav-item').forEach(el => {
-    el.addEventListener('click', (e) => {
-      e.preventDefault();
-      document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
-      el.classList.add('active');
-      const page = el.getAttribute('data-page');
-      renderPage(page);
-    });
-  });
-}
-
-function updateCounts() {
-  const docCount = state.verificationQueue.filter(c => c.subjectType === 'doctor' && c.status === 'submitted').length;
-  const hospCount = state.verificationQueue.filter(c => c.subjectType === 'organization' && c.status === 'submitted').length;
-
-  document.getElementById('doc-queue-count').textContent = docCount;
-  document.getElementById('hosp-queue-count').textContent = hospCount;
-}
-
-function renderPage(pageKey) {
-  state.activePage = pageKey;
-  const container = document.getElementById('page-container');
-  const titleEl = document.getElementById('page-title');
-  const subtitleEl = document.getElementById('page-subtitle');
-
-  if (routes[pageKey]) {
-    routes[pageKey](container, titleEl, subtitleEl);
+async function handleLogin(e) {
+  e.preventDefault();
+  const username = $('login-username').value.trim();
+  const password = $('login-password').value;
+  if (!username || !password) { showError('login-error', 'Enter your username and password.'); return; }
+  $('login-submit').disabled = true;
+  showError('login-error', '');
+  try {
+    const result = await signInWithPassword(username, password);
+    if (result.resolver) {
+      pendingResolver = result.resolver;
+      $('mfa-form').reset();
+      showError('mfa-error', '');
+      show('screen-mfa');
+      $('mfa-code').focus();
+    }
+    // Without a second factor, onSessionChange routes to enrollment or the workspace.
+  } catch (err) {
+    showError('login-error', authMessage(err));
+  } finally {
+    $('login-submit').disabled = false;
+    $('login-password').value = '';
   }
 }
 
-function renderDashboard(container, titleEl, subtitleEl) {
-  titleEl.textContent = 'Executive Operations Dashboard';
-  subtitleEl.textContent = 'Real-time verification queues, shift health, and audit trail';
-
-  const pendingCount = state.verificationQueue.filter(c => c.status !== 'approved').length;
-  const modCount = state.moderationReports.filter(r => r.status === 'open').length;
-
-  container.innerHTML = `
-    <div class="metrics-grid">
-      <div class="metric-card">
-        <div class="title">Pending Verifications</div>
-        <div class="value">${pendingCount}</div>
-        <div class="subtitle">Doctor & Hospital cases awaiting review</div>
-      </div>
-      <div class="metric-card">
-        <div class="title">Active Published Duties</div>
-        <div class="value">14</div>
-        <div class="subtitle">Across 3 major metro healthcare hubs</div>
-      </div>
-      <div class="metric-card">
-        <div class="title">Offer Expiry Duration</div>
-        <div class="value">${state.config.offerExpiryHours}h</div>
-        <div class="subtitle">Centralized platform policy</div>
-      </div>
-      <div class="metric-card">
-        <div class="title">Safety Moderation Reports</div>
-        <div class="value">${modCount}</div>
-        <div class="subtitle">Active reports requiring intervention</div>
-      </div>
-    </div>
-
-    <div class="table-card">
-      <div class="table-header">
-        <h3>Pending Verification Queue (Doctors & Hospitals)</h3>
-      </div>
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>Type</th>
-            <th>Name / Entity</th>
-            <th>Registration / Council</th>
-            <th>Automated Outcome</th>
-            <th>Status</th>
-            <th>Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${state.verificationQueue.map(c => `
-            <tr>
-              <td><strong>${c.subjectType.toUpperCase()}</strong></td>
-              <td>${c.name}</td>
-              <td>${c.registrationNo} (${c.council})</td>
-              <td>
-                ${c.automatedCheck ? `
-                  <span class="status-badge ${c.automatedCheck.outcome === 'MATCH' ? 'approved' : 'needs_information'}">
-                    ${c.automatedCheck.outcome} (${c.automatedCheck.confidence}%)
-                  </span>
-                ` : '<span style="color: var(--text-muted);">Manual Case</span>'}
-              </td>
-              <td><span class="status-badge ${c.status}">${c.status.replace('_', ' ')}</span></td>
-              <td><button class="btn-action" onclick="window.reviewCase('${c.caseId}')">Review Case</button></td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    </div>
-  `;
-}
-
-function renderDoctorVerification(container, titleEl, subtitleEl) {
-  titleEl.textContent = 'Doctor Professional Identity Verification';
-  subtitleEl.textContent = 'Side-by-side comparison of submitted information vs official medical council register';
-
-  const doctors = state.verificationQueue.filter(c => c.subjectType === 'doctor');
-  container.innerHTML = `
-    <div class="table-card">
-      <div class="table-header">
-        <h3>Doctor Verification Queue (${doctors.length})</h3>
-      </div>
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>Doctor Name</th>
-            <th>Medical Council</th>
-            <th>Registration No</th>
-            <th>Automated Match</th>
-            <th>Status</th>
-            <th>Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${doctors.map(d => `
-            <tr>
-              <td><strong>${d.name}</strong></td>
-              <td>${d.council}</td>
-              <td><code>${d.registrationNo}</code></td>
-              <td>
-                ${d.automatedCheck ? `
-                  <span class="status-badge ${d.automatedCheck.outcome === 'MATCH' ? 'approved' : 'needs_information'}">
-                    ${d.automatedCheck.outcome} (${d.automatedCheck.confidence}%)
-                  </span>
-                ` : 'Pending Check'}
-              </td>
-              <td><span class="status-badge ${d.status}">${d.status.replace('_', ' ')}</span></td>
-              <td><button class="btn-action" onclick="window.reviewCase('${d.caseId}')">Inspect & Verify</button></td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    </div>
-  `;
-}
-
-function renderHospitalVerification(container, titleEl, subtitleEl) {
-  titleEl.textContent = 'Hospital Establishment Verification';
-  subtitleEl.textContent = 'Verify healthcare facility licenses, clinical establishment certificates, and authorized reps';
-
-  const orgs = state.verificationQueue.filter(c => c.subjectType === 'organization');
-  container.innerHTML = `
-    <div class="table-card">
-      <div class="table-header">
-        <h3>Organization Cases (${orgs.length})</h3>
-      </div>
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>Organization Name</th>
-            <th>Type</th>
-            <th>Establishment Reg No</th>
-            <th>Status</th>
-            <th>Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${orgs.map(o => `
-            <tr>
-              <td><strong>${o.name}</strong></td>
-              <td>${o.qualification}</td>
-              <td><code>${o.registrationNo}</code></td>
-              <td><span class="status-badge ${o.status}">${o.status.replace('_', ' ')}</span></td>
-              <td><button class="btn-action" onclick="window.reviewCase('${o.caseId}')">Inspect Documents</button></td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    </div>
-  `;
-}
-
-function renderModeration(container, titleEl, subtitleEl) {
-  titleEl.textContent = 'Duty & User Safety Moderation';
-  subtitleEl.textContent = 'Manage reported duties, clinical terms disputes, and disciplinary moderation';
-
-  container.innerHTML = `
-    <div class="table-card">
-      <div class="table-header">
-        <h3>Open Moderation Reports (${state.moderationReports.length})</h3>
-      </div>
-      ${state.moderationReports.length === 0 ? `
-        <div style="padding: 32px; text-align: center; color: var(--text-muted);">
-          ✅ All moderation queues clear. No active duty or user violations reported.
-        </div>
-      ` : `
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Target</th>
-              <th>Reason Code</th>
-              <th>Report Details</th>
-              <th>Timestamp</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${state.moderationReports.map(r => `
-              <tr>
-                <td><strong>${r.targetTitle}</strong><br><small style="color: var(--text-muted);">${r.targetId}</small></td>
-                <td><span class="status-badge needs_information">${r.reason}</span></td>
-                <td>${r.details}</td>
-                <td>${new Date(r.createdAt).toLocaleTimeString()}</td>
-                <td>
-                  <div style="display: flex; gap: 6px;">
-                    <button class="btn-action" style="background: var(--accent-rose); padding: 4px 8px; font-size: 11px;" onclick="window.moderateReport('${r.reportId}', 'hide_duty')">Hide Duty</button>
-                    <button class="btn-secondary" style="padding: 4px 8px; font-size: 11px;" onclick="window.moderateReport('${r.reportId}', 'warn_user')">Warn Hospital</button>
-                    <button class="btn-secondary" style="padding: 4px 8px; font-size: 11px;" onclick="window.moderateReport('${r.reportId}', 'resolve')">Dismiss</button>
-                  </div>
-                </td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      `}
-    </div>
-  `;
-}
-
-function renderAuditLogs(container, titleEl, subtitleEl) {
-  titleEl.textContent = 'Immutable Audit & Compliance Stream';
-  subtitleEl.textContent = 'Cryptographically auditable timeline of all privileged mutations, verification outcomes, and selections';
-
-  container.innerHTML = `
-    <div class="table-card">
-      <div class="table-header">
-        <h3>Security Audit Logs</h3>
-      </div>
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>Timestamp</th>
-            <th>Actor</th>
-            <th>Action</th>
-            <th>Target</th>
-            <th>Correlation ID</th>
-            <th>Result</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${state.auditLogs.map(a => `
-            <tr>
-              <td>${new Date(a.createdAt).toLocaleString()}</td>
-              <td><code>${a.actorId}</code> (${a.actorRole})</td>
-              <td><strong>${a.action}</strong></td>
-              <td>${a.targetType}:${a.targetId}</td>
-              <td><code>${a.correlationId}</code></td>
-              <td><span class="status-badge approved">${a.result}</span></td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    </div>
-  `;
-}
-
-function renderConfig(container, titleEl, subtitleEl) {
-  titleEl.textContent = 'Master Configuration & Remote Flags';
-  subtitleEl.textContent = 'Manage medical council registries, centralized offer expiry duration, and feature rollout flags';
-
-  container.innerHTML = `
-    <div class="table-card" style="padding: 24px;">
-      <h3 style="margin-bottom: 16px;">Centralized Assignment Policy</h3>
-      <div style="background: var(--bg-surface-elevated); padding: 16px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); margin-bottom: 24px;">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <div>
-            <strong>Duty Offer Expiration Window</strong>
-            <p style="color: var(--text-muted); font-size: 12px; margin-top: 4px;">
-              Configures the duration in hours before an unaccepted doctor selection offer expires automatically.
-            </p>
-          </div>
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <input type="number" id="expiry-hours-input" value="${state.config.offerExpiryHours}" style="width: 70px; padding: 8px; background: var(--bg-surface); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 4px;" />
-            <button class="btn-action" onclick="window.updateOfferExpiry()">Update Policy</button>
-          </div>
-        </div>
-      </div>
-
-      <h3 style="margin-bottom: 16px;">Platform Feature Flags (Phase 2 Control)</h3>
-      <div style="display: flex; flex-direction: column; gap: 12px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--bg-surface-elevated); border-radius: var(--radius-sm);">
-          <div>
-            <strong>Phase 2 Availability Calendar</strong>
-            <p style="color: var(--text-muted); font-size: 12px;">Allows doctors to define recurring availability rules</p>
-          </div>
-          <span class="status-badge rejected">DISABLED</span>
-        </div>
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--bg-surface-elevated); border-radius: var(--radius-sm);">
-          <div>
-            <strong>Phase 2 Replacement State Machine</strong>
-            <p style="color: var(--text-muted); font-size: 12px;">Enables automated replacement candidate search</p>
-          </div>
-          <span class="status-badge rejected">DISABLED</span>
-        </div>
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--bg-surface-elevated); border-radius: var(--radius-sm);">
-          <div>
-            <strong>Phase 2 Dispute Center</strong>
-            <p style="color: var(--text-muted); font-size: 12px;">Formal dispute filing and single-level appeal</p>
-          </div>
-          <span class="status-badge rejected">DISABLED</span>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-window.updateOfferExpiry = function() {
-  const val = parseInt(document.getElementById('expiry-hours-input').value, 10);
-  if (val > 0) {
-    state.config.offerExpiryHours = val;
-    state.auditLogs.unshift({
-      auditId: 'aud_' + Date.now(),
-      actorId: 'admin_usr_01',
-      actorRole: 'super_admin',
-      action: 'PLATFORM_CONFIG_UPDATED',
-      targetType: 'configuration',
-      targetId: 'offer_policy',
-      reasonCode: 'MASTER_CONFIG_EDIT',
-      correlationId: 'corr_' + Math.random().toString(36).substring(2, 8),
-      result: 'SUCCESS',
-      createdAt: new Date().toISOString(),
-    });
-    alert(`Offer expiry updated to ${val} hours with audit record created.`);
-    renderPage('config');
+async function handleMfa(e) {
+  e.preventDefault();
+  const code = $('mfa-code').value.trim();
+  if (!/^\d{6}$/.test(code)) { showError('mfa-error', 'Enter the 6-digit code.'); return; }
+  $('mfa-submit').disabled = true;
+  try {
+    await completeSecondFactor(pendingResolver, code);
+    pendingResolver = null;
+  } catch (err) {
+    showError('mfa-error', authMessage(err));
+  } finally {
+    $('mfa-submit').disabled = false;
   }
+}
+
+async function showEnrollment() {
+  show('screen-enroll');
+  $('enroll-form').reset();
+  showError('enroll-error', '');
+  $('enroll-submit').disabled = true;
+  try {
+    enrollment = await startTotpEnrollment();
+    $('enroll-qr').src = qrDataUrl(enrollment.qrUrl);
+    $('enroll-secret').textContent = enrollment.secretKey.replace(/(.{4})/g, '$1 ').trim();
+    $('enroll-submit').disabled = false;
+    $('enroll-code').focus();
+  } catch (err) {
+    showError('enroll-error',
+      `${authMessage(err)} Two-step verification must be enabled for this project (Identity Platform, TOTP).`);
+  }
+}
+
+async function handleEnroll(e) {
+  e.preventDefault();
+  const code = $('enroll-code').value.trim();
+  if (!/^\d{6}$/.test(code)) { showError('enroll-error', 'Enter the 6-digit code from the app.'); return; }
+  $('enroll-submit').disabled = true;
+  try {
+    await finishTotpEnrollment(enrollment.secret, code);
+    enrollment = null;
+    // The current session predates the second factor; sign in again with it.
+    notice = 'Two-step verification is on. Sign in again with your authenticator code.';
+    await signOut();
+  } catch (err) {
+    showError('enroll-error', authMessage(err));
+    $('enroll-submit').disabled = false;
+  }
+}
+
+// ── Workspace ─────────────────────────────────────────────
+const counts = {};
+let currentId = null;
+let timers = [];
+
+const stopTimers = () => { timers.forEach(clearInterval); timers = []; };
+
+function buildNav() {
+  const nav = clear($('nav'));
+  for (const group of NAV) {
+    const items = group.items.filter(canOpen);
+    if (!items.length) continue;
+    if (group.group) nav.append(h('div', { class: 'nav-group' }, group.group));
+    for (const item of items) {
+      const n = item.count ? counts[item.count] : 0;
+      nav.append(h('a', {
+        class: `nav-link${item.id === currentId ? ' active' : ''}`, href: `#/${item.id}`,
+        'aria-current': item.id === currentId ? 'page' : null,
+        onclick: () => setDrawer(false),
+      }, icon(item.icon), h('span', {}, item.label),
+      n ? h('span', { class: `count${item.hot ? ' hot' : ''}` }, String(n)) : null));
+    }
+  }
+}
+
+/** Sidebar and bell counts, refreshed on boot, every 2 minutes and after actions. */
+async function refreshCounts() {
+  try {
+    const [dash, attention] = await Promise.all([invoke('getAdminDashboard'), invoke('getAttentionItems')]);
+    Object.assign(counts, {
+      doctorCases: dash.pending.doctorCases,
+      organizationCases: dash.pending.organizationCases,
+      openReports: roles.admin() ? dash.pending.openReports : 0,
+      escalated: dash.insights?.sla?.escalated ?? 0,
+      attention: attention.items.length,
+    });
+    $('bell-count').textContent = attention.items.length > 99 ? '99+' : String(attention.items.length);
+    $('bell-count').hidden = !attention.items.length;
+    buildNav();
+  } catch (_) {
+    // Counts are a convenience; each section reports its own errors.
+  }
+}
+
+const routeFromHash = () => {
+  const [id, param] = window.location.hash.replace(/^#\/?/, '').split('/');
+  return { id: id || 'dashboard', param: param ? decodeURIComponent(param) : null };
 };
 
-window.moderateReport = function(reportId, action) {
-  state.moderationReports = state.moderationReports.filter(r => r.reportId !== reportId);
-  state.auditLogs.unshift({
-    auditId: 'aud_' + Date.now(),
-    actorId: 'admin_usr_01',
-    actorRole: 'admin',
-    action: `MODERATION_${action.toUpperCase()}`,
-    targetType: 'moderationReports',
-    targetId: reportId,
-    reasonCode: 'MODERATOR_INTERVENTION',
-    correlationId: 'corr_' + Math.random().toString(36).substring(2, 8),
-    result: 'SUCCESS',
-    createdAt: new Date().toISOString(),
+const navigate = (id, param) => {
+  const hash = `#/${id}${param ? `/${encodeURIComponent(param)}` : ''}`;
+  if (window.location.hash === hash) render(); else window.location.hash = hash;
+};
+
+let renderSeq = 0;
+
+async function render() {
+  if ($('screen-app').hidden) return;
+  let { id } = routeFromHash();
+  const { param } = routeFromHash();
+  if (!canOpen(sectionById(id))) id = 'dashboard';
+  const section = sectionById(id);
+  const seq = ++renderSeq;
+  currentId = id;
+  buildNav();
+  const content = clear($('content'));
+  content.append(loading());
+  document.title = `${section.label} · HealthForce Admin`;
+  const ctx = {
+    param, navigate, refreshCounts,
+    isCurrent: () => seq === renderSeq,
+    rerender: render,
+  };
+  try {
+    const node = h('div');
+    await section.render(node, ctx);
+    if (seq !== renderSeq) return;
+    clear(content).append(node);
+    content.focus({ preventScroll: true });
+  } catch (err) {
+    if (seq !== renderSeq) return;
+    clear(content).append(errorBox(err, render));
+  }
+}
+
+function setupTopbar() {
+  const name = session.user.displayName || session.user.email.split('@')[0];
+  $('profile-name').textContent = name;
+  $('profile-role').textContent = roleLabel();
+  $('profile-avatar').textContent = initials(name);
+
+  $('mfa-chip').className = `chip ${session.secondFactor ? 'chip-ok' : session.emulator || !session.mfaRequired ? 'chip-warn' : 'chip-bad'}`;
+  $('mfa-chip-label').textContent = session.secondFactor ? 'MFA active'
+    : session.emulator ? 'Emulator · no MFA' : !session.mfaRequired ? 'MFA not enforced yet' : 'MFA off';
+  $('env-badge').textContent = session.emulator ? 'Local emulator · demo-healthforce' : 'Live · asia-south1';
+
+  const tick = () => {
+    $('clock').textContent = new Date().toLocaleString('en-IN', { weekday: 'short', hour: '2-digit', minute: '2-digit' });
+  };
+  tick();
+  stopTimers();
+  timers.push(setInterval(tick, 30_000), setInterval(refreshCounts, 120_000));
+}
+
+async function enterWorkspace() {
+  show('screen-app');
+  const banner = $('testing-banner');
+  banner.textContent = session.testingModeNotice || '';
+  banner.hidden = !session.testingModeNotice;
+  setupTopbar();
+  await render();
+  refreshCounts();
+}
+
+// ── Global search (Ctrl K) ────────────────────────────────
+const HIT_ICON = { doctor: 'stethoscope', organization: 'building', duty: 'calendar', case: 'shield', user: 'user' };
+
+function openSearch() {
+  if ($('screen-app').hidden) return;
+  const modal = openModal({ title: 'Search' });
+  modal.dialog.classList.add('palette');
+  const input = h('input', {
+    class: 'input', placeholder: 'ID, registration number, name, email or +91 phone',
+    autocomplete: 'off', spellcheck: false, 'aria-label': 'Search',
   });
-  alert(`Moderation action '${action}' applied successfully.`);
-  renderPage('moderation');
-};
+  const results = h('div', { class: 'palette-results' }, h('div', { class: 'palette-note' },
+    'Exact IDs and registration numbers, or the start of a name. Email and phone lookups are for support staff.'));
+  modal.body.replaceWith(h('div', {}, input, results));
+  input.focus();
 
-window.reviewCase = function(caseId) {
-  const item = state.verificationQueue.find(c => c.caseId === caseId);
-  if (!item) return;
+  let timer = null;
+  let seq = 0;
+  const openHit = hit => {
+    modal.close();
+    if (hit.type === 'doctor' || hit.type === 'user') openDoctor(hit.id, { refreshCounts });
+    else if (hit.type === 'organization') openOrganization(hit.id);
+    else if (hit.type === 'duty') openDuty(hit.id, { refreshCounts });
+    else if (hit.type === 'case') openCase(hit.id, { onChange: refreshCounts });
+  };
+  input.addEventListener('input', () => {
+    clearTimeout(timer);
+    const query = input.value.trim();
+    if (query.length < 2) return;
+    timer = setTimeout(async () => {
+      const mine = ++seq;
+      clear(results).append(h('div', { class: 'palette-note' }, 'Searching…'));
+      try {
+        const { results: hits } = await invoke('adminSearch', { query });
+        if (mine !== seq) return;
+        clear(results);
+        if (!hits.length) { results.append(h('div', { class: 'palette-note' }, 'No matches.')); return; }
+        hits.forEach(hit => results.append(h('button', { class: 'palette-hit', type: 'button', onclick: () => openHit(hit) },
+          icon(HIT_ICON[hit.type] || 'grid'),
+          h('div', {}, h('div', { class: 'cell-main' }, hit.title),
+            h('div', { class: 'cell-sub' }, `${hit.type === 'organization' ? 'hospital' : hit.type} · ${hit.subtitle || hit.id}`)))));
+      } catch (err) {
+        if (mine === seq) clear(results).append(h('div', { class: 'palette-note' }, err.message));
+      }
+    }, 250);
+  });
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') results.querySelector('.palette-hit')?.click();
+  });
+}
 
-  const modal = document.getElementById('modal-container');
-  const title = document.getElementById('modal-title');
-  const body = document.getElementById('modal-body');
+// ── Theme ─────────────────────────────────────────────────
+// ── Mobile navigation drawer ─────────────────────────────
+function setDrawer(open) {
+  $('sidebar').classList.toggle('open', open);
+  $('scrim').hidden = !open;
+  $('menu-btn').setAttribute('aria-expanded', String(open));
+  document.body.classList.toggle('no-scroll', open);
+  if (open) $('sidebar').querySelector('.nav-link.active, .nav-link')?.focus();
+}
 
-  title.textContent = `Verify Case: ${item.name}`;
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  $('theme-color').content = theme === 'dark' ? '#121315' : '#F4F4F1';
+  $('theme-label').textContent = theme === 'dark' ? 'Light theme' : 'Dark theme';
+  try { localStorage.setItem('hf-admin-theme', theme); } catch (_) { /* storage may be blocked */ }
+}
 
-  const hasAutomated = !!item.automatedCheck;
-  const official = hasAutomated ? item.automatedCheck.officialRecord : null;
+function initialTheme() {
+  try {
+    const saved = localStorage.getItem('hf-admin-theme');
+    if (saved === 'dark' || saved === 'light') return saved;
+  } catch (_) { /* ignore */ }
+  // Light is the app's default theme.
+  return 'light';
+}
 
-  body.innerHTML = `
-    <div style="display: flex; flex-direction: column; gap: 16px;">
-      ${hasAutomated ? `
-        <div style="background: var(--bg-surface-elevated); padding: 14px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <strong>Authoritative Registry Comparison</strong>
-            <span class="status-badge ${item.automatedCheck.outcome === 'MATCH' ? 'approved' : 'needs_information'}">
-              ${item.automatedCheck.outcome} (${item.automatedCheck.confidence}%)
-            </span>
-          </div>
-          <table class="data-table" style="font-size: 12px;">
-            <thead>
-              <tr>
-                <th>Field</th>
-                <th>Submitted by Doctor</th>
-                <th>Authoritative NMC / State Council Record</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><strong>Status</strong></td>
-                <td>ACTIVE</td>
-                <td><strong style="color: ${official.status === 'ACTIVE' ? 'var(--accent-emerald)' : 'var(--accent-rose)'};">${official.status}</strong></td>
-              </tr>
-              <tr>
-                <td><strong>Name</strong></td>
-                <td>${item.name}</td>
-                <td>${official.name}</td>
-              </tr>
-              <tr>
-                <td><strong>Reg Number</strong></td>
-                <td><code>${item.registrationNo}</code></td>
-                <td><code>${official.registrationNo}</code></td>
-              </tr>
-              <tr>
-                <td><strong>Council</strong></td>
-                <td>${item.council}</td>
-                <td>${official.council}</td>
-              </tr>
-              <tr>
-                <td><strong>Qualifications</strong></td>
-                <td>${item.qualification}</td>
-                <td>${official.qualification}</td>
-              </tr>
-            </tbody>
-          </table>
-          ${item.automatedCheck.discrepancy ? `
-            <div style="margin-top: 8px; color: var(--accent-amber); font-size: 12px;">
-              ⚠️ ${item.automatedCheck.discrepancy}
-            </div>
-          ` : ''}
-        </div>
-      ` : `
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-          <div>
-            <label style="color: var(--text-muted); font-size: 12px;">SUBJECT ENTITY</label>
-            <p><strong>${item.name}</strong></p>
-          </div>
-          <div>
-            <label style="color: var(--text-muted); font-size: 12px;">REGISTRATION NUMBER</label>
-            <p><code>${item.registrationNo}</code> (${item.council})</p>
-          </div>
-        </div>
-      `}
+// ── Wiring ────────────────────────────────────────────────
+function wire() {
+  $('login-form').addEventListener('submit', handleLogin);
+  $('mfa-form').addEventListener('submit', handleMfa);
+  $('mfa-cancel').addEventListener('click', () => { pendingResolver = null; showLogin(); });
+  $('enroll-form').addEventListener('submit', handleEnroll);
+  $('enroll-cancel').addEventListener('click', () => signOut());
+  window.addEventListener('hashchange', render);
 
-      <div style="padding: 14px; background: var(--bg-surface-elevated); border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
-        <label style="color: var(--text-muted); font-size: 12px; display: block; margin-bottom: 6px;">PRIVATE EVIDENCE DOCUMENT (STORAGE SIGNED URL)</label>
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <span>📄 medical_registration_certificate.pdf (2.4 MB)</span>
-          <button class="btn-action" onclick="alert('Generated 5-minute short-lived signed URL via Cloud Function getEvidenceReadUrl. Public download URLs are strictly denied.')">Inspect Document</button>
-        </div>
-      </div>
+  $('menu-btn').addEventListener('click', () => setDrawer(!$('sidebar').classList.contains('open')));
+  $('scrim').addEventListener('click', () => setDrawer(false));
+  $('skip-link').addEventListener('click', () => $('content').focus());
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('sidebar').classList.contains('open')) setDrawer(false); });
+  $('search-btn').addEventListener('click', openSearch);
+  $('bell-btn').addEventListener('click', () => navigate('attention'));
+  document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openSearch(); }
+  });
 
-      <div style="margin-top: 12px; display: flex; gap: 10px; justify-content: flex-end;">
-        <button class="btn-secondary" onclick="window.decision('${caseId}', 'needs_information', 'REQUEST_ADDITIONAL_EVIDENCE')">Request Evidence</button>
-        <button class="btn-action" style="background: var(--accent-rose);" onclick="window.decision('${caseId}', 'rejected', 'CREDENTIAL_DISCREPANCY')">Reject</button>
-        <button class="btn-action" style="background: var(--accent-emerald);" onclick="window.decision('${caseId}', 'approved', 'OFFICIAL_REGISTRY_MATCH')">Approve Verification</button>
-      </div>
-    </div>
-  `;
+  const menu = $('profile-menu');
+  const toggleMenu = open => { menu.hidden = !open; $('profile-btn').setAttribute('aria-expanded', String(open)); };
+  $('profile-btn').addEventListener('click', e => { e.stopPropagation(); toggleMenu(menu.hidden); });
+  document.addEventListener('click', e => { if (!menu.contains(e.target)) toggleMenu(false); });
+  menu.addEventListener('click', async e => {
+    const action = e.target.closest('button')?.dataset.action;
+    if (!action) return;
+    toggleMenu(false);
+    if (action === 'account') openAccount();
+    if (action === 'theme') applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
+    if (action === 'signout') await signOut();
+  });
+}
 
-  modal.classList.remove('hidden');
-};
-
-window.decision = function(caseId, outcome, reasonCode) {
-  const item = state.verificationQueue.find(c => c.caseId === caseId);
-  if (item) {
-    item.status = outcome;
-    state.auditLogs.unshift({
-      auditId: 'aud_' + Date.now(),
-      actorId: 'admin_usr_01',
-      actorRole: 'verifier',
-      action: 'VERIFICATION_DECISION_RECORDED',
-      targetType: 'verificationCases',
-      targetId: caseId,
-      reasonCode: reasonCode || 'MANUAL_INSPECTION',
-      correlationId: 'corr_' + Math.random().toString(36).substring(2, 8),
-      result: 'SUCCESS',
-      createdAt: new Date().toISOString(),
-    });
+/**
+ * Ties each `.field` label to its control so screen readers announce the
+ * label, for forms built anywhere in the portal (including dialogs).
+ */
+let fieldSeq = 0;
+function linkFieldLabels(node) {
+  if (node.nodeType !== 1) return;
+  const fields = node.matches('.field') ? [node] : [...node.querySelectorAll('.field')];
+  for (const field of fields) {
+    const label = field.querySelector(':scope > label');
+    const control = field.querySelector('input, select, textarea');
+    if (!label || !control || label.htmlFor) continue;
+    if (!control.id) control.id = `field-${++fieldSeq}`;
+    label.htmlFor = control.id;
   }
-  document.getElementById('modal-container').classList.add('hidden');
-  updateCounts();
-  renderPage(state.activePage);
-};
+}
 
-document.addEventListener('DOMContentLoaded', init);
+async function boot() {
+  new MutationObserver(records => records.forEach(r => r.addedNodes.forEach(linkFieldLabels)))
+    .observe(document.body, { childList: true, subtree: true });
+  applyTheme(initialTheme());
+  hydrateIcons();
+  wire();
+  try {
+    await initFirebase();
+  } catch (err) {
+    showLogin(err.message);
+    $('login-submit').disabled = true;
+    return;
+  }
+  if (session.emulator) $('env-note').textContent = 'Local emulator: two-step verification is not available here.';
+
+  // Single entry point for fresh and restored sessions.
+  onSessionChange(async user => {
+    if (!user) {
+      showLogin(notice);
+      notice = '';
+      return;
+    }
+    try {
+      const token = await refreshToken(true);
+      if (!hasPortalAccess(token)) {
+        notice = 'This account does not have staff access.';
+        await signOut();
+        return;
+      }
+      await loadSessionPolicy();
+      if (needsEnrollment()) {
+        if (enrolledFactors().length) {
+          // Enrolled, but this session skipped the second factor (e.g. restored from before enrollment).
+          notice = 'Sign in again and enter your authenticator code.';
+          await signOut();
+        } else {
+          await showEnrollment();
+        }
+        return;
+      }
+      await enterWorkspace();
+    } catch (err) {
+      toastError(err);
+      await signOut();
+    }
+  });
+}
+
+boot();

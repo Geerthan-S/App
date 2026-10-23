@@ -30,14 +30,12 @@ service cloud.firestore {
       return hasCustomClaim('isSuperAdmin');
     }
 
+    // Only active memberships grant tenant access. Memberships written before
+    // the status field existed are active.
     function isOrgMember(orgId) {
       return isAuthenticated() &&
-        exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid));
-    }
-
-    function isOrgAdmin(orgId) {
-      return isAuthenticated() &&
-        get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.role in ['owner', 'admin'];
+        exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.get('status', 'active') == 'active';
     }
 
     // Default Deny
@@ -50,34 +48,35 @@ service cloud.firestore {
     // =========================================================================
     match /users/{uid} {
       allow read: if isOwner(uid) || isSupportAdmin() || isSuperAdmin();
-      allow create, update: if isOwner(uid) && request.resource.data.uid == uid;
-      allow delete: if isSuperAdmin();
+      allow write: if false; // Server functions own identity, consent and suspension fields.
     }
 
+    // Registered through registerDeviceToken/unregisterDeviceToken so a token
+    // can move between accounts on a shared device without a client takeover.
     match /deviceTokens/{tokenId} {
-      allow read, write: if isAuthenticated() && (resource == null || resource.data.uid == request.auth.uid) && request.resource.data.uid == request.auth.uid;
+      allow read: if isAuthenticated() && resource.data.uid == request.auth.uid;
+      allow write: if false;
+    }
+
+    match /registrationReservations/{registrationNoNorm} {
+      allow read, write: if false; // Server-owned uniqueness reservations
     }
 
     // =========================================================================
     // DOCTORS & PROFILES
     // =========================================================================
     match /doctors/{doctorId} {
-      // Authenticated users can view doctor profile summary; doctor can update non-privileged fields
-      allow read: if isAuthenticated();
-      allow create: if isOwner(doctorId) && request.resource.data.userId == request.auth.uid && request.resource.data.isVerified == false;
-      allow update: if isOwner(doctorId) && 
-        request.resource.data.userId == request.auth.uid &&
-        request.resource.data.isVerified == resource.data.isVerified; // Prevent self-verification
-      allow delete: if isSuperAdmin();
+      allow read: if isOwner(doctorId) || isVerifier() || isSupportAdmin();
+      allow write: if false; // Prevent credential edits after verification.
 
       match /qualifications/{qualId} {
-        allow read: if isAuthenticated();
-        allow write: if isOwner(doctorId);
+        allow read: if isOwner(doctorId) || isVerifier();
+        allow write: if false;
       }
 
       match /specialties/{specId} {
-        allow read: if isAuthenticated();
-        allow write: if isOwner(doctorId);
+        allow read: if isOwner(doctorId) || isVerifier();
+        allow write: if false;
       }
     }
 
@@ -90,19 +89,17 @@ service cloud.firestore {
     // ORGANIZATIONS & FACILITIES
     // =========================================================================
     match /organizations/{orgId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update: if isOrgAdmin(orgId) && request.resource.data.verificationState == resource.data.verificationState;
-      allow delete: if isSuperAdmin();
+      allow read: if isOrgMember(orgId) || isVerifier() || isSupportAdmin();
+      allow write: if false; // Server-owned verification and tenant fields.
 
       match /members/{memberUid} {
         allow read: if isOrgMember(orgId) || isSupportAdmin();
-        allow write: if isOrgAdmin(orgId) || isSuperAdmin();
+        allow write: if false; // Membership grants require audited server flow.
       }
 
       match /facilities/{facilityId} {
-        allow read: if isAuthenticated();
-        allow write: if isOrgAdmin(orgId);
+        allow read: if isOrgMember(orgId) || isVerifier();
+        allow write: if false;
       }
     }
 
@@ -115,6 +112,12 @@ service cloud.firestore {
                      (resource != null && isOrgMember(resource.data.organizationId)) ||
                      isSupportAdmin();
       allow create, update, delete: if false; // Mutated strictly via Cloud Functions
+
+      // Edit history (updateDuty). Written only by the server.
+      match /versions/{version} {
+        allow read: if isOrgMember(get(/databases/$(database)/documents/duties/$(dutyId)).data.organizationId) || isSupportAdmin();
+        allow write: if false;
+      }
 
       match /applications/{doctorId} {
         allow read: if isOwner(doctorId) || isOrgMember(get(/databases/$(database)/documents/duties/$(dutyId)).data.organizationId) || isSupportAdmin();
@@ -183,6 +186,7 @@ service cloud.firestore {
       allow read: if isAuthenticated() && (
         resource.data.authorId == request.auth.uid ||
         resource.data.targetId == request.auth.uid ||
+        (resource.data.targetType == 'organization' && isOrgMember(resource.data.targetId)) ||
         isSupportAdmin()
       );
       allow write: if false; // Server created only
@@ -220,18 +224,77 @@ service cloud.firestore {
       allow read, write: if false; // Server-only background trigger & worker
     }
 
+    match /deliveryAttempts/{attemptId} {
+      allow read, write: if false; // Server-only outbox delivery records
+    }
+
+    // =========================================================================
+    // CHAT (doctor <-> hospital). Sent through callables only.
+    // =========================================================================
+    match /conversations/{conversationId} {
+      allow read: if isAuthenticated() && (
+        resource.data.doctorId == request.auth.uid ||
+        isOrgMember(resource.data.organizationId) ||
+        isSupportAdmin());
+      allow write: if false;
+
+      match /messages/{messageId} {
+        allow read: if isAuthenticated() && (
+          get(/databases/$(database)/documents/conversations/$(conversationId)).data.doctorId == request.auth.uid ||
+          isOrgMember(get(/databases/$(database)/documents/conversations/$(conversationId)).data.organizationId) ||
+          isSupportAdmin());
+        allow write: if false;
+      }
+    }
+
     match /inboxNotifications/{notifId} {
       allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      // Recipients may only mark a notification read, stamped with server time.
       allow update: if isAuthenticated() && resource.data.userId == request.auth.uid &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead', 'readAt']);
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead', 'readAt']) &&
+        request.resource.data.isRead == true &&
+        request.resource.data.readAt == request.time;
       allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
       allow create: if false;
     }
 
+    // Reports are filed through the rate-limited submitModerationReport callable
+    // (target must exist, one open report per target) and resolved only by the
+    // audited submitModerationAction callable.
     match /moderationReports/{reportId} {
       allow read: if isAuthenticated() && (resource.data.reporterId == request.auth.uid || isSupportAdmin());
-      allow create: if isAuthenticated() && request.resource.data.reporterId == request.auth.uid;
-      allow update, delete: if isSupportAdmin() || isSuperAdmin();
+      allow write: if false;
+    }
+
+    // Server-only operational collections: rate-limit counters, report dedupe
+    // locks, the staff role index and internal support tickets. Staff read them
+    // through guarded callables, never directly.
+    match /rateLimits/{counterId} {
+      allow read, write: if false;
+    }
+
+    match /moderationReportLocks/{lockId} {
+      allow read, write: if false;
+    }
+
+    match /staffDirectory/{uid} {
+      allow read, write: if false;
+    }
+
+    match /supportCases/{caseId} {
+      allow read, write: if false;
+    }
+
+    // Hospital team invitations: read and answered only through callables that
+    // match the invitee by their verified phone number or email.
+    match /organizationInvitations/{inviteId} {
+      allow read, write: if false;
+    }
+
+    // A doctor's saved searches; created and changed only through callables (limit, normalisation).
+    match /savedSearches/{searchId} {
+      allow read: if isAuthenticated() && resource.data.uid == request.auth.uid;
+      allow write: if false;
     }
 
     match /auditLogs/{auditId} {
@@ -239,45 +302,56 @@ service cloud.firestore {
       allow write: if false; // Append-only by Cloud Functions
     }
 
+    // Platform settings change only through validated, audited callables
+    // (updatePlatformConfig, setFeatureFlag), never by direct client writes.
     match /configuration/{configKey} {
       allow read: if isAuthenticated();
-      allow write: if isSuperAdmin();
+      allow write: if false;
     }
 
     match /featureFlags/{flag} {
       allow read: if true;
-      allow write: if isSuperAdmin();
+      allow write: if false;
     }
 
     match /appVersions/{version} {
       allow read: if true;
-      allow write: if isSuperAdmin();
+      allow write: if false;
     }
 
     // =========================================================================
     // PHASE 2 (Behind Feature Flags)
     // =========================================================================
+    // Written only by flag-gated callables; direct client writes would bypass the flag.
     match /availabilityRules/{ruleId} {
-      allow read, write: if isAuthenticated() && (resource == null || resource.data.doctorId == request.auth.uid) && request.resource.data.doctorId == request.auth.uid;
+      allow read: if isAuthenticated() && resource.data.doctorId == request.auth.uid;
+      allow write: if false;
     }
 
     match /availabilityExceptions/{exceptionId} {
-      allow read, write: if isAuthenticated() && (resource == null || resource.data.doctorId == request.auth.uid) && request.resource.data.doctorId == request.auth.uid;
+      allow read: if isAuthenticated() && resource.data.doctorId == request.auth.uid;
+      allow write: if false;
     }
 
     match /reliabilitySnapshots/{snapshotId} {
-      allow read: if isAuthenticated();
+      allow read: if isAuthenticated() && (resource.data.doctorId == request.auth.uid || isSupportAdmin());
       allow write: if false;
     }
 
     match /replacementRequests/{requestId} {
-      allow read: if isAuthenticated();
+      allow read: if isAuthenticated() && (
+        resource.data.doctorId == request.auth.uid ||
+        isOrgMember(resource.data.organizationId) ||
+        isSupportAdmin()
+      );
       allow write: if false;
     }
 
     match /disputes/{disputeId} {
       allow read: if isAuthenticated() && (
         resource.data.openedBy == request.auth.uid ||
+        resource.data.doctorId == request.auth.uid ||
+        isOrgMember(resource.data.organizationId) ||
         isSupportAdmin() || isSuperAdmin()
       );
       allow write: if false;

@@ -1,0 +1,25 @@
+# Weekly dependency update PRs. Security advisories open PRs immediately.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /functions
+    schedule:
+      interval: weekly
+    # Let a new release age a week before proposing it (supply-chain safety).
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+  - package-ecosystem: pub
+    directory: /
+    schedule:
+      interval: weekly
+    # Let a new release age a week before proposing it (supply-chain safety).
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 7

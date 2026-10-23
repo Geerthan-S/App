@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  functions:
+    name: Functions build + emulator tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: functions
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+      # Fails on high or critical advisories in shipped (non-dev) dependencies.
+      - run: npm audit --omit=dev --audit-level=high
+      - run: npm run build
+      - run: npm install -g firebase-tools
+      # Runs every Jest suite, including the production-handler and rules
+      # suites that only execute when the Firestore/Storage emulators are up.
+      - run: npm run test:emulator
+
+  flutter:
+    name: Flutter analyze + tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      # Lists outdated packages in the job log; Dependabot opens the upgrade PRs.
+      - run: flutter pub outdated || true
+      # Errors fail the build. Existing warnings/infos are a tracked baseline
+      # (docs/deployment-review-2026-10-08.md) to burn down before making them fatal.
+      - run: flutter analyze --no-fatal-infos --no-fatal-warnings
+      - run: flutter test

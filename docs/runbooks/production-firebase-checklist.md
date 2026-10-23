@@ -54,7 +54,7 @@ This runbook defines the mandatory verification and configuration steps required
 ---
 
 ## 8. Admin MFA & Step-Up Security
-- [ ] **Admin Identity:** Admins sign in via Firebase Auth with custom claim `isSuperAdmin` or `isVerifier`.
+- [ ] **Admin Identity:** Admins sign in to the portal with Firebase email/password (Google is not offered) and need custom claim `isSuperAdmin` or `isVerifier`. Create or reset the login with `node scripts/set-admin-login.mjs --confirm doctor-c7c29`.
 - [ ] **Identity Platform MFA:** Configure SMS or TOTP Multi-Factor Authentication in Identity Platform console (`BLOCKED_EXTERNAL_ADMIN_MFA` until console configured).
 - [ ] **Token Freshness:** Cloud Functions strictly enforce `auth_time` within 10 minutes for sensitive operations.
 

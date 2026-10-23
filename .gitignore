@@ -31,9 +31,16 @@ build/
 # Android
 android/**/gradle-wrapper.jar
 android/.gradle
+android/.kotlin/
 android/captures/
 android/local.properties
+android/key.properties
+*.jks
+*.keystore
 android/**/GeneratedPluginRegistrant.java
+
+# Admin portal config (contains production API keys — never commit)
+admin/firebase-config.json
 
 # Node / Functions
 node_modules/
@@ -48,3 +55,18 @@ ui-debug.log*
 # Functions build output
 functions/lib/
 
+# Local Firebase/browser artifacts (may contain session or test data)
+.firebase/
+.playwright-mcp/
+
+
+# Load-testing tools (JMeter install, local only)
+tools/
+
+# Load-test generated data (contains test credentials) and dependencies
+perf/data/
+perf/node_modules/
+perf/results/
+
+# Emulator-only function settings (never deployed)
+functions/.env.local
