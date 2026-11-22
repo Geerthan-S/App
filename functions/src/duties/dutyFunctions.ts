@@ -9,6 +9,8 @@ import { requireAuth, requireOrgPermission } from '../security/guards';
 import { CreateDutySchema, DocIdSchema } from '../shared/schemas';
 import { DomainError } from '../shared/errors';
 import { stageAudit } from '../audit/auditLogger';
+import { getBusinessConfig, isFlagEnabled } from '../shared/businessConfig';
+import { notifyPremiumDoctorsOfDuty } from '../subscriptions/earlyAccess';
 
 export const MAX_SHIFT_HOURS = 24;
 
@@ -110,7 +112,13 @@ export const publishDuty = domainCall('publishDuty', async (request: CallableReq
   }
   await requireOrgPermission(uid, initial.data()!.organizationId, 'manageDuties', correlationId);
 
-  await db().runTransaction(async tx => {
+  // Premium early access: new duties are shown only to premium doctors for a while.
+  const [premiumOn, subscriptionPolicy] = await Promise.all([
+    isFlagEnabled('premium_enabled'), getBusinessConfig('subscription_policy'),
+  ]);
+  const earlyAccessMinutes = premiumOn ? subscriptionPolicy.earlyAccessMinutes : 0;
+
+  const published = await db().runTransaction(async tx => {
     const [dutySnap, orgSnap] = await Promise.all([
       tx.get(dutyRef),
       tx.get(db().collection('organizations').doc(initial.data()!.organizationId)),
@@ -123,13 +131,20 @@ export const publishDuty = domainCall('publishDuty', async (request: CallableReq
     if (new Date(duty.schedule.startAt).getTime() <= Date.now()) {
       throw new DomainError('INVALID_STATE_TRANSITION', 'Duty start time must be in the future', correlationId);
     }
-    if (duty.status === 'published') return;
+    if (duty.status === 'published' || duty.status === 'early_access') return { status: duty.status as string, fresh: false };
     if (duty.status !== 'draft' && duty.status !== 'paused') {
       throw new DomainError('INVALID_STATE_TRANSITION', `Cannot publish duty in status ${duty.status}`, correlationId);
     }
 
+    // A duty starting before the early-access window would end goes straight to everyone.
+    const earlyAccessEndsMs = Date.now() + earlyAccessMinutes * 60000;
+    const useEarlyAccess = earlyAccessMinutes > 0 && duty.status === 'draft' &&
+      earlyAccessEndsMs < new Date(duty.schedule.startAt).getTime();
+    const status = useEarlyAccess ? 'early_access' : 'published';
+
     tx.update(dutyRef, {
-      status: 'published',
+      status,
+      earlyAccessEndsAt: useEarlyAccess ? new Date(earlyAccessEndsMs).toISOString() : null,
       version: duty.version + 1,
       publishedAt: nowTimestamp(),
       updatedAt: nowTimestamp(),
@@ -147,9 +162,14 @@ export const publishDuty = domainCall('publishDuty', async (request: CallableReq
       reasonCode: 'DUTY_PUBLISH',
       correlationId,
       result: 'SUCCESS',
-      afterSummary: { dutyId, status: 'published' },
+      afterSummary: { dutyId, status },
     });
+    return { status, fresh: true };
   });
 
-  return { success: true, dutyId, status: 'published' };
+  if (published.fresh && published.status === 'early_access') {
+    await notifyPremiumDoctorsOfDuty(dutyId);
+  }
+
+  return { success: true, dutyId, status: published.status };
 }, { requireConsent: true });

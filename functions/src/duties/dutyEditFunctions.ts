@@ -22,7 +22,7 @@ import { enqueueNotification } from '../notifications/outbox';
 import { CorrelationField, parseOrThrow } from '../admin/adminShared';
 import { MAX_SHIFT_HOURS } from './dutyFunctions';
 
-const EDITABLE_STATUSES = ['draft', 'published', 'paused'];
+const EDITABLE_STATUSES = ['draft', 'published', 'early_access', 'paused'];
 const SEAT_HOLDING_ASSIGNMENTS = ['selected', 'confirmed', 'in_progress', 'active'];
 const OPEN_APPLICATIONS = ['submitted', 'shortlisted'];
 /** Changes a doctor would weigh when deciding to apply or stay applied. */
@@ -111,8 +111,8 @@ export const updateDuty = domainCall('updateDuty', async (request: CallableReque
     for (const field of changed) update[field] = (changes as Record<string, unknown>)[field];
     if (changes.headcount !== undefined && changed.includes('headcount')) {
       const filled = (duty.headcount ?? 1) - (duty.remainingHeadcount ?? duty.headcount ?? 1);
-      if (changes.headcount < Math.max(1, filled) || (duty.status === 'published' && changes.headcount === filled)) {
-        throw new DomainError('VALIDATION_FAILED', `At least ${filled + (duty.status === 'published' ? 1 : 0)} seat(s) are needed: ${filled} already filled`, correlationId);
+      if (changes.headcount < Math.max(1, filled) || ((duty.status === 'published' || duty.status === 'early_access') && changes.headcount === filled)) {
+        throw new DomainError('VALIDATION_FAILED', `At least ${filled + (duty.status === 'published' || duty.status === 'early_access' ? 1 : 0)} seat(s) are needed: ${filled} already filled`, correlationId);
       }
       update.remainingHeadcount = changes.headcount - filled;
     }

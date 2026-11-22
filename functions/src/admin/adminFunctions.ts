@@ -19,6 +19,7 @@ import {
   getOfferExpiryHours, getVerificationPolicy,
 } from '../shared/platformConfig';
 import { dashboardInsights } from './dashboardInsights';
+import { BUSINESS_CONFIG_SCHEMAS, BUSINESS_DEFAULTS, BusinessConfigKey, getBusinessConfig } from '../shared/businessConfig';
 
 /** Assignment states that still hold a seat on a duty. */
 const OPEN_ASSIGNMENT_STATUSES = ['selected', 'confirmed', 'active'];
@@ -51,6 +52,9 @@ const CONFIG_SCHEMAS: Record<string, z.ZodTypeAny> = {
     reverifyAfterMonths: z.number().int().min(REVERIFY_MONTHS_RANGE.min).max(REVERIFY_MONTHS_RANGE.max),
   }).strict(),
 };
+
+// Business modules: attendance, payments, plans, last-minute, channels, AI.
+for (const [key, schema] of Object.entries(BUSINESS_CONFIG_SCHEMAS)) CONFIG_SCHEMAS[key] = schema;
 
 /** Semantic version as shipped in pubspec.yaml (e.g. 1.4.2). */
 const SEMVER = /^\d{1,3}\.\d{1,3}\.\d{1,3}$/;
@@ -311,6 +315,9 @@ export const getPlatformConfig = domainCall('getPlatformConfig', async (request:
     getVerificationPolicy(),
   ]);
 
+  const businessKeys = Object.keys(BUSINESS_DEFAULTS) as BusinessConfigKey[];
+  const businessValues = await Promise.all(businessKeys.map(key => getBusinessConfig(key)));
+
   const meta = (data: DocumentData | undefined) => ({
     version: data?.version ?? 0,
     updatedBy: data?.updatedBy ?? null,
@@ -337,6 +344,7 @@ export const getPlatformConfig = domainCall('getPlatformConfig', async (request:
       ...meta(releaseSnap.data()),
     },
     featureFlags: flagSnaps.map(snap => ({ key: snap.id, enabled: Boolean(snap.data()?.enabled), ...meta(snap.data()) })),
+    business: Object.fromEntries(businessKeys.map((key, i) => [key, { value: businessValues[i], defaults: BUSINESS_DEFAULTS[key] }])),
     fixed: {
       stepUpAuthMaxAgeSeconds: PLATFORM_DEFAULTS.STEP_UP_AUTH_MAX_AGE_SECONDS,
       maxEvidenceFileSizeBytes: PLATFORM_DEFAULTS.MAX_EVIDENCE_FILE_SIZE_BYTES,

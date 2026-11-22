@@ -26,6 +26,13 @@ export const FEATURE_FLAG_KEYS = [
   'phase2_availability_enabled',
   'phase2_replacement_enabled',
   'phase2_disputes_enabled',
+  // Business modules (shared/businessConfig.ts), all off until switched on.
+  'payments_enabled',
+  'premium_enabled',
+  'last_minute_enabled',
+  'channels_enabled',
+  'channels_media_enabled',
+  'ai_assistant_enabled',
 ] as const;
 
 /**

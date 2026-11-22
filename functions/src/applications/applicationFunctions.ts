@@ -10,6 +10,7 @@ import { ApplyToDutySchema, DocIdSchema } from '../shared/schemas';
 import { DomainError } from '../shared/errors';
 import { stageAudit } from '../audit/auditLogger';
 import { enqueueNotification } from '../notifications/outbox';
+import { isPremiumInTx } from '../subscriptions/subscriptionCore';
 
 const ACTIVE_APPLICATION_STATUSES = ['submitted', 'shortlisted', 'selected'];
 
@@ -53,8 +54,11 @@ export const applyToDuty = domainCall('applyToDuty', async (request: CallableReq
       throw new DomainError('DOCTOR_NOT_VERIFIED', 'Doctor must be verified before applying to duties', correlationId);
     }
     const duty = dutySnap.data();
-    if (!dutySnap.exists || duty?.status !== 'published') {
+    if (!dutySnap.exists || (duty?.status !== 'published' && duty?.status !== 'early_access')) {
       throw new DomainError('INVALID_STATE_TRANSITION', 'Duty is not open for applications', correlationId);
+    }
+    if (duty.status === 'early_access' && !(await isPremiumInTx(tx, doctorUid))) {
+      throw new DomainError('PREMIUM_REQUIRED', 'This duty is open to premium members first', correlationId);
     }
     if (duty.remainingHeadcount <= 0) {
       throw new DomainError('DUTY_CAPACITY_FILLED', 'Duty capacity has been filled', correlationId);

@@ -104,7 +104,7 @@ export const atomicSelectDoctor = domainCall('atomicSelectDoctor', async (reques
       return { assignmentId: app.assignmentId as string, expiresAt: app.offerExpiresAt as string, replayed: true };
     }
 
-    if (duty.status !== 'published') {
+    if (duty.status !== 'published' && duty.status !== 'early_access') {
       throw new DomainError('INVALID_STATE_TRANSITION', `Cannot select candidate for duty in status ${duty.status}`, correlationId);
     }
     if (new Date(startAt).getTime() <= Date.now()) {
@@ -141,7 +141,7 @@ export const atomicSelectDoctor = domainCall('atomicSelectDoctor', async (reques
     const newRemaining = duty.remainingHeadcount - 1;
     tx.update(dutyRef, {
       remainingHeadcount: newRemaining,
-      status: newRemaining === 0 ? 'filled' : 'published',
+      status: newRemaining === 0 ? 'filled' : duty.status,
       version: duty.version + 1,
       updatedAt: nowTimestamp(),
     });

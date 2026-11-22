@@ -24,6 +24,12 @@ export type DomainErrorCode =
   | 'RESOURCE_NOT_FOUND'
   | 'VALIDATION_FAILED'
   | 'CONCURRENT_UPDATE'
+  | 'FEATURE_DISABLED'
+  | 'PREMIUM_REQUIRED'
+  | 'ATTENDANCE_CODE_INVALID'
+  | 'PAYMENT_PROVIDER_NOT_CONFIGURED'
+  | 'AI_NOT_CONFIGURED'
+  | 'AI_QUOTA_EXCEEDED'
   | 'INTERNAL_ERROR';
 
 export class DomainError extends Error {
@@ -58,6 +64,7 @@ export class DomainError extends Error {
       case 'ACCOUNT_SUSPENDED':
       case 'STEP_UP_REQUIRED':
       case 'MFA_REQUIRED':
+      case 'PREMIUM_REQUIRED':
         functionsCode = 'permission-denied';
         break;
       case 'RESOURCE_NOT_FOUND':
@@ -77,9 +84,14 @@ export class DomainError extends Error {
       case 'INVALID_STATE_TRANSITION':
       case 'PROFILE_CHANGED':
       case 'FILE_NOT_ALLOWED':
+      case 'FEATURE_DISABLED':
+      case 'ATTENDANCE_CODE_INVALID':
+      case 'PAYMENT_PROVIDER_NOT_CONFIGURED':
+      case 'AI_NOT_CONFIGURED':
         functionsCode = 'failed-precondition';
         break;
       case 'RATE_LIMITED':
+      case 'AI_QUOTA_EXCEEDED':
         functionsCode = 'resource-exhausted';
         break;
       case 'OFFER_EXPIRED':

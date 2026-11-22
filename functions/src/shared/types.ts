@@ -9,6 +9,7 @@ export type UserStatus = 'active' | 'suspended' | 'deleted';
 
 export type DutyStatus = 
   | 'draft' 
+  | 'early_access'
   | 'published' 
   | 'paused' 
   | 'filled' 

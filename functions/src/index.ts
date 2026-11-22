@@ -99,3 +99,19 @@ export { startConversation, sendChatMessage, markConversationRead } from './chat
 export {
   seedDemoWorkspace, refreshDemoWorkspace, ensureDemoContent, getDemoWorkspaceStatus, clearDemoWorkspace,
 } from './demo/demoFunctions';
+
+// Business modules (docs/business/): QR attendance, payments, plans, last-minute
+// confirmation, community channels and the AI assistant.
+export { issueAttendanceCode, scanAttendanceCode, acknowledgeAttendance } from './attendance/attendanceFunctions';
+export { recordPaymentAction, listPaymentOrders, syncDutyBookingOrder } from './payments/paymentFunctions';
+export { requestSubscription, grantSubscription, listSubscribers, releaseEarlyAccessDuties } from './subscriptions/subscriptionFunctions';
+export {
+  setStandbyAvailability, requestLastMinuteConfirmation, acceptLastMinuteDuty, onLastMinuteSearchStarted,
+  closeLastMinuteSearches, listStandbyPool, listLastMinuteRequests,
+} from './lastMinute/lastMinuteFunctions';
+export {
+  createChannel, joinChannel, joinChannelByCode, leaveChannel, sendChannelMessage, deleteChannelMessage,
+  removeChannelMember, reportChannelMessage, listRecommendedChannels, listChannelReports, moderateChannelReport,
+  closeChannel, getChannelInvite,
+} from './channels/channelFunctions';
+export { askAssistant, getAssistantStatus } from './ai/aiFunctions';

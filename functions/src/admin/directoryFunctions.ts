@@ -297,7 +297,7 @@ export const getOrganizationProfile = domainCall('getOrganizationProfile', async
 
 // ── Duties ────────────────────────────────────────────────
 
-const DUTY_FILTERS = ['all', 'draft', 'published', 'paused', 'filled', 'in_progress', 'completed', 'closed', 'cancelled', 'hidden'] as const;
+const DUTY_FILTERS = ['all', 'draft', 'early_access', 'published', 'paused', 'filled', 'in_progress', 'completed', 'closed', 'cancelled', 'hidden'] as const;
 const ListDutiesSchema = z.object({ filter: z.enum(DUTY_FILTERS).default('all'), ...PageSchema }).strict();
 
 export const listDuties = domainCall('listDuties', async (request: CallableRequest) => {
@@ -346,7 +346,7 @@ export const setDutyVisibility = domainCall('setDutyVisibility', async (request:
     const duty = snap.data()!;
 
     if (visibility === 'hidden') {
-      if (duty.status !== 'published') {
+      if (duty.status !== 'published' && duty.status !== 'early_access') {
         throw new DomainError('INVALID_STATE_TRANSITION', `Only published duties can be hidden (this one is ${duty.status})`, correlationId);
       }
       tx.update(dutyRef, {

@@ -11,7 +11,7 @@ import { loadReviewQueue } from '../verification/reviewQueue';
 import { DAY_MS, HOUR_MS, istDayKey, toMillis } from './adminShared';
 
 /** Duty states that occupy a city's market right now. */
-const LIVE_DUTY_STATUSES = ['published', 'filled', 'in_progress'];
+const LIVE_DUTY_STATUSES = ['early_access', 'published', 'filled', 'in_progress'];
 const DECIDED_STATUSES = ['approved', 'rejected', 'needs_information'];
 const SLA_WINDOW_DAYS = 30;
 

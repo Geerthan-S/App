@@ -32,6 +32,17 @@ service cloud.firestore {
 
     // Only active memberships grant tenant access. Memberships written before
     // the status field existed are active.
+    // Premium doctors see early-access duties. premiumUntilMs is written by the server only.
+    function isPremiumMember() {
+      return isAuthenticated() &&
+        get(/databases/$(database)/documents/subscriptions/$(request.auth.uid)).data.get('premiumUntilMs', 0) > request.time.toMillis();
+    }
+
+    function isChannelMember(channelId) {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/channels/$(channelId)/members/$(request.auth.uid));
+    }
+
     function isOrgMember(orgId) {
       return isAuthenticated() &&
         exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)) &&
@@ -109,6 +120,7 @@ service cloud.firestore {
     match /duties/{dutyId} {
       // Doctors can read published/filled duties; Org members can read their own
       allow read: if (isAuthenticated() && (resource.data.status in ['published', 'filled', 'in_progress', 'completed'])) ||
+                     (resource.data.status == 'early_access' && isPremiumMember()) ||
                      (resource != null && isOrgMember(resource.data.organizationId)) ||
                      isSupportAdmin();
       allow create, update, delete: if false; // Mutated strictly via Cloud Functions
@@ -354,6 +366,78 @@ service cloud.firestore {
         isOrgMember(resource.data.organizationId) ||
         isSupportAdmin() || isSuperAdmin()
       );
+      allow write: if false;
+    }
+
+    // =========================================================================
+    // BUSINESS MODULES (docs/business/) — all writes go through Cloud Functions
+    // =========================================================================
+    match /attendance/{assignmentId} {
+      allow read: if isAuthenticated() && (
+        resource.data.doctorId == request.auth.uid ||
+        isOrgMember(resource.data.organizationId) ||
+        isSupportAdmin()
+      );
+      allow write: if false;
+    }
+
+    match /paymentOrders/{orderId} {
+      allow read: if isAuthenticated() && (
+        resource.data.payerUid == request.auth.uid ||
+        resource.data.doctorId == request.auth.uid ||
+        (resource.data.organizationId != null && isOrgMember(resource.data.organizationId)) ||
+        isSupportAdmin()
+      );
+      allow write: if false;
+    }
+
+    match /subscriptions/{uid} {
+      allow read: if isOwner(uid) || isSupportAdmin();
+      allow write: if false;
+    }
+
+    // Private standby list for the last-minute service: only the doctor sees their own entry.
+    match /standbyPool/{uid} {
+      allow read: if isOwner(uid);
+      allow write: if false;
+    }
+
+    match /channels/{channelId} {
+      allow read: if isAuthenticated() && (
+        (resource.data.visibility == 'public' && resource.data.status == 'active') ||
+        isChannelMember(channelId) ||
+        isSupportAdmin()
+      );
+      allow write: if false;
+
+      match /members/{memberUid} {
+        allow read: if isChannelMember(channelId) || isSupportAdmin();
+        allow write: if false;
+      }
+
+      match /messages/{messageId} {
+        allow read: if isChannelMember(channelId) || isSupportAdmin();
+        allow write: if false;
+      }
+    }
+
+    match /channelMemberships/{membershipId} {
+      allow read: if isAuthenticated() && resource.data.uid == request.auth.uid;
+      allow write: if false;
+    }
+
+    match /aiThreads/{uid} {
+      allow read: if isOwner(uid);
+      allow write: if false;
+
+      match /messages/{messageId} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
+    }
+
+    match /aiUsage/{uid} {
+      allow read: if isOwner(uid);
       allow write: if false;
     }
   }
