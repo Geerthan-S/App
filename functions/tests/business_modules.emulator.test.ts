@@ -152,6 +152,13 @@ describeWithEmulator('business modules', () => {
       expect(list.totals.platformRevenuePaise).toBe(10000);
     });
 
+    test('a booking created already confirmed (last-minute) also gets an order', async () => {
+      await flag('payments_enabled');
+      const after = { status: 'confirmed', organizationId: 'o1', doctorId: 'doc1', dutyId: 'd1', termsSnapshot: { amount: 3000 } };
+      await runTrigger(syncDutyBookingOrder, { params: { assignmentId: 'lm1' }, data: { before: { data: () => undefined }, after: { data: () => after } } });
+      expect((await db().doc('paymentOrders/duty_lm1').get()).data()!.totalPaise).toBe(301180);
+    });
+
     test('no order is created while payments are off; a cancelled paid booking is refunded', async () => {
       const after = { status: 'confirmed', organizationId: 'o1', doctorId: 'doc1', dutyId: 'd1', termsSnapshot: { amount: 5000 } };
       await runTrigger(syncDutyBookingOrder, changeEvent('a2', { ...after, status: 'selected' }, after));

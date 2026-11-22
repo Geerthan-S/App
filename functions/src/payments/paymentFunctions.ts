@@ -12,7 +12,7 @@
  */
 
 import type { CallableRequest } from 'firebase-functions/v2/https';
-import { onDocumentUpdated } from 'firebase-functions/v2/firestore';
+import { onDocumentWritten } from 'firebase-functions/v2/firestore';
 import { z } from 'zod';
 import { domainCall } from '../shared/callable';
 import { DomainError } from '../shared/errors';
@@ -174,14 +174,15 @@ export const listPaymentOrders = domainCall('listPaymentOrders', async (request:
  * confirms (if payments are on), becomes payout_due when the shift completes,
  * and is refunded or cancelled when the assignment is cancelled.
  */
-export const syncDutyBookingOrder = onDocumentUpdated('assignments/{assignmentId}', async event => {
+export const syncDutyBookingOrder = onDocumentWritten('assignments/{assignmentId}', async event => {
+  // Last-minute bookings are created already confirmed, so creates count too.
   const before = event.data?.before.data();
   const after = event.data?.after.data();
-  if (!before || !after || before.status === after.status) return;
+  if (!after || before?.status === after.status) return;
   const assignmentId = event.params.assignmentId;
   const ref = orderRef(`duty_${assignmentId}`);
 
-  if (after.status === 'confirmed' && before.status !== 'confirmed') {
+  if (after.status === 'confirmed' && before?.status !== 'confirmed') {
     if (!(await isFlagEnabled('payments_enabled'))) return;
     const policy = await getBusinessConfig('payment_policy');
     const breakdown = dutyBookingCharges(Number(after.termsSnapshot?.amount ?? 0), policy.platformFeeInr, policy.gstRatePercent);
