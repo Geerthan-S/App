@@ -126,3 +126,23 @@ export const releaseEarlyAccessDuties = onSchedule({ schedule: 'every 1 minutes'
     });
   }
 });
+
+/** What the app shows: which modules are on, plan prices and the standby rules. */
+export const getBusinessFeatures = domainCall('getBusinessFeatures', async (request: CallableRequest) => {
+  requireAuth(request);
+  const [subscriptions, payments, lastMinute, flags] = await Promise.all([
+    getBusinessConfig('subscription_policy'),
+    getBusinessConfig('payment_policy'),
+    getBusinessConfig('last_minute_policy'),
+    Promise.all(['premium_enabled', 'last_minute_enabled', 'channels_enabled', 'channels_media_enabled', 'ai_assistant_enabled', 'payments_enabled']
+      .map(async key => [key, await isFlagEnabled(key)] as const)),
+  ]);
+  const on = Object.fromEntries(flags);
+  return {
+    flags: on,
+    plans: subscriptions.plans.filter(p => p.active && on[p.kind === 'premium' ? 'premium_enabled' : 'ai_assistant_enabled']),
+    earlyAccessMinutes: subscriptions.earlyAccessMinutes,
+    gstRatePercent: payments.gstRatePercent,
+    lastMinute: { windowHours: lastMinute.windowHours, confirmationChargeInr: lastMinute.confirmationChargeInr },
+  };
+});

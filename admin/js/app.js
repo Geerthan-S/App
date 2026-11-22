@@ -22,6 +22,7 @@ import { renderAudit } from './views/governance.js';
 import { renderStaff, renderSystemHealth, renderNotifications, renderSupport } from './views/platform.js';
 import { renderMasterConfig, renderCouncils, renderFlags } from './views/config.js';
 import { openAccount } from './views/account.js';
+import { renderPayments, renderPlans, renderLastMinute, renderChannelReports, renderBusinessSettings } from './views/business.js';
 
 // ── Sections ──────────────────────────────────────────────
 const NAV = [
@@ -45,6 +46,12 @@ const NAV = [
     { id: 'reports', label: 'Reports', icon: 'flag', access: 'admin', render: renderReports, count: 'openReports' },
     { id: 'duty-moderation', label: 'Duty Moderation', icon: 'eyeOff', access: 'admin', render: renderDutyModeration },
   ] },
+  { group: 'Business', items: [
+    { id: 'payments', label: 'Payments', icon: 'wallet', access: 'admin', render: renderPayments },
+    { id: 'plans', label: 'Premium & AI Plans', icon: 'star', access: 'admin', render: renderPlans },
+    { id: 'last-minute', label: 'Last-Minute Service', icon: 'zap', access: 'admin', render: renderLastMinute },
+    { id: 'channel-reports', label: 'Channel Reports', icon: 'message', access: 'admin', render: renderChannelReports },
+  ] },
   { group: 'Governance', items: [
     { id: 'audit', label: 'Audit & Compliance', icon: 'scroll', access: 'admin', render: (c, x) => renderAudit(c, x, 'all') },
     { id: 'admin-activity', label: 'Admin Activity', icon: 'activity', access: 'admin', render: (c, x) => renderAudit(c, x, 'staff') },
@@ -58,6 +65,7 @@ const NAV = [
   { group: 'Configuration', items: [
     { id: 'config', label: 'Master Config', icon: 'sliders', access: 'admin', render: renderMasterConfig },
     { id: 'councils', label: 'Medical Councils', icon: 'landmark', access: 'admin', render: renderCouncils },
+    { id: 'business-settings', label: 'Business Settings', icon: 'sliders', access: 'admin', render: renderBusinessSettings },
     { id: 'flags', label: 'Feature Flags', icon: 'toggle', access: 'admin', render: renderFlags },
   ] },
 ];
@@ -214,6 +222,9 @@ const navigate = (id, param) => {
 
 let renderSeq = 0;
 
+/** Per-section UI state (selected tab, date filter) kept across re-renders. */
+const viewState = {};
+
 async function render() {
   if ($('screen-app').hidden) return;
   let { id } = routeFromHash();
@@ -230,6 +241,7 @@ async function render() {
     param, navigate, refreshCounts,
     isCurrent: () => seq === renderSeq,
     rerender: render,
+    state: viewState,
   };
   try {
     const node = h('div');

@@ -12,6 +12,7 @@ import '../../../core/widgets/ui_kit.dart';
 import '../../doctor_profile/data/doctor_repository.dart';
 import '../../../core/errors/error_envelope.dart';
 import '../../chat/presentation/chats_screen.dart' show ChatButton;
+import '../../business/presentation/attendance_scanner_screen.dart';
 
 class MessagesScreen extends StatelessWidget {
   const MessagesScreen({super.key});
@@ -613,9 +614,21 @@ class _AssignmentTileState extends State<_AssignmentTile> {
               ),
             ],
 
-            // Confirmed / in-progress: contact
+            // Confirmed / in-progress: QR attendance and contact
             if (isConfirmed) ...[
               const SizedBox(height: AppSpacing.sm),
+              _ActionIndent(
+                child: AppButton(
+                  label: status == 'confirmed' ? 'Check in (scan QR)' : 'Check out (scan QR)',
+                  icon: Icons.qr_code_scanner,
+                  onPressed: () => AttendanceScannerScreen.open(
+                    context,
+                    checkIn: status == 'confirmed',
+                    facilityName: widget.assignment['facilityName'] as String? ?? 'the hospital',
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xs),
               _ActionIndent(
                 child: AppSecondaryButton(
                   label: 'View hospital contact',

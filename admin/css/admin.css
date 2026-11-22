@@ -249,6 +249,7 @@ fieldset.box legend { padding: 0 6px; font-size: 12px; font-weight: 700; color: 
 .grid { display: grid; gap: 16px; }
 .grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.stat { font-size: 1.6rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .grid-main { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
 .stack { display: flex; flex-direction: column; gap: 16px; }

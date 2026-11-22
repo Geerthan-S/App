@@ -74,6 +74,10 @@ const ICONS = {
   download: 'M12 4v11M7 10l5 5 5-5M5 20h14',
   plus: 'M12 5v14M5 12h14',
   mapPin: 'M12 21s-7-6-7-11a7 7 0 1 1 14 0c0 5-7 11-7 11zM12 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4z',
+  wallet: 'M4 7h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a1 1 0 0 1-1-1V7zM4 7l11-3v3M16 13h2',
+  star: 'M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.4 6.7 19.4l1.2-6L3.4 9.3l6-.7z',
+  zap: 'M13 3L5 14h6l-1 7 8-11h-6z',
+  message: 'M4 5h16v11H8l-4 4zM8 10h8M8 13h5',
 };
 
 export function icon(name, cls = '') {
@@ -132,8 +136,8 @@ export const initials = name => String(name || '?').split(/[\s@._-]+/).filter(Bo
 
 // ── Status badges (fixed vocabulary → fixed classes) ──────
 const BADGE_TONES = {
-  ok: ['approved', 'clean', 'delivered', 'active', 'SUCCESS', 'verified', 'resolved', 'published', 'completed', 'on_track', 'ok'],
-  warn: ['needs_information', 'pending', 'under_review', 'paused', 'due_soon', 'leased', 'failed', 'warning', 'draft', 'open', 'waiting_on_applicant', 'high'],
+  ok: ['approved', 'clean', 'delivered', 'active', 'SUCCESS', 'verified', 'resolved', 'published', 'completed', 'on_track', 'ok', 'paid', 'paid_out', 'matched', 'refunded'],
+  warn: ['needs_information', 'pending', 'awaiting_payment', 'payout_due', 'refund_due', 'searching', 'early_access', 'under_review', 'paused', 'due_soon', 'leased', 'failed', 'warning', 'draft', 'open', 'waiting_on_applicant', 'high'],
   bad: ['rejected', 'infected', 'dead_letter', 'suspended', 'DENIED', 'FAILED', 'overdue', 'cancelled', 'urgent', 'expired'],
   info: ['submitted', 'filled', 'in_progress', 'confirmed', 'selected', 'normal', 'blocked_external'],
   ink: ['ink'],

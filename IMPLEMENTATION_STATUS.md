@@ -1,5 +1,15 @@
 # Implementation Status Matrix
 
+## Business modules: attendance, payments, plans, last-minute, channels, AI (2026-11-22, branch `claude/epic-dirac-dsr4u5`)
+
+- Guide: `docs/business/README.md`. All modules behind feature flags that start off; settings in Admin › Business Settings.
+- `IMPLEMENTED` backend: QR check-in/check-out with GPS radius, late/early/mock-location flags and hospital acknowledgement; paise-accurate charges (GST on platform charges only), payment orders and append-only ledger, staff recording for the manual provider, duty-booking orders that follow the assignment; premium/AI plans, staff grants, premium-only early access (rules + server) with alerts; private standby pool, paid last-minute confirmation, first-to-accept direct confirmation, automatic close with full refund; community channels (public / invite code, text, optional voice and images, owner and platform moderation, specialty-based recommendations); OpenAI-backed AI assistant with free quota, AI plan and photo-consent gate. Firestore and Storage rules and indexes for every new collection.
+- `IMPLEMENTED` admin portal: Payments (record payment / payout / refund), Premium & AI Plans (grant), Last-Minute Service (requests, standby list by date), Channel Reports, Business Settings; flag labels for the new modules.
+- `IMPLEMENTED` Flutter: QR scanner with location (My Duties), Active Shifts with self-renewing QR and acknowledgement (hospital dashboard), hospital Payments, Need a doctor fast?, Premium & standby (plans, early-access duties, standby dates, last-minute offers, plan payments), Community (channels, recommendations, create, join by code), channel chat with voice notes and images, HealthForce AI. New packages pinned so Flutter 3.38 still builds.
+- `TESTED`: functions typecheck; emulator suite 21 suites, 200 tests (18 new workflow tests, 5 new rules tests, 17 new unit tests). Flutter analyze: 0 errors; Flutter tests pass incl. new formatting tests.
+- `UNVERIFIED`: new Flutter screens and admin pages not exercised on a device or browser; camera, location, microphone and media flows untested on hardware; nothing deployed.
+- `BLOCKED_EXTERNAL`: payment gateway (needs an RBI-authorised aggregator and a CA decision on intermediary vs principal); OpenAI key; DPDP privacy-notice update for AI and location.
+
 ## Client review: chat, sample data, hospital onboarding (2026-10-23, branch `phase1-completion`)
 
 - `DEPLOYED` to doctor-c7c29: rules, indexes, 98 functions, admin portal. Sample data turned on (4 sample hospitals, 4 sample doctors, 8 open duties, 5 reviews; audited as `DEMO_WORKSPACE_SEEDED`).

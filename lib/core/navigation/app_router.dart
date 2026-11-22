@@ -2,6 +2,10 @@
  * Application GoRouter Configuration with Auth & Role Routing
  */
 
+import '../../features/business/presentation/premium_screen.dart';
+import '../../features/channels/presentation/channels_screen.dart';
+import '../../features/channels/presentation/channel_screen.dart';
+import '../../features/channels/presentation/ai_assistant_screen.dart';
 import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
@@ -218,6 +222,17 @@ final appRouter = GoRouter(
           viewer: extra['side'] == 'organization' ? ChatSide.organization : ChatSide.doctor,
           title: extra['title'] as String? ?? 'Chat',
         );
+      },
+    ),
+    GoRoute(path: '/premium', builder: (context, state) => const PremiumScreen()),
+    GoRoute(path: '/channels', builder: (context, state) => const ChannelsScreen()),
+    GoRoute(path: '/ai-assistant', builder: (context, state) => const AiAssistantScreen()),
+    GoRoute(
+      path: '/channel',
+      redirect: (context, state) => state.extra is Map && (state.extra as Map)['channelId'] is String ? null : '/channels',
+      builder: (context, state) {
+        final extra = state.extra as Map;
+        return ChannelScreen(channelId: extra['channelId'] as String, name: extra['name'] as String? ?? 'Channel');
       },
     ),
     GoRoute(path: '/privacy', builder: (context, state) => const PrivacyScreen()),

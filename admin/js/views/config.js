@@ -226,13 +226,19 @@ const FLAG_LABELS = {
   phase2_availability_enabled: ['Doctor availability rules', 'Doctors set recurring availability; hospitals see it when selecting.'],
   phase2_replacement_enabled: ['Duty replacement requests', 'A selected doctor can ask for a replacement instead of cancelling.'],
   phase2_disputes_enabled: ['Assignment disputes', 'Either party can open a dispute on a completed assignment.'],
+  payments_enabled: ['Duty-booking payments', 'Hospitals pay through the app when a doctor confirms; the doctor is paid after check-out.'],
+  premium_enabled: ['Premium plan & early access', 'Doctors can buy Premium; new duties show to premium members first.'],
+  last_minute_enabled: ['Last-minute confirmation service', 'Hospitals pay a confirmation charge and the standby list is alerted.'],
+  channels_enabled: ['Community channels', 'Doctors create and join discussion channels.'],
+  channels_media_enabled: ['Voice notes & images in channels', 'Adds Storage cost; switch off if it gets expensive.'],
+  ai_assistant_enabled: ['AI assistant', 'OpenAI-backed clinical assistant. Needs OPENAI_API_KEY on the server.'],
 };
 
 export async function renderFlags(root, ctx) {
   const config = await invoke('getPlatformConfig');
   const { canEdit } = config;
   add(root, 
-    pageHead('Feature Flags', 'Phase 2 features, off until each is ready. Changes apply to every user immediately.'),
+    pageHead('Feature Flags', 'Phase 2 and business modules, off until each is ready. Changes apply to every user immediately.'),
     readOnlyNote(canEdit),
     card(null, null, h('div', { class: 'list-rows' }, config.featureFlags.map(flag => {
       const [label, detail] = FLAG_LABELS[flag.key] || [flag.key, ''];

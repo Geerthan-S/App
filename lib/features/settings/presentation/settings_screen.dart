@@ -57,6 +57,25 @@ class SettingsScreen extends ConsumerWidget {
             ),
             const SizedBox(height: AppSpacing.lg),
 
+            const GroupLabel('HealthForce'),
+            RowGroup(
+              children: [
+                ListRow(
+                  icon: Icons.workspace_premium_outlined,
+                  title: 'Premium & standby',
+                  subtitle: 'Early access, last-minute duties and plans',
+                  onTap: () => context.push('/premium'),
+                ),
+                ListRow(
+                  icon: Icons.forum_outlined,
+                  title: 'Community',
+                  subtitle: 'Doctor channels and HealthForce AI',
+                  onTap: () => context.push('/channels'),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.lg),
+
             const GroupLabel('Notifications'),
             RowGroup(
               children: [

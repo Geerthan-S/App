@@ -8,7 +8,7 @@ import {
 } from './helpers/emulator';
 import { acknowledgeAttendance, issueAttendanceCode, scanAttendanceCode } from '../src/attendance/attendanceFunctions';
 import { listPaymentOrders, recordPaymentAction, syncDutyBookingOrder } from '../src/payments/paymentFunctions';
-import { grantSubscription, releaseEarlyAccessDuties, requestSubscription } from '../src/subscriptions/subscriptionFunctions';
+import { getBusinessFeatures, grantSubscription, releaseEarlyAccessDuties, requestSubscription } from '../src/subscriptions/subscriptionFunctions';
 import {
   acceptLastMinuteDuty, closeSearch, requestLastMinuteConfirmation, setStandbyAvailability,
 } from '../src/lastMinute/lastMinuteFunctions';
@@ -335,6 +335,15 @@ describeWithEmulator('business modules', () => {
       await expectDomainError(call(askAssistant, 'doc1', { question: 'What is this lesion?', imagePath: 'ai/doc1/x.jpg' }), 'VALIDATION_FAILED');
       await expectDomainError(call(askAssistant, 'doc1', { question: 'What is this lesion?', imagePath: 'ai/doc2/x.jpg', patientConsentConfirmed: true }), 'FILE_NOT_ALLOWED');
     });
+  });
+
+  test('the app sees only switched-on modules and their plans', async () => {
+    let features = await call<{ plans: { planId: string }[]; flags: Record<string, boolean> }>(getBusinessFeatures, 'doc1', {});
+    expect(features.plans).toEqual([]);
+    await flag('premium_enabled');
+    features = await call(getBusinessFeatures, 'doc1', {});
+    expect(features.plans.map(p => p.planId)).toEqual(['premium_6m']);
+    expect(features.flags.premium_enabled).toBe(true);
   });
 
   test('completing a confirmed shift still works after check-in', async () => {

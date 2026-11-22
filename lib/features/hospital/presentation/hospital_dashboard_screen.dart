@@ -1,3 +1,5 @@
+import '../../business/presentation/hospital_shifts_section.dart';
+import '../../business/presentation/last_minute_button.dart';
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -631,7 +633,7 @@ class _HospitalDashboardScreenState
                                   ),
                                 ),
                                 StatusBadge(status: duty['status'] as String),
-                                if (const ['draft', 'published', 'paused'].contains(duty['status']))
+                                if (const ['draft', 'published', 'early_access', 'paused'].contains(duty['status']))
                                   IconButton(
                                     tooltip: 'Edit duty',
                                     visualDensity: VisualDensity.compact,
@@ -685,6 +687,11 @@ class _HospitalDashboardScreenState
                                 ),
                               ],
                             ),
+                            if (LastMinuteButton.applies(duty))
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: LastMinuteButton(duty: duty),
+                              ),
                           ],
                         ),
                       );
@@ -692,6 +699,9 @@ class _HospitalDashboardScreenState
                   );
                 },
               ),
+              const SizedBox(height: AppSpacing.lg),
+
+              HospitalShiftsSection(organizationId: _selectedOrgId!),
               const SizedBox(height: AppSpacing.lg),
 
               // Completed assignments — review doctors

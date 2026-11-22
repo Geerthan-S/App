@@ -104,7 +104,9 @@ export {
 // confirmation, community channels and the AI assistant.
 export { issueAttendanceCode, scanAttendanceCode, acknowledgeAttendance } from './attendance/attendanceFunctions';
 export { recordPaymentAction, listPaymentOrders, syncDutyBookingOrder } from './payments/paymentFunctions';
-export { requestSubscription, grantSubscription, listSubscribers, releaseEarlyAccessDuties } from './subscriptions/subscriptionFunctions';
+export {
+  requestSubscription, grantSubscription, listSubscribers, releaseEarlyAccessDuties, getBusinessFeatures,
+} from './subscriptions/subscriptionFunctions';
 export {
   setStandbyAvailability, requestLastMinuteConfirmation, acceptLastMinuteDuty, onLastMinuteSearchStarted,
   closeLastMinuteSearches, listStandbyPool, listLastMinuteRequests,
