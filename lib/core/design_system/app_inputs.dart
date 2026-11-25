@@ -35,13 +35,11 @@ class AppTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: AppTypography.labelBold(AppColors.textDarkSecondary),
-        ),
+        Text(label, style: AppTypography.labelBold(colors.textSecondary)),
         const SizedBox(height: AppSpacing.xs),
         TextFormField(
           controller: controller,
@@ -50,34 +48,79 @@ class AppTextField extends StatelessWidget {
           obscureText: obscureText,
           maxLines: maxLines,
           onChanged: onChanged,
-          style: AppTypography.bodyLarge(AppColors.textDarkPrimary),
+          style: AppTypography.bodyLarge(
+            colors.textPrimary,
+          ).copyWith(fontSize: 14),
+          cursorColor: colors.accent,
           decoration: InputDecoration(
             hintText: hintText,
-            hintStyle: AppTypography.bodyMedium(AppColors.textDarkMuted),
             prefixIcon: prefixIcon,
             suffixIcon: suffixIcon,
-            filled: true,
-            fillColor: AppColors.surfaceElevatedDark,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-              borderSide: const BorderSide(color: AppColors.borderDark),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-              borderSide: const BorderSide(color: AppColors.borderDark),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-              borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
-            ),
-            errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-              borderSide: const BorderSide(color: AppColors.rose),
-            ),
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Minimal search field: flat surface, no border until focused, outline
+/// search icon. Used by Search, the Marketplace and other list filters.
+class AppSearchField extends StatelessWidget {
+  final TextEditingController? controller;
+  final String hintText;
+  final ValueChanged<String>? onChanged;
+  final VoidCallback? onClear;
+  final bool showClear;
+  final Widget? trailing;
+  final bool autofocus;
+
+  const AppSearchField({
+    super.key,
+    this.controller,
+    required this.hintText,
+    this.onChanged,
+    this.onClear,
+    this.showClear = false,
+    this.trailing,
+    this.autofocus = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    return TextField(
+      controller: controller,
+      onChanged: onChanged,
+      autofocus: autofocus,
+      textInputAction: TextInputAction.search,
+      cursorColor: colors.accent,
+      style: AppTypography.bodyLarge(colors.textPrimary).copyWith(fontSize: 14),
+      decoration: InputDecoration(
+        hintText: hintText,
+        prefixIcon: Icon(
+          Icons.search_outlined,
+          color: colors.textMuted,
+          size: 20,
+        ),
+        suffixIcon: showClear
+            ? IconButton(
+                icon: Icon(
+                  Icons.close_outlined,
+                  color: colors.textMuted,
+                  size: 18,
+                ),
+                onPressed: onClear,
+              )
+            : trailing,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 15,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+          borderSide: BorderSide.none,
+        ),
+      ),
     );
   }
 }

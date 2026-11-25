@@ -13,7 +13,7 @@ export interface VerificationLookupQuery {
 export interface VerificationSourceResult {
   sourceName: string;
   matched: boolean;
-  officialStatus: 'ACTIVE' | 'SUSPENDED' | 'EXPIRED' | 'NOT_FOUND';
+  officialStatus: 'ACTIVE' | 'SUSPENDED' | 'EXPIRED' | 'NOT_FOUND' | 'SOURCE_UNAVAILABLE';
   registeredName?: string;
   registrationDate?: string;
   qualificationsRegistered?: string[];
@@ -30,13 +30,14 @@ export class ManualVerificationAdapter implements IVerificationSourceAdapter {
   public readonly sourceId = 'MANUAL_OFFICIAL_REGISTRY_LOOKUP';
 
   async lookup(query: VerificationLookupQuery): Promise<VerificationSourceResult> {
-    // In manual workflow, the human verifier performs verification against NMC/SMC portals
+    // A manual review requires a real reviewer and recorded source evidence.
+    // This adapter must never manufacture a successful registry check.
+    void query;
     return {
-      sourceName: 'NMC / State Medical Council Portal (Manual Verifier Inspection)',
-      matched: true,
-      officialStatus: 'ACTIVE',
-      registeredName: query.doctorName,
-      rawSummary: `Manual check verified against ${query.council} registry for Reg No: ${query.registrationNumber}`,
+      sourceName: 'Manual review pending',
+      matched: false,
+      officialStatus: 'SOURCE_UNAVAILABLE',
+      rawSummary: 'No official registry check has been recorded by a verifier.',
       checkedAt: new Date().toISOString(),
     };
   }

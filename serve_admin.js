@@ -1,13 +1,15 @@
 /**
  * Local Static Web Server for Admin Portal
- * Serves the Healthcare Workforce Admin Web Portal on port 5000 (as specified in firebase.json)
+ * Serves admin/ on PORT (default 5000) with the same security headers as
+ * Firebase Hosting (firebase.json), so CSP problems show up locally. The CSP
+ * also allows the local emulators on 127.0.0.1.
  */
 
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
-const PORT = 5000;
+const PORT = Number(process.env.PORT) || 5000;
 const PUBLIC_DIR = path.join(__dirname, 'admin');
 
 const MIME_TYPES = {
@@ -21,38 +23,70 @@ const MIME_TYPES = {
   '.ico': 'image/x-icon',
 };
 
+// Mirrors the hosting headers in firebase.json, plus the local emulator origins.
+const CSP = [
+  "default-src 'self'",
+  "script-src 'self' https://www.gstatic.com https://apis.google.com",
+  "style-src 'self' https://fonts.googleapis.com",
+  'font-src https://fonts.gstatic.com',
+  "img-src 'self' data:",
+  "connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com " +
+    'https://asia-south1-doctor-c7c29.cloudfunctions.net http://127.0.0.1:* http://localhost:*',
+  'frame-src https://doctor-c7c29.firebaseapp.com',
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+].join('; ');
+
+const SECURITY_HEADERS = {
+  'Content-Security-Policy': CSP,
+  'Cross-Origin-Opener-Policy': 'same-origin',
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+  'Referrer-Policy': 'no-referrer',
+  'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+  'X-Robots-Tag': 'noindex, nofollow',
+  // Always revalidate so edits show up on reload.
+  'Cache-Control': 'no-cache',
+};
+
+const send = (res, status, contentType, body) => {
+  res.writeHead(status, { 'Content-Type': contentType, ...SECURITY_HEADERS });
+  res.end(body);
+};
+
+const sendIndex = res => fs.readFile(path.join(PUBLIC_DIR, 'index.html'), (err, data) => {
+  if (err) send(res, 404, 'text/plain', 'Not Found');
+  else send(res, 200, 'text/html; charset=utf-8', data);
+});
+
+// nosemgrep: problem-based-packs.insecure-transport.js-node.using-http-server.using-http-server -- local dev server bound to loopback only
 const server = http.createServer((req, res) => {
-  let reqPath = req.url.split('?')[0];
+  let reqPath;
+  try {
+    reqPath = decodeURIComponent(req.url.split('?')[0]);
+  } catch (_) {
+    send(res, 400, 'text/plain', 'Bad Request');
+    return;
+  }
   if (reqPath === '/' || reqPath === '') reqPath = '/index.html';
-  const filePath = path.join(PUBLIC_DIR, reqPath);
+  // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal -- result is checked to stay inside PUBLIC_DIR below
+  const filePath = path.resolve(PUBLIC_DIR, `.${reqPath}`);
+  // Never serve anything outside admin/ (e.g. /../functions/package.json).
+  if (filePath !== PUBLIC_DIR && !filePath.startsWith(PUBLIC_DIR + path.sep)) {
+    send(res, 403, 'text/plain', 'Forbidden');
+    return;
+  }
 
   fs.stat(filePath, (err, stats) => {
     if (err || !stats.isFile()) {
-      // Fallback rewrite to index.html (SPA routing)
-      const indexPath = path.join(PUBLIC_DIR, 'index.html');
-      fs.readFile(indexPath, (err, data) => {
-        if (err) {
-          res.writeHead(404, { 'Content-Type': 'text/plain' });
-          res.end('Not Found');
-        } else {
-          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-          res.end(data);
-        }
-      });
+      sendIndex(res); // SPA fallback
       return;
     }
-
-    const ext = path.extname(filePath).toLowerCase();
-    const contentType = MIME_TYPES[ext] || 'application/octet-stream';
-
-    fs.readFile(filePath, (err, data) => {
-      if (err) {
-        res.writeHead(500, { 'Content-Type': 'text/plain' });
-        res.end('Internal Server Error');
-      } else {
-        res.writeHead(200, { 'Content-Type': contentType });
-        res.end(data);
-      }
+    fs.readFile(filePath, (readErr, data) => {
+      if (readErr) send(res, 500, 'text/plain', 'Internal Server Error');
+      else send(res, 200, MIME_TYPES[path.extname(filePath).toLowerCase()] || 'application/octet-stream', data);
     });
   });
 });
@@ -60,3 +94,9 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, '127.0.0.1', () => {
   console.log(`Healthcare Workforce Admin Portal running at http://localhost:${PORT}`);
 });
+
+// Browsers may resolve "localhost" to the IPv6 loopback; serve it too (still loopback only).
+// nosemgrep: problem-based-packs.insecure-transport.js-node.using-http-server.using-http-server -- local dev server bound to loopback only
+http.createServer(server.listeners('request')[0])
+  .on('error', () => { /* IPv6 loopback unavailable: IPv4 is enough */ })
+  .listen(PORT, '::1');

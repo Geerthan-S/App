@@ -15,10 +15,9 @@ class RoleSelectionScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final colors = context.appColors;
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Choose Account Type'),
-      ),
+      appBar: AppBar(title: const Text('Choose Account Type')),
       body: SafeArea(
         child: Padding(
           padding: AppSpacing.paddingScreen,
@@ -27,25 +26,23 @@ class RoleSelectionScreen extends ConsumerWidget {
             children: [
               Text(
                 'How will you use HealthForce?',
-                style: AppTypography.headingLarge(AppColors.textDarkPrimary),
+                style: AppTypography.headingLarge(colors.textPrimary),
               ),
               const SizedBox(height: AppSpacing.xs),
               Text(
                 'Select your primary operational role on the platform.',
-                style: AppTypography.bodyMedium(AppColors.textDarkSecondary),
+                style: AppTypography.bodyMedium(colors.textSecondary),
               ),
               const SizedBox(height: AppSpacing.xl),
               AppCard(
                 onTap: () => context.go('/doctor-onboarding'),
+                padding: const EdgeInsets.all(18),
                 child: Row(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                      ),
-                      child: const Icon(Icons.medical_services_rounded, color: AppColors.primary, size: 32),
+                    Icon(
+                      Icons.medical_services_outlined,
+                      size: 24,
+                      color: colors.textPrimary,
                     ),
                     const SizedBox(width: AppSpacing.md),
                     Expanded(
@@ -54,32 +51,38 @@ class RoleSelectionScreen extends ConsumerWidget {
                         children: [
                           Text(
                             'Licensed Doctor / Consultant',
-                            style: AppTypography.headingSmall(AppColors.textDarkPrimary),
+                            style: AppTypography.headingSmall(
+                              colors.textPrimary,
+                            ),
                           ),
                           const SizedBox(height: 2),
                           Text(
                             'Find verified hospital duties, shifts, and immediate on-demand coverage.',
-                            style: AppTypography.bodySmall(AppColors.textDarkSecondary),
+                            style: AppTypography.bodySmall(
+                              colors.textSecondary,
+                            ),
                           ),
                         ],
                       ),
                     ),
-                    const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.textDarkMuted, size: 16),
+                    Icon(
+                      Icons.chevron_right_outlined,
+                      color: colors.textMuted,
+                      size: 20,
+                    ),
                   ],
                 ),
               ),
               const SizedBox(height: AppSpacing.md),
               AppCard(
                 onTap: () => context.go('/hospital-dashboard'),
+                padding: const EdgeInsets.all(18),
                 child: Row(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppColors.teal.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                      ),
-                      child: const Icon(Icons.local_hospital_rounded, color: AppColors.teal, size: 32),
+                    Icon(
+                      Icons.local_hospital_outlined,
+                      size: 24,
+                      color: colors.textPrimary,
                     ),
                     const SizedBox(width: AppSpacing.md),
                     Expanded(
@@ -88,17 +91,25 @@ class RoleSelectionScreen extends ConsumerWidget {
                         children: [
                           Text(
                             'Hospital / Clinic Coordinator',
-                            style: AppTypography.headingSmall(AppColors.textDarkPrimary),
+                            style: AppTypography.headingSmall(
+                              colors.textPrimary,
+                            ),
                           ),
                           const SizedBox(height: 2),
                           Text(
                             'Post genuine duty requirements, review verified doctors, and assign atomically.',
-                            style: AppTypography.bodySmall(AppColors.textDarkSecondary),
+                            style: AppTypography.bodySmall(
+                              colors.textSecondary,
+                            ),
                           ),
                         ],
                       ),
                     ),
-                    const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.textDarkMuted, size: 16),
+                    Icon(
+                      Icons.chevron_right_outlined,
+                      color: colors.textMuted,
+                      size: 20,
+                    ),
                   ],
                 ),
               ),

@@ -2,25 +2,33 @@
  * Auth & Identity Cloud Functions
  */
 
-import { onCall, CallableRequest } from 'firebase-functions/v2/https';
-import { getAuth } from 'firebase-admin/auth';
+import type { CallableRequest } from 'firebase-functions/v2/https';
 import { db, nowTimestamp, sanitizeCorrelationId } from '../shared/firestoreHelpers';
-import { requireAuth, requireSuperAdmin } from '../security/guards';
+import { domainCall } from '../shared/callable';
+import { requireAuth } from '../security/guards';
 import { DomainError } from '../shared/errors';
-import { logAudit } from '../audit/auditLogger';
+import { stageAudit } from '../audit/auditLogger';
+import { RecordConsentSchema } from '../shared/schemas';
+import { PLATFORM_DEFAULTS } from '../shared/platformConfig';
 
-export const recordConsent = onCall(async (request: CallableRequest) => {
+/** Persists acceptance of the current consent version. Onboarding cannot advance without it. */
+export const recordConsent = domainCall('recordConsent', async (request: CallableRequest) => {
   const uid = requireAuth(request);
   const correlationId = sanitizeCorrelationId(request.data?.correlationId);
-  const consentVersion = request.data?.consentVersion || 'v1.0';
+  const parsed = RecordConsentSchema.safeParse(request.data);
+  if (!parsed.success || parsed.data.consentVersion !== PLATFORM_DEFAULTS.CURRENT_CONSENT_VERSION) {
+    throw new DomainError('VALIDATION_FAILED',
+      `Consent must be given for the current version (${PLATFORM_DEFAULTS.CURRENT_CONSENT_VERSION})`, correlationId);
+  }
+  const { consentVersion } = parsed.data;
 
-  const userRef = db().collection('users').doc(uid);
-  await userRef.set({
+  const batch = db().batch();
+  batch.set(db().collection('users').doc(uid), {
     consentVersion,
+    consentAcceptedAt: nowTimestamp(),
     updatedAt: nowTimestamp(),
   }, { merge: true });
-
-  await logAudit({
+  stageAudit(batch, {
     actorId: uid,
     actorRole: 'user',
     action: 'CONSENT_ACCEPTED',
@@ -31,41 +39,7 @@ export const recordConsent = onCall(async (request: CallableRequest) => {
     result: 'SUCCESS',
     afterSummary: { consentVersion },
   });
+  await batch.commit();
 
   return { success: true, consentVersion };
-});
-
-export const setCustomClaims = onCall(async (request: CallableRequest) => {
-  const correlationId = sanitizeCorrelationId(request.data?.correlationId);
-  const adminUid = requireSuperAdmin(request, correlationId);
-
-  const targetUid = request.data?.targetUid;
-  const claims = request.data?.claims;
-
-  if (!targetUid || typeof claims !== 'object') {
-    throw new DomainError('VALIDATION_FAILED', 'targetUid and claims object are required', correlationId);
-  }
-
-  // Allowed coarse-grained claims only
-  const sanitizedClaims = {
-    isVerifier: Boolean(claims.isVerifier),
-    isSupportAdmin: Boolean(claims.isSupportAdmin),
-    isSuperAdmin: Boolean(claims.isSuperAdmin),
-  };
-
-  await getAuth().setCustomUserClaims(targetUid, sanitizedClaims);
-
-  await logAudit({
-    actorId: adminUid,
-    actorRole: 'super_admin',
-    action: 'CUSTOM_CLAIMS_SET',
-    targetType: 'users',
-    targetId: targetUid,
-    reasonCode: request.data?.reasonCode || 'ADMIN_PRIVILEGE_GRANT',
-    correlationId,
-    result: 'SUCCESS',
-    afterSummary: sanitizedClaims,
-  });
-
-  return { success: true, targetUid, claims: sanitizedClaims };
 });

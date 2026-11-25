@@ -1,128 +1,265 @@
 /**
  * Verification Engine Cloud Functions & Secure Storage Integrations
+ *
+ * A verification case reviews one revision of a subject profile. Cases are
+ * never reopened or rewritten after a decision: a material profile change or a
+ * rejection starts a new case linked to the previous one, and an approval only
+ * applies while the subject is still on the revision the case reviewed.
  */
 
-import { onCall, CallableRequest } from 'firebase-functions/v2/https';
+import type { CallableRequest } from 'firebase-functions/v2/https';
 import { getStorage } from 'firebase-admin/storage';
+import type { DocumentData } from 'firebase-admin/firestore';
 import { db, nowTimestamp, sanitizeCorrelationId } from '../shared/firestoreHelpers';
-import { requireAuth, requireVerifier, requireStepUpAuth } from '../security/guards';
-import { VerificationDecisionSchema } from '../shared/schemas';
+import { domainCall } from '../shared/callable';
+import { requireAuth, requireOrgAdmin, requireVerifier, requireStepUpAuth, isActiveOrgMemberInTx } from '../security/guards';
+import { DocIdSchema, OfficialSourceReviewSchema, VerificationDecisionSchema } from '../shared/schemas';
 import { DomainError } from '../shared/errors';
-import { logAudit } from '../audit/auditLogger';
-import { ManualVerificationAdapter } from './verificationSourceAdapter';
-import { VerificationService } from './verificationService';
+import { logAudit, stageAudit } from '../audit/auditLogger';
+import { enqueueNotification } from '../notifications/outbox';
+import { ACTIVE_CASE_STATUSES, REVIEWABLE_CASE_STATUSES } from './verificationStates';
+import { loadReviewQueue } from './reviewQueue';
+import { registryDomainsOf } from './registryDefaults';
+import { verificationEvidenceRequired } from '../shared/runtime';
 
-export const createVerificationCase = onCall(async (request: CallableRequest) => {
-  const uid = requireAuth(request);
+/** Profiles written before revisions existed are revision 1. */
+const revisionOf = (data: DocumentData | undefined, field: 'profileRevision' | 'subjectRevision'): number =>
+  typeof data?.[field] === 'number' ? data[field] : 1;
+
+const subjectCollection = (subjectType: string) => (subjectType === 'doctor' ? 'doctors' : 'organizations');
+
+const isSubjectVerified = (subjectType: string, subject: DocumentData | undefined): boolean =>
+  subjectType === 'doctor' ? subject?.isVerified === true : subject?.verificationState === 'approved';
+
+/** Evidence is trusted only when the scanner cleared the exact stored object generation. */
+const isTrustedEvidence = (evidence: DocumentData): boolean =>
+  evidence.scanStatus === 'clean' &&
+  evidence.generation != null &&
+  evidence.scannedGeneration === evidence.generation;
+
+export const getVerificationQueue = domainCall('getVerificationQueue', async (request: CallableRequest) => {
   const correlationId = sanitizeCorrelationId(request.data?.correlationId);
-  const subjectType = request.data?.subjectType || 'doctor';
-  const subjectId = request.data?.subjectId || uid;
+  requireVerifier(request, correlationId);
+  // Cases do not store a display name; the queue loader reads each subject's current one.
+  return { cases: await loadReviewQueue(), generatedAt: new Date().toISOString() };
+}, { audience: 'staff' });
 
-  const caseRef = db().collection('verificationCases').doc();
-  const caseId = caseRef.id;
-
-  const caseData = {
-    caseId,
-    subjectType,
-    subjectId,
-    status: 'draft',
-    policyVersion: 'v1.0_2026',
-    reviewerId: null,
-    decisionReason: null,
-    submittedAt: nowTimestamp(),
-    decidedAt: null,
-    updatedAt: nowTimestamp(),
-  };
-
-  await caseRef.set(caseData);
-
-  // Link case ID to doctor / org profile
-  if (subjectType === 'doctor') {
-    await db().collection('doctors').doc(subjectId).set({
-      verificationCaseId: caseId,
-      updatedAt: nowTimestamp(),
-    }, { merge: true });
-  } else {
-    await db().collection('organizations').doc(subjectId).set({
-      verificationCaseId: caseId,
-      updatedAt: nowTimestamp(),
-    }, { merge: true });
+export const getVerificationCaseDetails = domainCall('getVerificationCaseDetails', async (request: CallableRequest) => {
+  const correlationId = sanitizeCorrelationId(request.data?.correlationId);
+  const verifierUid = requireVerifier(request, correlationId);
+  requireStepUpAuth(request, correlationId, 600);
+  const caseId = DocIdSchema.safeParse(request.data?.caseId);
+  if (!caseId.success) {
+    throw new DomainError('VALIDATION_FAILED', 'Valid caseId is required', correlationId);
   }
-
+  const caseSnap = await db().collection('verificationCases').doc(caseId.data).get();
+  if (!caseSnap.exists) throw new DomainError('RESOURCE_NOT_FOUND', 'Case not found', correlationId);
+  const caseData = caseSnap.data()!;
+  const subjectSnap = await db().collection(subjectCollection(caseData.subjectType)).doc(caseData.subjectId).get();
+  const documentsSnap = await db().collection('verificationDocuments').where('caseId', '==', caseId.data).limit(20).get();
+  const subject = subjectSnap.data() || {};
   await logAudit({
-    actorId: uid,
-    actorRole: 'user',
-    action: 'VERIFICATION_CASE_CREATED',
+    actorId: verifierUid,
+    actorRole: 'verifier',
+    action: 'VERIFICATION_CASE_VIEWED',
     targetType: 'verificationCases',
-    targetId: caseId,
-    reasonCode: 'CASE_INITIATION',
+    targetId: caseId.data,
+    reasonCode: 'VERIFIER_REVIEW',
     correlationId,
     result: 'SUCCESS',
   });
+  return {
+    case: caseData,
+    // A stale case reviews an older profile revision and cannot be approved.
+    isStale: subject.verificationCaseId !== caseId.data ||
+      revisionOf(subject, 'profileRevision') !== revisionOf(caseData, 'subjectRevision'),
+    subject: caseData.subjectType === 'doctor' ? {
+      fullName: subject.fullName,
+      council: subject.council,
+      registrationNo: subject.registrationNo || subject.registrationNumber,
+      qualification: subject.qualification || subject.primaryQualification,
+      primarySpecialty: subject.primarySpecialty,
+      specialties: subject.specialties,
+      yearsOfExperience: subject.yearsOfExperience,
+      profileRevision: revisionOf(subject, 'profileRevision'),
+    } : {
+      legalName: subject.legalName,
+      registrationNumber: subject.registrationNumber,
+      organizationType: subject.organizationType,
+      profileRevision: revisionOf(subject, 'profileRevision'),
+    },
+    documents: documentsSnap.docs.map(doc => ({
+      documentId: doc.id,
+      contentType: doc.data().contentType,
+      sizeBytes: doc.data().sizeBytes,
+      scanStatus: doc.data().scanStatus,
+      sha256: doc.data().sha256,
+    })),
+  };
+}, { audience: 'staff' });
 
-  return { success: true, caseId };
-});
-
-export const submitVerificationCase = onCall(async (request: CallableRequest) => {
+/**
+ * Returns the subject's open case for its current profile revision, or opens a
+ * new one. Decided cases (approved/rejected) and cases for an older revision
+ * are kept unchanged as history and linked through `previousCaseId`.
+ */
+export const createVerificationCase = domainCall('createVerificationCase', async (request: CallableRequest) => {
   const uid = requireAuth(request);
   const correlationId = sanitizeCorrelationId(request.data?.correlationId);
-  const caseId = request.data?.caseId;
+  const subjectType = request.data?.subjectType || 'doctor';
+  const subjectIdParse = DocIdSchema.safeParse(request.data?.subjectId || uid);
+  if (!['doctor', 'organization'].includes(subjectType) || !subjectIdParse.success) {
+    throw new DomainError('VALIDATION_FAILED', 'Invalid verification subject', correlationId);
+  }
+  const subjectId = subjectIdParse.data;
+  if (subjectType === 'doctor' && subjectId !== uid) {
+    throw new DomainError('PERMISSION_DENIED', 'Doctor cases must belong to the caller', correlationId);
+  }
+  if (subjectType === 'organization') {
+    await requireOrgAdmin(uid, subjectId, correlationId);
+  }
 
-  if (!caseId) {
+  const subjectRef = db().collection(subjectCollection(subjectType)).doc(subjectId);
+  const caseRef = db().collection('verificationCases').doc();
+  const result = await db().runTransaction(async tx => {
+    const subjectSnap = await tx.get(subjectRef);
+    if (!subjectSnap.exists) {
+      throw new DomainError('RESOURCE_NOT_FOUND', 'Profile not found', correlationId);
+    }
+    const subject = subjectSnap.data()!;
+    const currentRevision = revisionOf(subject, 'profileRevision');
+    const existingId: string | null = subject.verificationCaseId ?? null;
+    const existingSnap = existingId ? await tx.get(db().collection('verificationCases').doc(existingId)) : null;
+    const existing = existingSnap?.exists ? existingSnap.data()! : null;
+
+    if (existing && revisionOf(existing, 'subjectRevision') === currentRevision) {
+      if (ACTIVE_CASE_STATUSES.includes(existing.status)) {
+        return { caseId: existingId!, status: existing.status as string, created: false };
+      }
+      if (existing.status === 'approved' && isSubjectVerified(subjectType, subject)) {
+        return { caseId: existingId!, status: 'approved', created: false };
+      }
+    }
+
+    tx.create(caseRef, {
+      caseId: caseRef.id,
+      subjectType,
+      subjectId,
+      subjectRevision: currentRevision,
+      credentialFingerprint: subject.credentialFingerprint ?? null,
+      previousCaseId: existingId ?? subject.previousVerificationCaseId ?? null,
+      status: 'draft',
+      policyVersion: 'v1.1_2026',
+      reviewerId: null,
+      decisionReason: null,
+      submittedAt: null,
+      decidedAt: null,
+      createdAt: nowTimestamp(),
+      updatedAt: nowTimestamp(),
+    });
+    tx.update(subjectRef, { verificationCaseId: caseRef.id, updatedAt: nowTimestamp() });
+    stageAudit(tx, {
+      actorId: uid,
+      actorRole: subjectType === 'doctor' ? 'doctor' : 'hospital_staff',
+      action: 'VERIFICATION_CASE_CREATED',
+      targetType: 'verificationCases',
+      targetId: caseRef.id,
+      reasonCode: existingId ? 'NEW_REVIEW_CYCLE' : 'CASE_INITIATION',
+      correlationId,
+      result: 'SUCCESS',
+      afterSummary: { subjectType, subjectId, subjectRevision: currentRevision, previousCaseId: existingId },
+    });
+    return { caseId: caseRef.id, status: 'draft', created: true };
+  });
+
+  return { success: true, caseId: result.caseId, status: result.status, created: result.created };
+}, { requireConsent: true });
+
+export const submitVerificationCase = domainCall('submitVerificationCase', async (request: CallableRequest) => {
+  const uid = requireAuth(request);
+  const correlationId = sanitizeCorrelationId(request.data?.correlationId);
+  const caseIdParse = DocIdSchema.safeParse(request.data?.caseId);
+
+  if (!caseIdParse.success) {
     throw new DomainError('VALIDATION_FAILED', 'caseId is required', correlationId);
   }
+  const caseId = caseIdParse.data;
 
   const caseRef = db().collection('verificationCases').doc(caseId);
   const caseDoc = await caseRef.get();
   if (!caseDoc.exists) {
     throw new DomainError('RESOURCE_NOT_FOUND', 'Verification case not found', correlationId);
   }
+  const caseData = caseDoc.data()!;
+  if (caseData.subjectType === 'doctor') {
+    if (caseData.subjectId !== uid) {
+      throw new DomainError('PERMISSION_DENIED', 'Case does not belong to caller', correlationId);
+    }
+  } else if (caseData.subjectType === 'organization') {
+    await requireOrgAdmin(uid, caseData.subjectId, correlationId);
+  } else {
+    throw new DomainError('INVALID_STATE_TRANSITION', 'Invalid case subject', correlationId);
+  }
 
-  await caseRef.update({
-    status: 'submitted',
-    submittedAt: nowTimestamp(),
-    updatedAt: nowTimestamp(),
-  });
-
-  await logAudit({
-    actorId: uid,
-    actorRole: 'user',
-    action: 'VERIFICATION_CASE_SUBMITTED',
-    targetType: 'verificationCases',
-    targetId: caseId,
-    reasonCode: 'EVIDENCE_SUBMISSION',
-    correlationId,
-    result: 'SUCCESS',
+  await db().runTransaction(async tx => {
+    const [latest, subjectSnap] = await Promise.all([
+      tx.get(caseRef),
+      tx.get(db().collection(subjectCollection(caseData.subjectType)).doc(caseData.subjectId)),
+    ]);
+    if (!latest.exists || !['draft', 'needs_information'].includes(latest.data()?.status)) {
+      throw new DomainError('INVALID_STATE_TRANSITION', 'Case cannot be submitted in this state', correlationId);
+    }
+    const subject = subjectSnap.data();
+    if (subject?.verificationCaseId !== caseId ||
+        revisionOf(subject, 'profileRevision') !== revisionOf(latest.data(), 'subjectRevision')) {
+      throw new DomainError('PROFILE_CHANGED', 'The profile changed after this case was opened; start a new review', correlationId);
+    }
+    tx.update(caseRef, {
+      status: 'submitted',
+      submittedAt: nowTimestamp(),
+      updatedAt: nowTimestamp(),
+    });
+    stageAudit(tx, {
+      actorId: uid,
+      actorRole: caseData.subjectType === 'doctor' ? 'doctor' : 'hospital_staff',
+      action: 'VERIFICATION_CASE_SUBMITTED',
+      targetType: 'verificationCases',
+      targetId: caseId,
+      reasonCode: 'EVIDENCE_SUBMISSION',
+      correlationId,
+      result: 'SUCCESS',
+    });
   });
 
   return { success: true, caseId, status: 'submitted' };
-});
+}, { requireConsent: true });
 
 /**
  * PRIVATE EVIDENCE SIGNED READ URL
  * Strictly prohibits getDownloadURL().
  * Requires verifier role + step-up authentication.
  */
-export const getEvidenceReadUrl = onCall(async (request: CallableRequest) => {
+export const getEvidenceReadUrl = domainCall('getEvidenceReadUrl', async (request: CallableRequest) => {
   const correlationId = sanitizeCorrelationId(request.data?.correlationId);
   const verifierUid = requireVerifier(request, correlationId);
   requireStepUpAuth(request, correlationId, 600); // 10-minute maximum token age
 
-  const documentId = request.data?.documentId;
-  if (!documentId) {
+  const documentId = DocIdSchema.safeParse(request.data?.documentId);
+  if (!documentId.success) {
     throw new DomainError('VALIDATION_FAILED', 'documentId is required', correlationId);
   }
 
-  const docRecord = await db().collection('verificationDocuments').doc(documentId).get();
+  const docRecord = await db().collection('verificationDocuments').doc(documentId.data).get();
   if (!docRecord.exists) {
     throw new DomainError('RESOURCE_NOT_FOUND', 'Evidence document record not found', correlationId);
   }
+  const evidence = docRecord.data()!;
+  if (!isTrustedEvidence(evidence)) {
+    throw new DomainError('INVALID_STATE_TRANSITION', 'Evidence has not passed scanning', correlationId);
+  }
 
-  const objectKey = docRecord.data()!.objectKey;
-  const bucket = getStorage().bucket();
-  const file = bucket.file(objectKey);
-
-  // Generate 5-minute short-lived signed URL
+  // Pin the read to the scanned generation so a replaced object is never served.
+  const file = getStorage().bucket(evidence.bucket).file(evidence.objectKey, { generation: Number(evidence.generation) });
   const [signedUrl] = await file.getSignedUrl({
     version: 'v4',
     action: 'read',
@@ -134,21 +271,23 @@ export const getEvidenceReadUrl = onCall(async (request: CallableRequest) => {
     actorRole: 'verifier',
     action: 'EVIDENCE_ACCESSED',
     targetType: 'verificationDocuments',
-    targetId: documentId,
+    targetId: documentId.data,
     reasonCode: 'VERIFIER_INSPECTION',
     correlationId,
     result: 'SUCCESS',
-    afterSummary: { objectKey },
+    afterSummary: { objectKey: evidence.objectKey, generation: evidence.generation },
   });
 
   return { success: true, signedUrl, expiresInSeconds: 300 };
-});
+}, { audience: 'staff' });
 
 /**
  * RECORD VERIFICATION DECISION
- * Requires verifier role + step-up authentication.
+ * Requires verifier role + step-up authentication. Every input to the decision
+ * (case state, subject revision, evidence set, registry allowlist, reviewer
+ * conflicts) is read inside the decision transaction.
  */
-export const recordVerificationDecision = onCall(async (request: CallableRequest) => {
+export const recordVerificationDecision = domainCall('recordVerificationDecision', async (request: CallableRequest) => {
   const correlationId = sanitizeCorrelationId(request.data?.correlationId);
   const verifierUid = requireVerifier(request, correlationId);
   requireStepUpAuth(request, correlationId, 600);
@@ -159,112 +298,173 @@ export const recordVerificationDecision = onCall(async (request: CallableRequest
   }
 
   const { caseId, decision, reasonCode, notes } = parsed.data;
+  if (!DocIdSchema.safeParse(caseId).success) {
+    throw new DomainError('VALIDATION_FAILED', 'Invalid caseId', correlationId);
+  }
+
+  const parsedReview = decision === 'approved'
+    ? OfficialSourceReviewSchema.safeParse(request.data?.review) : null;
+  if (decision === 'approved' && (!parsedReview?.success ||
+      Date.parse(parsedReview.data.checkedAt) > Date.now() ||
+      Date.now() - Date.parse(parsedReview.data.checkedAt) > 24 * 60 * 60 * 1000)) {
+    throw new DomainError('VALIDATION_FAILED', 'Recorded official-source review is required before approval', correlationId);
+  }
+  const review = parsedReview?.success ? parsedReview.data : null;
+  let sourceHostname = '';
+  if (decision === 'approved') {
+    try { sourceHostname = new URL(review!.sourceUrl).hostname.toLowerCase(); } catch (_) {
+      throw new DomainError('VALIDATION_FAILED', 'Invalid official source URL', correlationId);
+    }
+  }
 
   const caseRef = db().collection('verificationCases').doc(caseId);
-  const caseDoc = await caseRef.get();
-  if (!caseDoc.exists) {
-    throw new DomainError('RESOURCE_NOT_FOUND', 'Verification case not found', correlationId);
-  }
-  const caseData = caseDoc.data()!;
-
   const checkRef = db().collection('verificationChecks').doc();
-  const adapter = new ManualVerificationAdapter();
 
-  const checkResult = await adapter.lookup({
-    council: 'Official Council Registry',
-    registrationNumber: caseData.subjectId,
-  });
+  const subjectId = await db().runTransaction(async tx => {
+    // ---- reads ----
+    const caseSnap = await tx.get(caseRef);
+    if (!caseSnap.exists) {
+      throw new DomainError('RESOURCE_NOT_FOUND', 'Verification case not found', correlationId);
+    }
+    const caseData = caseSnap.data()!;
+    const subjectRef = db().collection(subjectCollection(caseData.subjectType)).doc(caseData.subjectId);
+    const [subjectSnap, evidenceSnap, registryConfig] = await Promise.all([
+      tx.get(subjectRef),
+      tx.get(db().collection('verificationDocuments').where('caseId', '==', caseId)),
+      tx.get(db().collection('configuration').doc('approved_registry_domains')),
+    ]);
+    const reviewerIsOrgMember = caseData.subjectType === 'organization' &&
+      await isActiveOrgMemberInTx(tx, verifierUid, caseData.subjectId);
 
-  const batch = db().batch();
+    // ---- validation ----
+    if (caseData.subjectId === verifierUid || reviewerIsOrgMember) {
+      throw new DomainError('PERMISSION_DENIED', 'A verifier cannot decide a case they are a party to', correlationId);
+    }
+    if (!REVIEWABLE_CASE_STATUSES.includes(caseData.status)) {
+      throw new DomainError('INVALID_STATE_TRANSITION', 'Case is not reviewable', correlationId);
+    }
+    // An escalated case needs senior sign-off.
+    if (caseData.escalated === true && request.auth?.token?.isSuperAdmin !== true) {
+      throw new DomainError('PERMISSION_DENIED', 'This case is escalated; a super admin must decide it', correlationId);
+    }
+    const subject = subjectSnap.data();
+    if (!subjectSnap.exists || subject?.verificationCaseId !== caseId ||
+        revisionOf(subject, 'profileRevision') !== revisionOf(caseData, 'subjectRevision')) {
+      throw new DomainError('PROFILE_CHANGED',
+        'The profile changed after this case was opened; the case no longer describes it', correlationId);
+    }
+    // Testing mode (client review): evidence is optional, so approval rests on
+    // the official-registry check alone. The policy used is recorded below.
+    const evidenceRequired = verificationEvidenceRequired();
+    if (decision === 'approved') {
+      if (evidenceRequired && (evidenceSnap.empty || evidenceSnap.docs.some(doc => !isTrustedEvidence(doc.data())))) {
+        throw new DomainError('INVALID_STATE_TRANSITION', 'Approval requires scanned, clean evidence', correlationId);
+      }
+      const domains = registryDomainsOf(registryConfig.data());
+      if (!domains.some(domain => typeof domain === 'string' && domain.toLowerCase() === sourceHostname)) {
+        throw new DomainError('INVALID_STATE_TRANSITION',
+          `Official source domain is not trusted. Use a page on: ${domains.join(', ')}`, correlationId);
+      }
+    }
+    const evidencePolicy = evidenceRequired ? 'SCANNED_EVIDENCE_REQUIRED' : 'TESTING_MODE_EVIDENCE_OPTIONAL';
 
-  // 1. Record Field Check
-  batch.set(checkRef, {
-    checkId: checkRef.id,
-    caseId,
-    checkType: 'OFFICIAL_REGISTRY_MATCH',
-    source: adapter.sourceId,
-    queryParams: { subjectId: caseData.subjectId },
-    result: checkResult,
-    checkedAt: nowTimestamp(),
-    reviewerId: verifierUid,
-  });
+    // ---- writes ----
+    const reviewedEvidence = evidenceSnap.docs.map(doc => ({
+      documentId: doc.id,
+      sha256: doc.data().sha256 ?? null,
+      generation: doc.data().generation ?? null,
+    }));
+    tx.create(checkRef, {
+      checkId: checkRef.id,
+      caseId,
+      checkType: decision === 'approved' ? 'OFFICIAL_REGISTRY_MATCH' : 'HUMAN_REVIEW_DECISION',
+      source: 'HUMAN_REVIEW',
+      result: review || null,
+      subjectRevision: revisionOf(caseData, 'subjectRevision'),
+      credentialFingerprint: subject?.credentialFingerprint ?? null,
+      reviewedEvidence,
+      evidencePolicy,
+      checkedAt: nowTimestamp(),
+      reviewerId: verifierUid,
+    });
 
-  // 2. Update Case State
-  batch.update(caseRef, {
-    status: decision,
-    reviewerId: verifierUid,
-    decisionReason: `${reasonCode}: ${notes || ''}`,
-    decidedAt: nowTimestamp(),
-    updatedAt: nowTimestamp(),
-  });
-
-  // 3. Update Subject (Doctor / Org)
-  if (caseData.subjectType === 'doctor') {
-    const docRef = db().collection('doctors').doc(caseData.subjectId);
-    batch.update(docRef, {
-      isVerified: decision === 'approved',
+    tx.update(caseRef, {
+      status: decision,
+      reviewerId: verifierUid,
+      decisionReason: `${reasonCode}: ${notes || ''}`,
+      decidedAt: nowTimestamp(),
       updatedAt: nowTimestamp(),
     });
-  } else {
-    const orgRef = db().collection('organizations').doc(caseData.subjectId);
-    batch.update(orgRef, {
-      verificationState: decision,
-      updatedAt: nowTimestamp(),
+
+    if (caseData.subjectType === 'doctor') {
+      tx.update(subjectRef, {
+        isVerified: decision === 'approved',
+        verificationStatus: decision,
+        ...(decision === 'approved' ? {
+          verifiedRevision: revisionOf(caseData, 'subjectRevision'),
+          verifiedCaseId: caseId,
+          verifiedAt: nowTimestamp(),
+        } : {}),
+        updatedAt: nowTimestamp(),
+      });
+    } else {
+      tx.update(subjectRef, {
+        verificationState: decision,
+        ...(decision === 'approved' ? { verifiedCaseId: caseId, verifiedAt: nowTimestamp() } : {}),
+        updatedAt: nowTimestamp(),
+      });
+    }
+
+    enqueueNotification(tx, {
+      dedupeKey: `verif_decision_${caseId}`,
+      eventType: 'verification.updated',
+      ...(caseData.subjectType === 'doctor'
+        ? { targetUserId: caseData.subjectId }
+        : { targetOrganizationId: caseData.subjectId }),
+      title: 'Verification Status Update',
+      body: `Your professional verification has been ${decision.replace('_', ' ')}`,
+      payload: { caseId, decision, reasonCode },
     });
-  }
 
-  // 4. Outbox notification to user
-  const outboxRef = db().collection('notificationOutbox').doc();
-  batch.set(outboxRef, {
-    eventId: outboxRef.id,
-    dedupeKey: `verif_decision_${caseId}`,
-    eventType: 'verification.updated',
-    targetUserId: caseData.subjectId,
-    title: 'Verification Status Update',
-    body: `Your professional verification has been ${decision.replace('_', ' ')}`,
-    payload: { caseId, decision, reasonCode },
-    status: 'pending',
-    leaseExpiresAt: null,
-    attemptCount: 0,
-    maxAttempts: 5,
-    lastError: null,
-    availableAt: nowTimestamp(),
-    createdAt: nowTimestamp(),
+    stageAudit(tx, {
+      actorId: verifierUid,
+      actorRole: 'verifier',
+      action: 'VERIFICATION_DECISION_RECORDED',
+      targetType: 'verificationCases',
+      targetId: caseId,
+      reasonCode,
+      correlationId,
+      result: 'SUCCESS',
+      beforeSummary: { status: caseData.status },
+      afterSummary: {
+        decision,
+        subjectType: caseData.subjectType,
+        subjectId: caseData.subjectId,
+        subjectRevision: revisionOf(caseData, 'subjectRevision'),
+        evidenceCount: reviewedEvidence.length,
+        evidencePolicy,
+      },
+    });
+    return caseData.subjectId as string;
   });
 
-  await batch.commit();
-
-  await logAudit({
-    actorId: verifierUid,
-    actorRole: 'verifier',
-    action: 'VERIFICATION_DECISION_RECORDED',
-    targetType: 'verificationCases',
-    targetId: caseId,
-    reasonCode,
-    correlationId,
-    result: 'SUCCESS',
-    afterSummary: { decision, subjectType: caseData.subjectType, subjectId: caseData.subjectId },
-  });
-
-  return { success: true, caseId, decision };
-});
+  return { success: true, caseId, decision, subjectId };
+}, { audience: 'staff' });
 
 /**
- * AUTOMATED / HYBRID DOCTOR REGISTRATION VERIFICATION
- * Runs authoritative source check + Comparison Engine.
- * - MATCH: Auto-approved, updates doctor profile and dispatches FCM notification.
- * - MISMATCH: Places case into Admin Verifier Queue with detailed comparison discrepancies.
- * - NOT_FOUND: Requests evidence from doctor, queued for reviewer.
- * - SOURCE_UNAVAILABLE: Kept pending/reviewable (no automatic rejection).
+ * Records a request for a human official-source registration review.
+ * No live authoritative registry integration is configured, so no automatic
+ * match, approval, or verified badge can result from this callable.
  */
-export const verifyDoctorRegistration = onCall(async (request: CallableRequest) => {
+export const verifyDoctorRegistration = domainCall('verifyDoctorRegistration', async (request: CallableRequest) => {
   const uid = requireAuth(request);
   const correlationId = sanitizeCorrelationId(request.data?.correlationId);
-  const caseId = request.data?.caseId;
+  const caseIdParse = DocIdSchema.safeParse(request.data?.caseId);
 
-  if (!caseId) {
+  if (!caseIdParse.success) {
     throw new DomainError('VALIDATION_FAILED', 'caseId is required', correlationId);
   }
+  const caseId = caseIdParse.data;
 
   const caseRef = db().collection('verificationCases').doc(caseId);
   const caseDoc = await caseRef.get();
@@ -273,12 +473,16 @@ export const verifyDoctorRegistration = onCall(async (request: CallableRequest) 
   }
   const caseData = caseDoc.data()!;
 
-  // Must belong to caller or caller must be verifier/admin
+  if (caseData.subjectType !== 'doctor') {
+    throw new DomainError('VALIDATION_FAILED', 'Doctor verification requires a doctor case', correlationId);
+  }
   if (caseData.subjectId !== uid) {
     requireVerifier(request, correlationId);
   }
+  if (!REVIEWABLE_CASE_STATUSES.includes(caseData.status)) {
+    throw new DomainError('INVALID_STATE_TRANSITION', 'Case is not awaiting a source check', correlationId);
+  }
 
-  // Fetch doctor profile
   const docRef = db().collection('doctors').doc(caseData.subjectId);
   const docSnap = await docRef.get();
   if (!docSnap.exists) {
@@ -286,135 +490,72 @@ export const verifyDoctorRegistration = onCall(async (request: CallableRequest) 
   }
   const docData = docSnap.data()!;
 
+  // Recorded from the stored profile only; client-supplied claims are ignored.
   const submittedDetails = {
-    registrationNumber: request.data?.registrationNumber || docData.registrationNumber || '',
-    council: request.data?.council || docData.council || '',
-    fullName: request.data?.fullName || docData.fullName || '',
-    qualification: request.data?.qualification || docData.primaryQualification || docData.qualifications?.[0]?.degree || 'MBBS',
+    registrationNumber: docData.registrationNo || '',
+    council: docData.council || '',
+    fullName: docData.fullName || '',
+    qualification: docData.qualification || '',
   };
 
-  const verifService = new VerificationService();
-  const providerPreference = request.data?.providerId;
-  const verificationResult = await verifService.verifyDoctor(submittedDetails, providerPreference);
+  // Phase 1 has no approved machine-readable NMC/SMC integration.
+  // Client-supplied claims must never turn into an official match or badge.
+  const providerId = 'MANUAL_REVIEW_REQUIRED';
+  const comparison = {
+    outcome: 'SOURCE_UNAVAILABLE',
+    isAutoApprovable: false,
+    confidenceScore: 0,
+    fieldComparisons: [],
+    discrepancySummary: 'Official-source review is pending an authorized verifier',
+  };
 
-  const { providerId, officialRecord, comparison } = verificationResult;
   const checkRef = db().collection('verificationChecks').doc();
-  const now = nowTimestamp();
+  const finalCaseStatus = 'under_review';
 
-  const batch = db().batch();
-
-  // 1. Record Detailed Verification Check
-  batch.set(checkRef, {
-    checkId: checkRef.id,
-    caseId,
-    checkType: 'AUTOMATED_COUNCIL_MATCH',
-    providerId,
-    registrationNumber: submittedDetails.registrationNumber,
-    council: submittedDetails.council,
-    submittedFields: submittedDetails,
-    officialFields: officialRecord || null,
-    comparedFields: comparison.fieldComparisons,
-    mismatchDetails: comparison.discrepancySummary,
-    automatedResult: comparison.outcome,
-    confidenceScore: comparison.confidenceScore,
-    checkedAt: now,
-    actorId: uid,
-  });
-
-  let finalCaseStatus = caseData.status;
-
-  if (comparison.outcome === 'MATCH') {
-    // Fast-track Auto Approval
-    finalCaseStatus = 'approved';
-
-    batch.update(caseRef, {
-      status: 'approved',
-      automatedOutcome: 'MATCH',
-      confidenceScore: comparison.confidenceScore,
-      reviewerId: 'SYSTEM_VERIFICATION_ENGINE',
-      decisionReason: 'AUTOMATED_MATCH_FAST_TRACK: Authoritative Medical Council registry confirmed credentials',
-      decidedAt: now,
-      updatedAt: now,
-    });
-
-    batch.update(docRef, {
-      isVerified: true,
-      verificationStatus: 'verified',
-      council: submittedDetails.council,
+  await db().runTransaction(async tx => {
+    const latest = await tx.get(caseRef);
+    if (!latest.exists || !REVIEWABLE_CASE_STATUSES.includes(latest.data()?.status)) {
+      throw new DomainError('INVALID_STATE_TRANSITION', 'Case is no longer awaiting review', correlationId);
+    }
+    tx.create(checkRef, {
+      checkId: checkRef.id,
+      caseId,
+      checkType: 'MANUAL_SOURCE_REVIEW_REQUESTED',
+      providerId,
       registrationNumber: submittedDetails.registrationNumber,
-      updatedAt: now,
+      council: submittedDetails.council,
+      submittedFields: submittedDetails,
+      officialFields: null,
+      comparedFields: comparison.fieldComparisons,
+      mismatchDetails: comparison.discrepancySummary,
+      automatedResult: comparison.outcome,
+      confidenceScore: comparison.confidenceScore,
+      checkedAt: nowTimestamp(),
+      actorId: uid,
     });
 
-    // Outbox notification
-    const outboxRef = db().collection('notificationOutbox').doc();
-    batch.set(outboxRef, {
-      eventId: outboxRef.id,
-      dedupeKey: `auto_verif_${caseId}`,
-      eventType: 'verification.approved',
-      targetUserId: caseData.subjectId,
-      title: 'Medical Registration Verified!',
-      body: 'Your medical council registration has been verified. You now have unrestricted access to platform duties.',
-      payload: { caseId, outcome: 'MATCH' },
-      status: 'pending',
-      leaseExpiresAt: null,
-      attemptCount: 0,
-      maxAttempts: 5,
-      lastError: null,
-      availableAt: now,
-      createdAt: now,
-    });
-  } else if (comparison.outcome === 'MISMATCH') {
-    finalCaseStatus = 'under_review';
-    batch.update(caseRef, {
-      status: 'under_review',
-      automatedOutcome: 'MISMATCH',
-      requiresReviewReason: comparison.discrepancySummary,
-      confidenceScore: comparison.confidenceScore,
-      updatedAt: now,
-    });
-  } else if (comparison.outcome === 'NOT_FOUND') {
-    finalCaseStatus = 'needs_information';
-    batch.update(caseRef, {
-      status: 'needs_information',
-      automatedOutcome: 'NOT_FOUND',
-      requiresReviewReason: 'Registration record not found in official register; upload supporting certificates',
-      confidenceScore: 0,
-      updatedAt: now,
-    });
-  } else if (comparison.outcome === 'SOURCE_UNAVAILABLE') {
-    finalCaseStatus = 'pending_source';
-    batch.update(caseRef, {
-      status: 'under_review',
+    tx.update(caseRef, {
+      status: finalCaseStatus,
       automatedOutcome: 'SOURCE_UNAVAILABLE',
-      requiresReviewReason: 'Medical Council registry is temporarily unreachable; manual verifier inspection queued',
-      updatedAt: now,
+      requiresReviewReason: comparison.discrepancySummary,
+      updatedAt: nowTimestamp(),
     });
-  } else {
-    finalCaseStatus = 'under_review';
-    batch.update(caseRef, {
-      status: 'under_review',
-      automatedOutcome: comparison.outcome,
-      requiresReviewReason: comparison.discrepancySummary || 'Manual inspection required',
-      updatedAt: now,
+
+    stageAudit(tx, {
+      actorId: uid,
+      actorRole: caseData.subjectId === uid ? 'doctor' : 'verifier',
+      action: 'VERIFICATION_CHECK_EXECUTED',
+      targetType: 'verificationCases',
+      targetId: caseId,
+      reasonCode: 'MANUAL_SOURCE_REVIEW_REQUIRED',
+      correlationId,
+      result: 'SUCCESS',
+      afterSummary: {
+        outcome: comparison.outcome,
+        confidenceScore: comparison.confidenceScore,
+        discrepancySummary: comparison.discrepancySummary,
+      },
     });
-  }
-
-  await batch.commit();
-
-  await logAudit({
-    actorId: uid,
-    actorRole: 'user',
-    action: comparison.outcome === 'MATCH' ? 'VERIFICATION_AUTO_APPROVED' : 'VERIFICATION_CHECK_EXECUTED',
-    targetType: 'verificationCases',
-    targetId: caseId,
-    reasonCode: comparison.outcome === 'MATCH' ? 'AUTOMATED_MATCH_FAST_TRACK' : `OUTCOME_${comparison.outcome}`,
-    correlationId,
-    result: 'SUCCESS',
-    afterSummary: {
-      outcome: comparison.outcome,
-      confidenceScore: comparison.confidenceScore,
-      discrepancySummary: comparison.discrepancySummary,
-    },
   });
 
   return {
@@ -425,7 +566,7 @@ export const verifyDoctorRegistration = onCall(async (request: CallableRequest) 
     confidenceScore: comparison.confidenceScore,
     discrepancies: comparison.discrepancySummary,
     fieldComparisons: comparison.fieldComparisons,
-    officialRecord,
+    officialRecord: null,
     caseStatus: finalCaseStatus,
   };
 });
