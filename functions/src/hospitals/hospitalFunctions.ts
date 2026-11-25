@@ -12,6 +12,7 @@ import { DomainError } from '../shared/errors';
 import { z } from 'zod';
 import { stageAudit } from '../audit/auditLogger';
 import { verificationEvidenceRequired, testingModeNotice } from '../shared/runtime';
+import { isFlagEnabled } from '../shared/businessConfig';
 
 export const createOrganizationDraft = domainCall('createOrganizationDraft', async (request: CallableRequest) => {
   const uid = requireAuth(request);
@@ -22,6 +23,25 @@ export const createOrganizationDraft = domainCall('createOrganizationDraft', asy
     throw new DomainError('VALIDATION_FAILED', 'Invalid organization details', correlationId, parsed.error.flatten().fieldErrors);
   }
 
+  // A solo practice is a verified doctor posting relief duties for their own
+  // shift. Their medical verification stands in for an establishment licence,
+  // so the practice is approved at once and the basis is kept on record.
+  const isSolo = parsed.data.organizationType === 'solo_practice';
+  let doctorRegistrationNo: string | null = null;
+  if (isSolo) {
+    if (!(await isFlagEnabled('solo_posting_enabled'))) {
+      throw new DomainError('FEATURE_DISABLED', 'Posting your own relief duties is not available yet', correlationId);
+    }
+    const doctor = (await db().collection('doctors').doc(uid).get()).data();
+    if (!doctor || doctor.isVerified !== true) {
+      throw new DomainError('DOCTOR_NOT_VERIFIED', 'Only verified doctors can post relief duties for their own shift', correlationId);
+    }
+    doctorRegistrationNo = typeof doctor.registrationNo === 'string' ? doctor.registrationNo : null;
+  } else if (!parsed.data.registrationNumber) {
+    throw new DomainError('VALIDATION_FAILED', 'Registration number is required', correlationId,
+      { registrationNumber: ['Required'] });
+  }
+
   const orgRef = db().collection('organizations').doc();
   const orgId = orgRef.id;
 
@@ -30,10 +50,11 @@ export const createOrganizationDraft = domainCall('createOrganizationDraft', asy
     legalName: parsed.data.legalName,
     displayName: parsed.data.displayName,
     organizationType: parsed.data.organizationType,
-    registrationNumber: parsed.data.registrationNumber,
+    registrationNumber: parsed.data.registrationNumber ?? doctorRegistrationNo,
     address: parsed.data.address,
     city: parsed.data.city,
-    verificationState: 'draft',
+    verificationState: isSolo ? 'approved' : 'draft',
+    ...(isSolo ? { verificationBasis: 'verified_doctor', soloDoctorId: uid, approvedAt: nowTimestamp() } : {}),
     verificationCaseId: null,
     createdBy: uid,
     createdAt: nowTimestamp(),
@@ -51,26 +72,31 @@ export const createOrganizationDraft = domainCall('createOrganizationDraft', asy
     status: 'active',
     joinedAt: nowTimestamp(),
   });
+  // A solo practitioner stays a doctor: only the organization is added, the
+  // active role is left alone so their doctor home and applications keep working.
   batch.set(db().collection('users').doc(uid), {
-    activeRole: 'hospital_staff',
+    ...(isSolo ? {} : { activeRole: 'hospital_staff' }),
     organizationIds: FieldValue.arrayUnion(orgId),
     updatedAt: nowTimestamp(),
   }, { merge: true });
 
   stageAudit(batch, {
     actorId: uid,
-    actorRole: 'hospital_staff',
+    actorRole: isSolo ? 'doctor' : 'hospital_staff',
     action: 'ORGANIZATION_CREATED',
     targetType: 'organizations',
     targetId: orgId,
-    reasonCode: 'ORG_REGISTRATION',
+    reasonCode: isSolo ? 'SOLO_PRACTICE_REGISTRATION' : 'ORG_REGISTRATION',
     correlationId,
     result: 'SUCCESS',
-    afterSummary: { legalName: parsed.data.legalName, orgId },
+    afterSummary: {
+      legalName: parsed.data.legalName, orgId,
+      ...(isSolo ? { verificationState: 'approved', verificationBasis: 'verified_doctor' } : {}),
+    },
   });
   await batch.commit();
 
-  return { success: true, organizationId: orgId };
+  return { success: true, organizationId: orgId, verificationState: orgData.verificationState };
 }, { requireConsent: true });
 
 export const getMyOrganizations = domainCall('getMyOrganizations', async (request: CallableRequest) => {

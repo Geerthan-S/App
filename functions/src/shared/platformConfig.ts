@@ -33,6 +33,8 @@ export const FEATURE_FLAG_KEYS = [
   'channels_enabled',
   'channels_media_enabled',
   'ai_assistant_enabled',
+  // Trust & safety phase (docs/business/next-phase-implementation-prompt.md), all off by default.
+  'solo_posting_enabled',
 ] as const;
 
 /**

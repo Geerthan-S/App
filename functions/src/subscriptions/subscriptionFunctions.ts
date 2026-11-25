@@ -127,6 +127,12 @@ export const releaseEarlyAccessDuties = onSchedule({ schedule: 'every 1 minutes'
   }
 });
 
+/** Flags the app reads through getBusinessFeatures; every module flag the app gates on belongs here. */
+export const BUSINESS_FEATURE_FLAGS = [
+  'premium_enabled', 'last_minute_enabled', 'channels_enabled', 'channels_media_enabled', 'ai_assistant_enabled',
+  'payments_enabled', 'solo_posting_enabled',
+];
+
 /** What the app shows: which modules are on, plan prices and the standby rules. */
 export const getBusinessFeatures = domainCall('getBusinessFeatures', async (request: CallableRequest) => {
   requireAuth(request);
@@ -134,8 +140,7 @@ export const getBusinessFeatures = domainCall('getBusinessFeatures', async (requ
     getBusinessConfig('subscription_policy'),
     getBusinessConfig('payment_policy'),
     getBusinessConfig('last_minute_policy'),
-    Promise.all(['premium_enabled', 'last_minute_enabled', 'channels_enabled', 'channels_media_enabled', 'ai_assistant_enabled', 'payments_enabled']
-      .map(async key => [key, await isFlagEnabled(key)] as const)),
+    Promise.all(BUSINESS_FEATURE_FLAGS.map(async key => [key, await isFlagEnabled(key)] as const)),
   ]);
   const on = Object.fromEntries(flags);
   return {

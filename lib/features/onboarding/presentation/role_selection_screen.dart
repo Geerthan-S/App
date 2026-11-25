@@ -9,6 +9,7 @@ import '../../../core/design_system/app_colors.dart';
 import '../../../core/design_system/app_typography.dart';
 import '../../../core/design_system/app_spacing.dart';
 import '../../../core/design_system/app_cards.dart';
+import '../../business/data/business_repository.dart';
 
 class RoleSelectionScreen extends ConsumerWidget {
   const RoleSelectionScreen({super.key});
@@ -111,6 +112,39 @@ class RoleSelectionScreen extends ConsumerWidget {
                       size: 20,
                     ),
                   ],
+                ),
+              ),
+              FeatureGate(
+                flag: 'solo_posting_enabled',
+                child: Padding(
+                  padding: const EdgeInsets.only(top: AppSpacing.md),
+                  child: AppCard(
+                    onTap: () => context.push('/solo-practice'),
+                    padding: const EdgeInsets.all(18),
+                    child: Row(
+                      children: [
+                        Icon(Icons.swap_horiz_outlined, size: 24, color: colors.textPrimary),
+                        const SizedBox(width: AppSpacing.md),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "I'm a doctor posting a relief duty for my own shift",
+                                style: AppTypography.headingSmall(colors.textPrimary),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Verified doctors only. You stay a doctor on HealthForce.',
+                                style: AppTypography.bodySmall(colors.textSecondary),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(Icons.chevron_right_outlined, color: colors.textMuted, size: 20),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ],

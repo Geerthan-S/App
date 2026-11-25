@@ -4,6 +4,7 @@
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/widgets.dart';
 import '../../../core/config/backend_config.dart';
 
 class BusinessRepository {
@@ -167,4 +168,19 @@ class BusinessFeatures {
   }
 
   static bool isOn(Map<String, dynamic> features, String flag) => (features['flags'] as Map?)?[flag] == true;
+}
+
+/// Shows [child] only while the server reports [flag] as on (getBusinessFeatures).
+class FeatureGate extends StatelessWidget {
+  final String flag;
+  final Widget child;
+  final Widget fallback;
+
+  const FeatureGate({super.key, required this.flag, required this.child, this.fallback = const SizedBox.shrink()});
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<Map<String, dynamic>>(
+        future: BusinessFeatures.load(),
+        builder: (context, snap) => snap.hasData && BusinessFeatures.isOn(snap.data!, flag) ? child : fallback,
+      );
 }

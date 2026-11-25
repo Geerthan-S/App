@@ -26,8 +26,10 @@ export const SubmitDoctorProfileSchema = z.object({
 export const CreateOrganizationSchema = z.object({
   legalName: z.string().min(2).max(150),
   displayName: z.string().min(2).max(150),
-  organizationType: z.enum(['hospital', 'clinic', 'nursing_home']),
-  registrationNumber: z.string().min(2).max(100),
+  // `solo_practice`: a verified doctor posting relief duties for their own shift
+  // (flag `solo_posting_enabled`). It needs no establishment registration number.
+  organizationType: z.enum(['hospital', 'clinic', 'nursing_home', 'solo_practice']),
+  registrationNumber: z.string().min(2).max(100).optional(),
   address: z.string().min(5).max(300),
   city: z.string().min(2).max(100),
 });

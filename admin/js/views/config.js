@@ -232,6 +232,7 @@ const FLAG_LABELS = {
   channels_enabled: ['Community channels', 'Doctors create and join discussion channels.'],
   channels_media_enabled: ['Voice notes & images in channels', 'Adds Storage cost; switch off if it gets expensive.'],
   ai_assistant_enabled: ['AI assistant', 'OpenAI-backed clinical assistant. Needs OPENAI_API_KEY on the server.'],
+  solo_posting_enabled: ['Solo practitioners can post', 'A verified doctor can post a relief duty for their own shift as a solo practice.'],
 };
 
 export async function renderFlags(root, ctx) {

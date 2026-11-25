@@ -3,6 +3,7 @@
  */
 
 import '../../features/business/presentation/premium_screen.dart';
+import '../../features/business/presentation/solo_practice_screen.dart';
 import '../../features/channels/presentation/channels_screen.dart';
 import '../../features/channels/presentation/channel_screen.dart';
 import '../../features/channels/presentation/ai_assistant_screen.dart';
@@ -225,6 +226,7 @@ final appRouter = GoRouter(
       },
     ),
     GoRoute(path: '/premium', builder: (context, state) => const PremiumScreen()),
+    GoRoute(path: '/solo-practice', builder: (context, state) => const SoloPracticeScreen()),
     GoRoute(path: '/channels', builder: (context, state) => const ChannelsScreen()),
     GoRoute(path: '/ai-assistant', builder: (context, state) => const AiAssistantScreen()),
     GoRoute(

@@ -16,6 +16,7 @@ import '../../../core/widgets/theme_selector_dialog.dart';
 import '../../../core/widgets/ui_kit.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../../core/services/push_registration_service.dart';
+import '../../business/data/business_repository.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -71,6 +72,15 @@ class SettingsScreen extends ConsumerWidget {
                   title: 'Community',
                   subtitle: 'Doctor channels and HealthForce AI',
                   onTap: () => context.push('/channels'),
+                ),
+                FeatureGate(
+                  flag: 'solo_posting_enabled',
+                  child: ListRow(
+                    icon: Icons.swap_horiz_outlined,
+                    title: 'Post a relief duty',
+                    subtitle: 'Find a doctor to cover your own shift',
+                    onTap: () => context.push('/solo-practice'),
+                  ),
                 ),
               ],
             ),
